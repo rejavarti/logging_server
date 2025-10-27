@@ -9299,7 +9299,7 @@ app.get('/logs', requireAuth, (req, res) => {
 
         function updateStats() {
             const total = allLogs.length;
-            const errors = allLogs.filter(l => l.level === 'error' || l.level === 'warn').length;
+            const errors = allLogs.filter(l => l.severity === 'error' || l.severity === 'warn' || l.severity === 'warning' || l.severity === 'critical' || l.level === 'error' || l.level === 'warn').length;
             
             // Calculate hourly average
             const range = document.getElementById('analytics-date-range').value;
