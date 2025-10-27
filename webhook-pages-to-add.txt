@@ -1,0 +1,326 @@
+// ADD THESE ROUTES RIGHT AFTER THE MAIN /webhooks ROUTE (around line 8700)
+
+// Webhook Add page
+app.get('/webhooks/add', requireAuth, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send(getPageTemplate({
+            pageTitle: 'Access Denied',
+            pageIcon: 'fas fa-ban',
+            activeNav: '',
+            contentBody: '<div class="card"><div class="card-body"><h2 style="color: var(--error-color);"><i class="fas fa-exclamation-triangle"></i> Access Denied</h2><p>Admin privileges required to access this page.</p><a href="/dashboard" class="btn"><i class="fas fa-arrow-left"></i> Return to Dashboard</a></div></div>',
+            additionalCSS: '',
+            additionalJS: '',
+            req: req
+        }));
+    }
+
+    const pageContent = `
+        <div class="page-header">
+            <div>
+                <h1><i class="fas fa-plus"></i> Add Webhook</h1>
+                <p>Create a new webhook for event notifications</p>
+            </div>
+            <div>
+                <button onclick="window.location.href='/webhooks'" class="btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Webhooks
+                </button>
+            </div>
+        </div>
+
+        <div class="card" style="max-width: 800px; margin: 0 auto;">
+            <div class="card-body">
+                <div class="form-group">
+                    <label><i class="fas fa-tag"></i> Name *</label>
+                    <input type="text" id="webhook-name" class="form-control" placeholder="My Webhook" required>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-link"></i> URL *</label>
+                    <input type="url" id="webhook-url" class="form-control" placeholder="https://example.com/webhook" required>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-exchange-alt"></i> HTTP Method</label>
+                    <select id="webhook-method" class="form-control">
+                        <option value="POST">POST</option>
+                        <option value="GET">GET</option>
+                        <option value="PUT">PUT</option>
+                        <option value="DELETE">DELETE</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-bolt"></i> Event Types</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                            <input type="checkbox" class="event-type" value="log_created"> Log Created
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                            <input type="checkbox" class="event-type" value="alert_created"> Alert Created
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                            <input type="checkbox" class="event-type" value="backup_created"> Backup Created
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                            <input type="checkbox" class="event-type" value="user_login"> User Login
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                            <input type="checkbox" class="event-type" value="user_logout"> User Logout
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                            <input type="checkbox" class="event-type" value="system_error"> System Error
+                        </label>
+                    </div>
+                    <small>Select events that will trigger this webhook</small>
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fas fa-key"></i> Secret (Optional)</label>
+                    <input type="password" id="webhook-secret" class="form-control" placeholder="Secret for X-Webhook-Secret header">
+                    <small>Used to verify webhook authenticity</small>
+                </div>
+
+                <div class="form-group">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
+                        <input type="checkbox" id="webhook-enabled" checked>
+                        <span>Enable this webhook</span>
+                    </label>
+                </div>
+
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button onclick="saveWebhook()" class="btn btn-success" style="flex: 1;">
+                        <i class="fas fa-save"></i> Save Webhook
+                    </button>
+                    <button onclick="window.location.href='/webhooks'" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const additionalJS = `
+        async function saveWebhook() {
+            const name = document.getElementById('webhook-name').value;
+            const url = document.getElementById('webhook-url').value;
+            const method = document.getElementById('webhook-method').value;
+            const secret = document.getElementById('webhook-secret').value;
+            const enabled = document.getElementById('webhook-enabled').checked;
+            
+            const event_types = Array.from(document.querySelectorAll('.event-type:checked')).map(cb => cb.value);
+
+            if (!name || !url) {
+                showToast('Name and URL are required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/webhooks', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, url, method, event_types, secret, enabled })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('Webhook created successfully', 'success');
+                    setTimeout(() => window.location.href = '/webhooks', 1000);
+                } else {
+                    showToast(result.error || 'Failed to create webhook', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving webhook:', error);
+                showToast('Failed to save webhook', 'error');
+            }
+        }
+    `;
+
+    res.send(getPageTemplate({
+        pageTitle: 'Add Webhook',
+        pageIcon: 'fas fa-plus',
+        activeNav: 'webhooks',
+        contentBody: pageContent,
+        additionalCSS: '',
+        additionalJS: additionalJS,
+        req: req
+    }));
+});
+
+// Webhook Edit page
+app.get('/webhooks/edit/:id', requireAuth, async (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).send(getPageTemplate({
+            pageTitle: 'Access Denied',
+            pageIcon: 'fas fa-ban',
+            activeNav: '',
+            contentBody: '<div class="card"><div class="card-body"><h2 style="color: var(--error-color);"><i class="fas fa-exclamation-triangle"></i> Access Denied</h2><p>Admin privileges required to access this page.</p><a href="/dashboard" class="btn"><i class="fas fa-arrow-left"></i> Return to Dashboard</a></div></div>',
+            additionalCSS: '',
+            additionalJS: '',
+            req: req
+        }));
+    }
+
+    const webhookId = req.params.id;
+
+    const pageContent = `
+        <div class="page-header">
+            <div>
+                <h1><i class="fas fa-edit"></i> Edit Webhook</h1>
+                <p>Update webhook configuration</p>
+            </div>
+            <div>
+                <button onclick="window.location.href='/webhooks'" class="btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Webhooks
+                </button>
+            </div>
+        </div>
+
+        <div class="card" style="max-width: 800px; margin: 0 auto;">
+            <div class="card-body" id="webhook-form">
+                <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem;"></i>
+                    <p>Loading webhook...</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    const additionalJS = `
+        const webhookId = ${webhookId};
+
+        async function loadWebhook() {
+            try {
+                const response = await fetch('/api/webhooks');
+                const webhooks = await response.json();
+                const webhook = webhooks.find(w => w.id === webhookId);
+
+                if (!webhook) {
+                    document.getElementById('webhook-form').innerHTML = '<p style="color: var(--error-color); text-align: center;">Webhook not found</p>';
+                    return;
+                }
+
+                document.getElementById('webhook-form').innerHTML = \`
+                    <div class="form-group">
+                        <label><i class="fas fa-tag"></i> Name *</label>
+                        <input type="text" id="webhook-name" class="form-control" value="\${webhook.name}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-link"></i> URL *</label>
+                        <input type="url" id="webhook-url" class="form-control" value="\${webhook.url}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-exchange-alt"></i> HTTP Method</label>
+                        <select id="webhook-method" class="form-control">
+                            <option value="POST" \${webhook.method === 'POST' ? 'selected' : ''}>POST</option>
+                            <option value="GET" \${webhook.method === 'GET' ? 'selected' : ''}>GET</option>
+                            <option value="PUT" \${webhook.method === 'PUT' ? 'selected' : ''}>PUT</option>
+                            <option value="DELETE" \${webhook.method === 'DELETE' ? 'selected' : ''}>DELETE</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-bolt"></i> Event Types</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                                <input type="checkbox" class="event-type" value="log_created" \${webhook.event_types.includes('log_created') ? 'checked' : ''}> Log Created
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                                <input type="checkbox" class="event-type" value="alert_created" \${webhook.event_types.includes('alert_created') ? 'checked' : ''}> Alert Created
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                                <input type="checkbox" class="event-type" value="backup_created" \${webhook.event_types.includes('backup_created') ? 'checked' : ''}> Backup Created
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                                <input type="checkbox" class="event-type" value="user_login" \${webhook.event_types.includes('user_login') ? 'checked' : ''}> User Login
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                                <input type="checkbox" class="event-type" value="user_logout" \${webhook.event_types.includes('user_logout') ? 'checked' : ''}> User Logout
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: normal;">
+                                <input type="checkbox" class="event-type" value="system_error" \${webhook.event_types.includes('system_error') ? 'checked' : ''}> System Error
+                            </label>
+                        </div>
+                        <small>Select events that will trigger this webhook</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label><i class="fas fa-key"></i> Secret (Optional)</label>
+                        <input type="password" id="webhook-secret" class="form-control" value="\${webhook.secret || ''}" placeholder="Secret for X-Webhook-Secret header">
+                        <small>Used to verify webhook authenticity</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600;">
+                            <input type="checkbox" id="webhook-enabled" \${webhook.enabled ? 'checked' : ''}>
+                            <span>Enable this webhook</span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                        <button onclick="updateWebhook()" class="btn btn-success" style="flex: 1;">
+                            <i class="fas fa-save"></i> Update Webhook
+                        </button>
+                        <button onclick="window.location.href='/webhooks'" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </button>
+                    </div>
+                \`;
+            } catch (error) {
+                console.error('Failed to load webhook:', error);
+                document.getElementById('webhook-form').innerHTML = '<p style="color: var(--error-color); text-align: center;">Failed to load webhook</p>';
+            }
+        }
+
+        async function updateWebhook() {
+            const name = document.getElementById('webhook-name').value;
+            const url = document.getElementById('webhook-url').value;
+            const method = document.getElementById('webhook-method').value;
+            const secret = document.getElementById('webhook-secret').value;
+            const enabled = document.getElementById('webhook-enabled').checked;
+            
+            const event_types = Array.from(document.querySelectorAll('.event-type:checked')).map(cb => cb.value);
+
+            if (!name || !url) {
+                showToast('Name and URL are required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(\`/api/webhooks/\${webhookId}\`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, url, method, event_types, secret, enabled })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showToast('Webhook updated successfully', 'success');
+                    setTimeout(() => window.location.href = '/webhooks', 1000);
+                } else {
+                    showToast(result.error || 'Failed to update webhook', 'error');
+                }
+            } catch (error) {
+                console.error('Error updating webhook:', error);
+                showToast('Failed to update webhook', 'error');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadWebhook();
+        });
+    `;
+
+    res.send(getPageTemplate({
+        pageTitle: 'Edit Webhook',
+        pageIcon: 'fas fa-edit',
+        activeNav: 'webhooks',
+        contentBody: pageContent,
+        additionalCSS: '',
+        additionalJS: additionalJS,
+        req: req
+    }));
+});

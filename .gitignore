@@ -1,0 +1,49 @@
+# Logs directory for categorized retention
+logs/
+*.log
+*.log.gz
+
+# Data directory with databases
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Node.js dependencies and cache
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.node_repl_history
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Docker build context
+.dockerignore
+Dockerfile.dev
+docker-compose.override.yml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backup files
+*.bak
+*.backup
+*.tmp
