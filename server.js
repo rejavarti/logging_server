@@ -17128,6 +17128,75 @@ app.post('/api/system/maintenance', requireAuth, async (req, res) => {
     }
 });
 
+// ============================================================================
+// EXTERNAL LOGGING ENDPOINT - accepts logs from Home Assistant, ESP32, etc.
+// ============================================================================
+app.post('/log', legacyAuth, (req, res) => {
+    const {
+        timestamp,
+        category = 'home_automation',
+        source = 'Unknown',
+        device_id = 'unknown-device',
+        event_type = 'log_event',
+        severity = 'info',
+        zone_number = null,
+        zone_name = null,
+        message,
+        metadata = '{}'
+    } = req.body;
+
+    // Validate required fields
+    if (!message) {
+        return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Use provided timestamp or generate one
+    const logTimestamp = timestamp || moment().tz(TIMEZONE).toISOString();
+    
+    // Parse metadata if it's a string
+    let metadataStr = metadata;
+    if (typeof metadata === 'object') {
+        metadataStr = JSON.stringify(metadata);
+    }
+
+    // Insert into database
+    db.run(
+        `INSERT INTO log_events (timestamp, category, source, device_id, event_type, severity, zone_number, zone_name, message, metadata)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [logTimestamp, category, source, device_id, event_type, severity, zone_number, zone_name, message, metadataStr],
+        function(err) {
+            if (err) {
+                loggers.system.error('Database insert error:', err);
+                return res.status(500).json({ error: 'Database error' });
+            }
+
+            loggers.system.info(`Log received from ${source}: ${message.substring(0, 50)}...`);
+            
+            // Broadcast to WebSocket clients if available
+            if (integrationManager && integrationManager.broadcastToWebSockets) {
+                integrationManager.broadcastToWebSockets({
+                    type: 'new_log_event',
+                    event: {
+                        id: this.lastID,
+                        timestamp: logTimestamp,
+                        category,
+                        source,
+                        device_id,
+                        event_type,
+                        severity,
+                        zone_number,
+                        zone_name,
+                        message,
+                        metadata: metadataStr
+                    }
+                });
+            }
+
+            res.json({ success: true, message: 'Log entry created', id: this.lastID });
+        }
+    );
+});
+
 // API endpoint to get logs
 app.get('/api/logs', requireAuth, (req, res) => {
     const { limit = 100, offset = 0, category, level, source } = req.query;
