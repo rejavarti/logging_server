@@ -3228,7 +3228,7 @@ class UserManager {
             if (!row) {
                 // Create default admin user
                 try {
-                    const defaultPassword = 'ChangeMe123!';
+                    const defaultPassword = process.env.AUTH_PASSWORD || 'ChangeMe123!';
                     const passwordHash = await bcrypt.hash(defaultPassword, config.auth.saltRounds);
                     
                     db.run(
