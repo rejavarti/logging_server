@@ -7,8 +7,8 @@
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://hub.docker.com/r/rejavarti/rejavartis_logging_server</Support>
-  <Project>https://hub.docker.com/r/rejavarti/rejavartis_logging_server</Project>
+  <Support>https://github.com/rejavarti/logging_server</Support>
+  <Project>https://github.com/rejavarti/logging_server</Project>
   <Overview>Enhanced Universal Logging Platform - Enterprise-grade logging server with web dashboard, real-time monitoring, MQTT integration, and API endpoints. Perfect for ESP32, IoT devices, home automation, and system logging.&#xD;
 &#xD;
 Features:&#xD;
@@ -27,8 +27,8 @@ Default Login: admin / ChangeMe123! (Please change immediately!)&#xD;
 Access the dashboard at: http://[IP]:[PORT:10180]/dashboard</Overview>
   <Category>Tools: Status:Stable HomeAutomation: Network:Other</Category>
   <WebUI>http://[IP]:[PORT:10180]/dashboard</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/rejavarti/logging-server/main/unraid-template.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/rejavarti/logging-server/main/public/favicon.svg</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/rejavarti/logging_server/main/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/rejavarti/logging_server/main/public/favicon.svg</Icon>
   <ExtraParams/>
   <PostArgs/>
   <CPUset/>
