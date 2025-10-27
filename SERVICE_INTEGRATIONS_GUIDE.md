@@ -44,6 +44,140 @@ rest_command:
 
 ### Create Automations for Events
 
+#### Option 1: Log EVERYTHING (Comprehensive Logging)
+
+This automation logs **ALL** state changes from all entities in Home Assistant. Perfect for complete system visibility.
+
+```yaml
+# Add to automations.yaml or configuration.yaml
+automation:
+  - alias: "Log ALL State Changes to Server"
+    description: "Logs every state change in Home Assistant to the logging server"
+    trigger:
+      - platform: event
+        event_type: state_changed
+    condition:
+      # Filter out frequent/noisy updates if needed
+      - condition: template
+        value_template: >
+          {% set entity = trigger.event.data.entity_id %}
+          {% set old = trigger.event.data.old_state %}
+          {% set new = trigger.event.data.new_state %}
+          {{ old != None and new != None and old.state != new.state and
+             not entity.startswith('sensor.time') and
+             not entity.startswith('sun.') and
+             not entity.endswith('_last_updated') }}
+    action:
+      - service: rest_command.send_to_logging_server
+        data:
+          category: >
+            {% set entity = trigger.event.data.entity_id %}
+            {% if entity.startswith('alarm_') %}security
+            {% elif entity.startswith('lock.') %}security
+            {% elif entity.startswith('binary_sensor.') and 'door' in entity %}security
+            {% elif entity.startswith('binary_sensor.') and 'window' in entity %}security
+            {% elif entity.startswith('binary_sensor.') and 'motion' in entity %}security
+            {% elif entity.startswith('climate.') %}climate
+            {% elif entity.startswith('light.') %}lighting
+            {% elif entity.startswith('switch.') %}power
+            {% elif entity.startswith('media_player.') %}media
+            {% elif entity.startswith('sensor.') and 'temperature' in entity %}climate
+            {% elif entity.startswith('sensor.') and 'humidity' in entity %}climate
+            {% elif entity.startswith('sensor.') and 'power' in entity %}energy
+            {% elif entity.startswith('person.') %}presence
+            {% elif entity.startswith('device_tracker.') %}presence
+            {% else %}home_automation
+            {% endif %}
+          device_id: "{{ trigger.event.data.entity_id }}"
+          event_type: "state_change"
+          severity: >
+            {% set entity = trigger.event.data.entity_id %}
+            {% set new_state = trigger.event.data.new_state.state %}
+            {% if entity.startswith('alarm_') and new_state == 'triggered' %}critical
+            {% elif entity.startswith('binary_sensor.') and 'smoke' in entity and new_state == 'on' %}critical
+            {% elif entity.startswith('binary_sensor.') and 'water' in entity and new_state == 'on' %}critical
+            {% elif entity.startswith('lock.') and new_state == 'unlocked' %}warning
+            {% elif entity.startswith('binary_sensor.') and ('door' in entity or 'window' in entity) and new_state == 'on' %}warning
+            {% elif new_state == 'unavailable' or new_state == 'unknown' %}warning
+            {% else %}info
+            {% endif %}
+          message: >
+            {% set old = trigger.event.data.old_state %}
+            {% set new = trigger.event.data.new_state %}
+            {% set name = new.attributes.friendly_name if new.attributes.friendly_name else trigger.event.data.entity_id %}
+            {{ name }} changed from {{ old.state }} to {{ new.state }}
+          metadata: >
+            {{ {
+              'entity_id': trigger.event.data.entity_id,
+              'old_state': trigger.event.data.old_state.state,
+              'new_state': trigger.event.data.new_state.state,
+              'old_attributes': trigger.event.data.old_state.attributes,
+              'new_attributes': trigger.event.data.new_state.attributes,
+              'last_changed': trigger.event.data.new_state.last_changed,
+              'last_updated': trigger.event.data.new_state.last_updated
+            } | tojson }}
+
+  - alias: "Log ALL Service Calls"
+    description: "Logs every service call made in Home Assistant"
+    trigger:
+      - platform: event
+        event_type: call_service
+    action:
+      - service: rest_command.send_to_logging_server
+        data:
+          category: "automation"
+          device_id: "ha-services"
+          event_type: "service_call"
+          severity: "info"
+          message: "Service called: {{ trigger.event.data.domain }}.{{ trigger.event.data.service }}"
+          metadata: >
+            {{ {
+              'domain': trigger.event.data.domain,
+              'service': trigger.event.data.service,
+              'service_data': trigger.event.data.service_data
+            } | tojson }}
+
+  - alias: "Log Automation Triggers"
+    description: "Logs when automations are triggered"
+    trigger:
+      - platform: event
+        event_type: automation_triggered
+    action:
+      - service: rest_command.send_to_logging_server
+        data:
+          category: "automation"
+          device_id: "{{ trigger.event.data.entity_id }}"
+          event_type: "automation_triggered"
+          severity: "info"
+          message: "Automation triggered: {{ trigger.event.data.name }}"
+          metadata: >
+            {{ {
+              'entity_id': trigger.event.data.entity_id,
+              'name': trigger.event.data.name,
+              'source': trigger.event.data.source
+            } | tojson }}
+
+  - alias: "Log Script Executions"
+    description: "Logs when scripts are executed"
+    trigger:
+      - platform: event
+        event_type: script_started
+    action:
+      - service: rest_command.send_to_logging_server
+        data:
+          category: "automation"
+          device_id: "{{ trigger.event.data.entity_id }}"
+          event_type: "script_started"
+          severity: "info"
+          message: "Script started: {{ trigger.event.data.name }}"
+          metadata: >
+            {{ trigger.event.data | tojson }}
+```
+
+#### Option 2: Log Specific Categories (Selective Logging)
+
+If "log everything" is too verbose, use these targeted automations instead:
+
 ```yaml
 # Log all motion sensor events
 automation:
