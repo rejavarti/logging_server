@@ -69,10 +69,10 @@ CMD ["pm2-runtime", "start", "server.js", "--name", "logging-server"]
 # Labels for better container management and Unraid integration
 LABEL maintainer="Rejavarti <rejavarti@github.com>" \
       description="Enterprise Logging Platform - Multi-Source Infrastructure Monitoring with Web Dashboard" \
-      version="1.1.0" \
+      version="1.1.2" \
       org.opencontainers.image.title="Enhanced Universal Logging Server" \
       org.opencontainers.image.description="Enterprise-grade logging server with web dashboard, real-time monitoring, MQTT integration, and API endpoints. Perfect for ESP32, IoT devices, home automation, and system logging." \
-      org.opencontainers.image.version="1.1.0" \
+      org.opencontainers.image.version="1.1.2" \
       org.opencontainers.image.url="https://hub.docker.com/r/rejavarti/rejavartis_logging_server" \
       org.opencontainers.image.documentation="https://github.com/rejavarti/logging_server" \
       org.opencontainers.image.source="https://github.com/rejavarti/logging_server" \
