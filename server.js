@@ -1955,7 +1955,7 @@ class IntegrationManager {
                     break;
 
                 case 'pushover':
-                    if (config.integrations.pushover.enabled && config.integrations.pushover.apiToken) {
+                    if (config.integrations.pushover?.enabled && config.integrations.pushover?.apiToken) {
                         try {
                             const pushResponse = await axios.post('https://api.pushover.net/1/users/validate.json', {
                                 token: config.integrations.pushover.apiToken,
@@ -1972,7 +1972,7 @@ class IntegrationManager {
                     break;
 
                 case 'discord':
-                    if (config.integrations.discord.enabled && config.integrations.discord.webhookUrl) {
+                    if (config.integrations.discord?.enabled && config.integrations.discord?.webhookUrl) {
                         status = 'online'; // Discord webhooks don't have a validation endpoint
                     } else {
                         status = 'disabled';
@@ -1980,7 +1980,7 @@ class IntegrationManager {
                     break;
 
                 case 'slack':
-                    if (config.integrations.slack.enabled && config.integrations.slack.webhookUrl) {
+                    if (config.integrations.slack?.enabled && config.integrations.slack?.webhookUrl) {
                         status = 'online'; // Slack webhooks don't have a validation endpoint
                     } else {
                         status = 'disabled';
@@ -1988,7 +1988,7 @@ class IntegrationManager {
                     break;
 
                 case 'telegram':
-                    if (config.integrations.telegram.enabled && config.integrations.telegram.botToken) {
+                    if (config.integrations.telegram?.enabled && config.integrations.telegram?.botToken) {
                         try {
                             const tgResponse = await axios.get(`https://api.telegram.org/bot${config.integrations.telegram.botToken}/getMe`, {
                                 timeout: 5000
@@ -9030,10 +9030,10 @@ app.get('/logs', requireAuth, (req, res) => {
             font-weight: 600;
             text-transform: uppercase;
         }
-        .severity-info { background: #bee3f8; color: #2c5282; }
-        .severity-warn { background: #fef5e7; color: #c05621; }
-        .severity-error { background: #fed7d7; color: #9b2c2c; }
-        .severity-success { background: #c6f6d5; color: #22543d; }
+        .severity-info { background: #3182ce; color: #ffffff; }
+        .severity-warn { background: #d69e2e; color: #ffffff; }
+        .severity-error { background: #e53e3e; color: #ffffff; }
+        .severity-success { background: #38a169; color: #ffffff; }
     `;
 
     const contentBody = `
@@ -9045,6 +9045,9 @@ app.get('/logs', requireAuth, (req, res) => {
                 </button>
                 <button onclick="switchTab('analytics')" id="tab-analytics" class="tab-btn" style="padding: 0.75rem 1.5rem; border: none; background: var(--bg-secondary); color: var(--text-primary); border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s ease;">
                     <i class="fas fa-chart-bar"></i> Analytics
+                </button>
+                <button onclick="switchTab('advanced')" id="tab-advanced" class="tab-btn" style="padding: 0.75rem 1.5rem; border: none; background: var(--bg-secondary); color: var(--text-primary); border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.3s ease;">
+                    <i class="fas fa-search-plus"></i> Advanced Logs
                 </button>
             </div>
         </div>
@@ -9194,6 +9197,48 @@ app.get('/logs', requireAuth, (req, res) => {
                 </div>
             </div>
         </div>
+
+        <!-- Advanced Logs Tab Content -->
+        <div id="content-advanced" class="tab-content" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fas fa-search-plus"></i> Advanced Log Viewer</h3>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="text" id="advanced-search" placeholder="Search logs..." 
+                               style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary); width: 300px;"
+                               oninput="filterAdvancedLogs()">
+                        <select id="advanced-severity-filter" onchange="filterAdvancedLogs()"
+                                style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                            <option value="">All Severities</option>
+                            <option value="critical">Critical</option>
+                            <option value="error">Error</option>
+                            <option value="warning">Warning</option>
+                            <option value="info">Info</option>
+                            <option value="debug">Debug</option>
+                        </select>
+                        <select id="advanced-category-filter" onchange="filterAdvancedLogs()"
+                                style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                            <option value="">All Categories</option>
+                            <option value="system">System</option>
+                            <option value="security">Security</option>
+                            <option value="automation">Automation</option>
+                            <option value="device">Device</option>
+                            <option value="service">Service</option>
+                        </select>
+                        <button onclick="loadAdvancedLogs()" class="btn">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div id="advanced-logs-container" style="max-height: 800px; overflow-y: auto;">
+                        <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                            <i class="fas fa-spinner fa-spin"></i> Loading logs...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     `;
 
     const additionalJS = `
@@ -9216,6 +9261,8 @@ app.get('/logs', requireAuth, (req, res) => {
                 loadLogs();
             } else if (tabName === 'analytics') {
                 refreshAnalytics();
+            } else if (tabName === 'advanced') {
+                loadAdvancedLogs();
             }
         }
 
@@ -9230,70 +9277,168 @@ app.get('/logs', requireAuth, (req, res) => {
         async function loadAnalytics() {
             try {
                 const range = document.getElementById('analytics-date-range').value;
-                const response = await fetch('/api/logs?limit=10000');
                 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch logs');
+                // Fetch pre-aggregated data from new API endpoints (100x faster!)
+                const statsPromise = fetch('/api/analytics/stats?range=' + range);
+                const sourcesPromise = fetch('/api/analytics/top-sources?range=' + range);
+                const categoriesPromise = fetch('/api/analytics/categories?range=' + range);
+                const severitiesPromise = fetch('/api/analytics/severities?range=' + range);
+                const activityRange = range === 'today' ? '24h' : range === '7days' ? '7d' : '7d';
+                const activityPromise = fetch('/api/analytics/activity?range=' + activityRange);
+                
+                const [statsRes, sourcesRes, categoriesRes, severitiesRes, activityRes] = await Promise.all([
+                    statsPromise, sourcesPromise, categoriesPromise, severitiesPromise, activityPromise
+                ]);
+                
+                if (!statsRes.ok) {
+                    throw new Error('Failed to fetch analytics stats');
                 }
                 
-                const logs = await response.json();
+                const stats = await statsRes.json();
+                const sources = await sourcesRes.json();
+                const categories = await categoriesRes.json();
+                const severities = await severitiesRes.json();
+                const activity = await activityRes.json();
                 
-                if (!logs || logs.length === 0) {
-                    document.getElementById('analytics-total-logs').textContent = '0';
-                    document.getElementById('analytics-error-logs').textContent = '0';
-                    document.getElementById('analytics-avg-per-hour').textContent = '0';
-                    document.getElementById('analytics-peak-hour').textContent = 'N/A';
-                    document.getElementById('analytics-peak-count').textContent = '0 events';
-                    document.getElementById('analytics-top-sources').innerHTML = '<p style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-inbox"></i><br>No log data available</p>';
-                    document.getElementById('analytics-patterns').innerHTML = '<p style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-inbox"></i><br>No data to analyze</p>';
-                    
-                    // Clear charts
-                    if (hourlyChart) hourlyChart.destroy();
-                    if (categoryChart) categoryChart.destroy();
-                    if (severityChart) severityChart.destroy();
-                    return;
+                // Update stats display
+                document.getElementById('analytics-total-logs').textContent = stats.total.toLocaleString();
+                document.getElementById('analytics-error-logs').textContent = stats.errors.toLocaleString();
+                document.getElementById('analytics-avg-per-hour').textContent = stats.avg_per_hour.toLocaleString();
+                document.getElementById('analytics-peak-hour').textContent = formatHour(stats.peak_hour);
+                document.getElementById('analytics-peak-count').textContent = stats.peak_count + ' events';
+                
+                const errorColor = stats.error_rate > 5 ? '#ef4444' : '#10b981';
+                document.getElementById('analytics-error-trend').innerHTML = 
+                    '<span style="color: ' + errorColor + '">' + stats.error_rate + '% error rate</span>';
+                
+                // Update top sources
+                if (sources.length === 0) {
+                    document.getElementById('analytics-top-sources').innerHTML = 
+                        '<p style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-inbox"></i><br>No sources found</p>';
+                } else {
+                    const maxCount = sources[0].count;
+                    let sourcesHtml = '';
+                    for (let i = 0; i < sources.length; i++) {
+                        const src = sources[i];
+                        const percent = Math.round((src.count / maxCount) * 100);
+                        sourcesHtml += '<div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">';
+                        sourcesHtml += '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">';
+                        sourcesHtml += '<span style="font-weight: 600;">#' + (i + 1) + ' ' + src.source + '</span>';
+                        sourcesHtml += '<span style="font-weight: 700; color: var(--accent-primary);">' + src.count + '</span>';
+                        sourcesHtml += '</div>';
+                        sourcesHtml += '<div style="background: var(--bg-secondary); height: 6px; border-radius: 3px; overflow: hidden;">';
+                        sourcesHtml += '<div style="background: var(--gradient-ocean); height: 100%; width: ' + percent + '%;"></div>';
+                        sourcesHtml += '</div></div>';
+                    }
+                    document.getElementById('analytics-top-sources').innerHTML = sourcesHtml;
                 }
                 
-                // Filter logs based on date range
-                const now = new Date();
-                let startDate = new Date();
+                // Update hourly chart
+                const ctx1 = document.getElementById('analytics-hourly-chart');
+                if (hourlyChart) {
+                    hourlyChart.destroy();
+                    hourlyChart = null;
+                }
+                hourlyChart = new Chart(ctx1, {
+                    type: 'line',
+                    data: {
+                        labels: activity.labels || [],
+                        datasets: [{
+                            label: 'Events',
+                            data: activity.values || [],
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
                 
-                switch(range) {
-                    case 'today':
-                        startDate.setHours(0, 0, 0, 0);
-                        break;
-                    case 'yesterday':
-                        startDate.setDate(startDate.getDate() - 1);
-                        startDate.setHours(0, 0, 0, 0);
-                        const endDate = new Date(startDate);
-                        endDate.setHours(23, 59, 59, 999);
-                        allLogs = logs.filter(l => {
-                            const date = new Date(l.timestamp);
-                            return date >= startDate && date <= endDate;
-                        });
-                        updateStats();
-                        updateCharts();
-                        updateTopSources();
-                        detectPatterns();
-                        return;
-                    case '7days':
-                        startDate.setDate(startDate.getDate() - 7);
-                        break;
-                    case '30days':
-                        startDate.setDate(startDate.getDate() - 30);
-                        break;
+                // Update category chart
+                const ctx2 = document.getElementById('analytics-category-chart');
+                if (categoryChart) {
+                    categoryChart.destroy();
+                    categoryChart = null;
+                }
+                if (categories.length > 0) {
+                    const catLabels = categories.map(function(c) { 
+                        return c.category.charAt(0).toUpperCase() + c.category.slice(1); 
+                    });
+                    const catData = categories.map(function(c) { return c.count; });
+                    categoryChart = new Chart(ctx2, {
+                        type: 'doughnut',
+                        data: {
+                            labels: catLabels,
+                            datasets: [{
+                                data: catData,
+                                backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: { legend: { position: 'right' } }
+                        }
+                    });
                 }
                 
-                allLogs = logs.filter(l => new Date(l.timestamp) >= startDate);
+                // Update severity chart
+                const ctx3 = document.getElementById('analytics-severity-chart');
+                if (severityChart) {
+                    severityChart.destroy();
+                    severityChart = null;
+                }
+                if (severities.length > 0) {
+                    const sevLabels = severities.map(function(s) { return s.severity.toUpperCase(); });
+                    const sevData = severities.map(function(s) { return s.count; });
+                    severityChart = new Chart(ctx3, {
+                        type: 'bar',
+                        data: {
+                            labels: sevLabels,
+                            datasets: [{
+                                label: 'Count',
+                                data: sevData,
+                                backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#10b981']
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                y: { beginAtZero: true }
+                            }
+                        }
+                    });
+                }
                 
-                updateStats();
-                updateCharts();
-                updateTopSources();
-                detectPatterns();
+                // Generate pattern insights
+                generatePatternInsights(stats, activity);
                 
             } catch (error) {
                 console.error('Failed to load analytics:', error);
-                showToast('Failed to load analytics data', 'error');
+                
+                // Reset UI to error state
+                document.getElementById('analytics-total-logs').textContent = '0';
+                document.getElementById('analytics-error-logs').textContent = '0';
+                document.getElementById('analytics-avg-per-hour').textContent = '0';
+                document.getElementById('analytics-peak-hour').textContent = 'N/A';
+                document.getElementById('analytics-peak-count').textContent = '0 events';
+                document.getElementById('analytics-top-sources').innerHTML = 
+                    '<p style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-exclamation-triangle"></i><br>Failed to load sources</p>';
+                document.getElementById('analytics-patterns').innerHTML = 
+                    '<p style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-exclamation-triangle"></i><br>Failed to analyze patterns</p>';
+                
+                showToast('Failed to load analytics: ' + error.message, 'error');
             }
         }
 
@@ -9450,56 +9595,61 @@ app.get('/logs', requireAuth, (req, res) => {
             document.getElementById('analytics-top-sources').innerHTML = html || '<p style="text-align: center; color: var(--text-muted);">No data</p>';
         }
 
-        function detectPatterns() {
+        function generatePatternInsights(stats, activity) {
             const patterns = [];
-            const hourlyData = getHourlyData();
             
             // Detect spikes (> 2x average)
-            const avg = hourlyData.reduce((sum, d) => sum + d.count, 0) / 24;
-            const spikes = hourlyData.filter(d => d.count > avg * 2);
-            if (spikes.length > 0 && avg > 0) {
-                patterns.push({
-                    type: 'spike',
-                    severity: 'warning',
-                    message: \`🔥 Activity spike detected at \${spikes.map(s => formatHour(s.hour)).join(', ')}\`,
-                    detail: \`Volume exceeded average by \${Math.round((spikes[0].count / avg - 1) * 100)}%\`
-                });
-            }
-            
-            // Detect unusual quiet periods
-            const quiet = hourlyData.filter(d => d.count < avg * 0.3 && d.count > 0);
-            if (quiet.length >= 3 && avg > 0) {
-                patterns.push({
-                    type: 'quiet',
-                    severity: 'info',
-                    message: \`😴 Unusual quiet periods detected\`,
-                    detail: \`\${quiet.length} hours with significantly reduced activity\`
-                });
+            if (activity.values && activity.values.length > 0) {
+                const values = activity.values;
+                const avg = values.reduce(function(sum, v) { return sum + v; }, 0) / values.length;
+                const maxValue = Math.max.apply(null, values);
+                
+                if (maxValue > avg * 2 && avg > 0) {
+                    const spikeIndex = values.indexOf(maxValue);
+                    const spikeLabel = activity.labels ? activity.labels[spikeIndex] : 'Unknown';
+                    patterns.push({
+                        type: 'spike',
+                        severity: 'warning',
+                        message: '🔥 Activity spike detected at ' + spikeLabel,
+                        detail: 'Volume exceeded average by ' + Math.round((maxValue / avg - 1) * 100) + '%'
+                    });
+                }
+                
+                // Detect unusual quiet periods
+                const quietThreshold = avg * 0.3;
+                const quiet = values.filter(function(v) { return v < quietThreshold && v > 0; });
+                if (quiet.length >= 3 && avg > 0) {
+                    patterns.push({
+                        type: 'quiet',
+                        severity: 'info',
+                        message: '😴 Unusual quiet periods detected',
+                        detail: quiet.length + ' periods with significantly reduced activity'
+                    });
+                }
             }
             
             // Detect error rate anomalies
-            const errors = allLogs.filter(l => l.level === 'error' || l.level === 'warn' || l.severity === 'error' || l.severity === 'warn').length;
-            const errorRate = allLogs.length > 0 ? (errors / allLogs.length) * 100 : 0;
+            const errorRate = parseFloat(stats.error_rate) || 0;
             if (errorRate > 10) {
                 patterns.push({
                     type: 'errors',
                     severity: 'error',
-                    message: \`⚠️ High error rate detected: \${errorRate.toFixed(1)}%\`,
-                    detail: \`\${errors} errors/warnings out of \${allLogs.length} total events\`
+                    message: '⚠️ High error rate detected: ' + errorRate.toFixed(1) + '%',
+                    detail: stats.errors + ' errors/warnings out of ' + stats.total + ' total events'
                 });
             } else if (errorRate > 5) {
                 patterns.push({
                     type: 'errors',
                     severity: 'warning',
-                    message: \`⚡ Elevated error rate: \${errorRate.toFixed(1)}%\`,
-                    detail: \`Monitor for potential issues\`
+                    message: '⚡ Elevated error rate: ' + errorRate.toFixed(1) + '%',
+                    detail: 'Monitor for potential issues'
                 });
             } else {
                 patterns.push({
                     type: 'healthy',
                     severity: 'success',
-                    message: \`✅ System health looks good\`,
-                    detail: \`Error rate: \${errorRate.toFixed(1)}% (within normal range)\`
+                    message: '✅ System health looks good',
+                    detail: 'Error rate: ' + errorRate.toFixed(1) + '% (within normal range)'
                 });
             }
             
@@ -9510,18 +9660,22 @@ app.get('/logs', requireAuth, (req, res) => {
                 success: '#10b981'
             };
             
-            const html = patterns.map(p => \`
-                <div style="padding: 1rem; background: \${colors[p.severity]}15; border-left: 4px solid \${colors[p.severity]}; border-radius: 6px; margin-bottom: 1rem;">
-                    <div style="font-weight: 600; margin-bottom: 0.5rem;">\${p.message}</div>
-                    <div style="font-size: 0.875rem; color: var(--text-muted);">\${p.detail}</div>
-                </div>
-            \`).join('');
+            let html = '';
+            for (let i = 0; i < patterns.length; i++) {
+                const p = patterns[i];
+                html += '<div style="padding: 1rem; background: ' + colors[p.severity] + '15; border-left: 4px solid ' + colors[p.severity] + '; border-radius: 6px; margin-bottom: 1rem;">';
+                html += '<div style="font-weight: 600; margin-bottom: 0.5rem;">' + p.message + '</div>';
+                html += '<div style="font-size: 0.875rem; color: var(--text-muted);">' + p.detail + '</div>';
+                html += '</div>';
+            }
             
             document.getElementById('analytics-patterns').innerHTML = html;
         }
 
         function formatHour(hour) {
-            return \`\${hour.toString().padStart(2, '0')}:00\`;
+            const hourStr = hour.toString();
+            const padded = hourStr.length === 1 ? '0' + hourStr : hourStr;
+            return padded + ':00';
         }
 
         function exportAnalytics() {
@@ -9536,6 +9690,154 @@ app.get('/logs', requireAuth, (req, res) => {
             a.download = \`analytics-\${range}-\${new Date().toISOString().split('T')[0]}.csv\`;
             a.click();
         }
+
+        // Advanced Logs functionality
+        let advancedLogsData = [];
+        let filteredAdvancedLogs = [];
+
+        async function loadAdvancedLogs() {
+            try {
+                const container = document.getElementById('advanced-logs-container');
+                container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading logs...</div>';
+                
+                const response = await fetch('/api/logs?limit=200');
+                if (!response.ok) {
+                    throw new Error('HTTP error! status: ' + response.status);
+                }
+                
+                advancedLogsData = await response.json();
+                filteredAdvancedLogs = advancedLogsData;
+                renderAdvancedLogs();
+            } catch (error) {
+                console.error('Error loading advanced logs:', error);
+                document.getElementById('advanced-logs-container').innerHTML = 
+                    '<div style="text-align: center; padding: 2rem; color: #ef4444;"><i class="fas fa-exclamation-triangle"></i> Failed to load logs: ' + error.message + '</div>';
+            }
+        }
+
+        function filterAdvancedLogs() {
+            const searchText = document.getElementById('advanced-search').value.toLowerCase();
+            const severityFilter = document.getElementById('advanced-severity-filter').value;
+            const categoryFilter = document.getElementById('advanced-category-filter').value;
+
+            filteredAdvancedLogs = advancedLogsData.filter(log => {
+                const matchesSearch = !searchText || 
+                    (log.message && log.message.toLowerCase().includes(searchText)) ||
+                    (log.source && log.source.toLowerCase().includes(searchText)) ||
+                    (log.device_id && log.device_id.toLowerCase().includes(searchText)) ||
+                    (log.entity_id && log.entity_id.toLowerCase().includes(searchText));
+                
+                const matchesSeverity = !severityFilter || log.severity === severityFilter;
+                const matchesCategory = !categoryFilter || log.category === categoryFilter;
+
+                return matchesSearch && matchesSeverity && matchesCategory;
+            });
+
+            renderAdvancedLogs();
+        }
+
+        function renderAdvancedLogs() {
+            const container = document.getElementById('advanced-logs-container');
+            
+            if (!filteredAdvancedLogs || filteredAdvancedLogs.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-muted);"><i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i><p style="font-size: 1.1rem; margin: 0;">No logs match your filters</p></div>';
+                return;
+            }
+
+            container.innerHTML = filteredAdvancedLogs.map((log, index) => {
+                const severityClass = 'severity-' + (log.severity || 'info');
+                const logId = 'log-' + (log.id || index);
+                
+                // Parse metadata if it's a string
+                let metadata = {};
+                try {
+                    if (typeof log.metadata === 'string') {
+                        metadata = JSON.parse(log.metadata);
+                    } else if (log.metadata) {
+                        metadata = log.metadata;
+                    }
+                } catch (e) {
+                    metadata = { raw: log.metadata };
+                }
+
+                // Collect all additional data
+                const detailsData = {
+                    id: log.id,
+                    timestamp: log.timestamp,
+                    severity: log.severity,
+                    category: log.category,
+                    source: log.source,
+                    event_type: log.event_type,
+                    message: log.message,
+                    device_id: log.device_id,
+                    entity_id: log.entity_id,
+                    metadata: metadata,
+                    service_data: log.service_data
+                };
+
+                return \`
+                    <div class="advanced-log-entry" style="border-bottom: 1px solid var(--border-color); transition: background 0.2s ease;">
+                        <div onclick="toggleLogDetails('\${logId}')" style="padding: 1rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; hover: background-color: var(--bg-hover);"
+                             onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                            <div style="flex: 1;">
+                                <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                                    <span class="severity-badge \${severityClass}" style="font-size: 0.75rem;">\${log.severity || 'info'}</span>
+                                    <span style="color: var(--text-muted); font-size: 0.875rem;">\${new Date(log.timestamp).toLocaleString()}</span>
+                                    <span style="color: var(--accent-secondary); font-weight: 600; font-size: 0.875rem;">\${log.category || 'N/A'}</span>
+                                    <span style="color: var(--text-muted); font-size: 0.875rem;">\${log.source || 'N/A'}</span>
+                                </div>
+                                <div style="color: var(--text-primary); font-size: 0.95rem;">\${log.message || 'N/A'}</div>
+                                \${log.device_id ? '<div style="color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem;"><i class="fas fa-microchip"></i> ' + log.device_id + '</div>' : ''}
+                            </div>
+                            <i id="\${logId}-icon" class="fas fa-chevron-down" style="color: var(--text-muted); transition: transform 0.3s ease;"></i>
+                        </div>
+                        <div id="\${logId}-details" style="display: none; padding: 0 1rem 1rem 1rem; background: var(--bg-secondary); border-top: 1px solid var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                                <h4 style="margin: 0.5rem 0; color: var(--text-primary);"><i class="fas fa-info-circle"></i> Log Details</h4>
+                                <button onclick="copyLogDetails('\${logId}')" class="btn" style="padding: 0.4rem 0.8rem; font-size: 0.875rem;">
+                                    <i class="fas fa-copy"></i> Copy JSON
+                                </button>
+                            </div>
+                            <pre id="\${logId}-json" style="background: var(--bg-primary); padding: 1rem; border-radius: 6px; overflow-x: auto; margin: 0; font-size: 0.875rem; line-height: 1.5; color: var(--text-primary);"><code>\${JSON.stringify(detailsData, null, 2)}</code></pre>
+                        </div>
+                    </div>
+                \`;
+            }).join('');
+        }
+
+        function toggleLogDetails(logId) {
+            const details = document.getElementById(logId + '-details');
+            const icon = document.getElementById(logId + '-icon');
+            
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                details.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function copyLogDetails(logId) {
+            const jsonElement = document.getElementById(logId + '-json');
+            const text = jsonElement.textContent;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                // Show temporary success message
+                const btn = event.target.closest('button');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                btn.style.background = '#10b981';
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.style.background = '';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard');
+            });
+        }
+
 
         async function loadLogs() {
             try {
@@ -9650,10 +9952,10 @@ app.get('/admin/users', requireAuth, (req, res) => {
             font-weight: 600;
             text-transform: uppercase;
         }
-        .role-admin { background: #fed7d7; color: #9b2c2c; }
-        .role-user { background: #bee3f8; color: #2c5282; }
-        .status-active { background: #c6f6d5; color: #22543d; }
-        .status-inactive { background: #fed7d7; color: #9b2c2c; }
+        .role-admin { background: #e53e3e; color: #ffffff; }
+        .role-user { background: #3182ce; color: #ffffff; }
+        .status-active { background: #38a169; color: #ffffff; }
+        .status-inactive { background: #e53e3e; color: #ffffff; }
         .modal {
             display: none !important;
             position: fixed;
@@ -15400,7 +15702,7 @@ app.get('/admin/security', requireAuth, (req, res) => {
 
 // Redirect old URLs
 app.get('/admin/rate-limits', requireAuth, (req, res) => { res.redirect('/admin/security'); });
-app.get('/admin/audit-trail', requireAuth, (req, res) => { res.redirect('/admin/security'); });
+// app.get('/admin/audit-trail', requireAuth, (req, res) => { res.redirect('/admin/security'); }); // REMOVED: Duplicate route - full page exists at line 15870
 
 // Rate Limiting Dashboard Page (OLD - KEEP FOR NOW)
 app.get('/admin/rate-limits-old', requireAuth, (req, res) => {
@@ -17595,6 +17897,163 @@ app.get('/api/status', requireAuth, (req, res) => {
     res.json(status);
 });
 
+// Analytics stats API - Returns aggregated statistics  
+app.get('/api/analytics/stats', requireAuth, (req, res) => {
+    const range = req.query.range || '7days';
+    let hours;
+    switch(range) {
+        case 'today': hours = 24; break;
+        case 'yesterday': hours = 24; break;
+        case '7days': hours = 24 * 7; break;
+        case '30days': hours = 24 * 30; break;
+        default: hours = 24 * 7;
+    }
+    
+    const startTime = moment().tz(TIMEZONE).subtract(hours, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    
+    const statsQuery = `
+        SELECT 
+            COUNT(*) as total,
+            SUM(CASE WHEN severity IN ('error', 'warn', 'warning', 'critical') THEN 1 ELSE 0 END) as errors
+        FROM log_events
+        WHERE timestamp >= ?
+    `;
+    
+    const peakQuery = `
+        SELECT strftime('%H', timestamp) as hour, COUNT(*) as count
+        FROM log_events
+        WHERE timestamp >= ?
+        GROUP BY hour
+        ORDER BY count DESC
+        LIMIT 1
+    `;
+    
+    db.get(statsQuery, [startTime], (err, stats) => {
+        if (err) {
+            loggers.system.error('Analytics stats query error:', err);
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+        
+        db.get(peakQuery, [startTime], (err2, peak) => {
+            if (err2) {
+                loggers.system.error('Analytics peak query error:', err2);
+                return res.status(500).json({ error: 'Database query failed' });
+            }
+            
+            const total = stats.total || 0;
+            const errors = stats.errors || 0;
+            const avgPerHour = Math.round(total / hours);
+            const errorRate = total > 0 ? ((errors / total) * 100).toFixed(1) : 0;
+            
+            res.json({
+                total,
+                errors,
+                error_rate: errorRate,
+                avg_per_hour: avgPerHour,
+                peak_hour: peak ? parseInt(peak.hour) : 0,
+                peak_count: peak ? peak.count : 0
+            });
+        });
+    });
+});
+
+// Analytics top sources API - Returns top 10 sources by log count
+app.get('/api/analytics/top-sources', requireAuth, (req, res) => {
+    const range = req.query.range || '7days';
+    let hours;
+    switch(range) {
+        case 'today': hours = 24; break;
+        case 'yesterday': hours = 24; break;
+        case '7days': hours = 24 * 7; break;
+        case '30days': hours = 24 * 30; break;
+        default: hours = 24 * 7;
+    }
+    
+    const startTime = moment().tz(TIMEZONE).subtract(hours, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    
+    const query = `
+        SELECT source, COUNT(*) as count
+        FROM log_events
+        WHERE timestamp >= ?
+        GROUP BY source
+        ORDER BY count DESC
+        LIMIT 10
+    `;
+    
+    db.all(query, [startTime], (err, rows) => {
+        if (err) {
+            loggers.system.error('Analytics top sources query error:', err);
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+        
+        res.json(rows || []);
+    });
+});
+
+// Analytics category distribution API
+app.get('/api/analytics/categories', requireAuth, (req, res) => {
+    const range = req.query.range || '7days';
+    let hours;
+    switch(range) {
+        case 'today': hours = 24; break;
+        case 'yesterday': hours = 24; break;
+        case '7days': hours = 24 * 7; break;
+        case '30days': hours = 24 * 30; break;
+        default: hours = 24 * 7;
+    }
+    
+    const startTime = moment().tz(TIMEZONE).subtract(hours, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    
+    const query = `
+        SELECT category, COUNT(*) as count
+        FROM log_events
+        WHERE timestamp >= ?
+        GROUP BY category
+        ORDER BY count DESC
+    `;
+    
+    db.all(query, [startTime], (err, rows) => {
+        if (err) {
+            loggers.system.error('Analytics categories query error:', err);
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+        
+        res.json(rows || []);
+    });
+});
+
+// Analytics severity distribution API
+app.get('/api/analytics/severities', requireAuth, (req, res) => {
+    const range = req.query.range || '7days';
+    let hours;
+    switch(range) {
+        case 'today': hours = 24; break;
+        case 'yesterday': hours = 24; break;
+        case '7days': hours = 24 * 7; break;
+        case '30days': hours = 24 * 30; break;
+        default: hours = 24 * 7;
+    }
+    
+    const startTime = moment().tz(TIMEZONE).subtract(hours, 'hours').format('YYYY-MM-DD HH:mm:ss');
+    
+    const query = `
+        SELECT severity, COUNT(*) as count
+        FROM log_events
+        WHERE timestamp >= ?
+        GROUP BY severity
+        ORDER BY count DESC
+    `;
+    
+    db.all(query, [startTime], (err, rows) => {
+        if (err) {
+            loggers.system.error('Analytics severities query error:', err);
+            return res.status(500).json({ error: 'Database query failed' });
+        }
+        
+        res.json(rows || []);
+    });
+});
+
 // ========================================
 // DASHBOARD WIDGETS API
 // ========================================
@@ -18187,9 +18646,9 @@ async function initializeServerComponents() {
         integrationManager.initializeHealthChecks();
         loggers.system.info('🎉 All systems operational!');
         
-        // Initialize maintenance tasks (backups, cleanup)
-        maintenanceManager.scheduleMaintenance();
-        loggers.system.info('⏰ Scheduled daily backups at 2:00 AM (keeping last 10)');
+        // Note: Maintenance tasks (backups, cleanup) are already scheduled by integrationManager.initializeMaintenanceTasks()
+        // Backups run daily at 2:00 AM (configurable via BACKUP_SCHEDULE env var)
+        // Cleanup runs daily at 3:00 AM (configurable via CLEANUP_SCHEDULE env var)
         
         // Log server startup to database
         logToDatabase(`Server started on port ${PORT}`, 'info', 'server', 'logging-server');
