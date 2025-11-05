@@ -1,0 +1,255 @@
+# ============================================================================
+# ESPHome Full Logging Configuration with MQTT Fallback
+# ============================================================================
+# Sends all log levels to your logging server via HTTP
+# Falls back to MQTT if HTTP is unavailable
+# Replace YOUR_SERVER_IP and YOUR_MQTT_BROKER with actual values
+
+esphome:
+  name: my-device
+  platform: ESP32
+  board: nodemcu-32s
+
+# WiFi Configuration
+wifi:
+  ssid: "YourWiFiSSID"
+  password: "YourWiFiPassword"
+  
+  # Fast connect for reliable logging
+  fast_connect: true
+  
+  # Optional: Static IP for consistent logging
+  # manual_ip:
+  #   static_ip: 192.168.1.100
+  #   gateway: 192.168.1.1
+  #   subnet: 255.255.255.0
+
+# Enable logging
+logger:
+  level: DEBUG  # Capture all log levels (DEBUG, INFO, WARN, ERROR)
+  
+# HTTP Request component for primary logging method
+http_request:
+  useragent: esphome/${device_name}
+  timeout: 10s
+  verify_ssl: false
+
+# MQTT as backup logging method (optional but recommended)
+mqtt:
+  broker: YOUR_MQTT_BROKER
+  port: 1883
+  username: ""  # Add if needed
+  password: ""  # Add if needed
+  topic_prefix: esphome/${device_name}
+  discovery: true
+  discovery_retain: true
+
+# Global variables to track logging health
+globals:
+  - id: http_logging_failures
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+# Send all log levels to server via HTTP
+logger:
+  on_message:
+    # ERROR Level - Always send
+    - level: ERROR
+      then:
+        - logger.log: "Sending ERROR log to server"
+        - http_request.post:
+            url: "http://YOUR_SERVER_IP:10180/log"
+            headers:
+              Content-Type: "application/json"
+            json:
+              message: !lambda 'return std::string(tag) + ": " + message;'
+              severity: "error"
+              category: "esphome"
+              source: "${device_name}"
+              device_id: !lambda 'return App.get_compilation_time();'
+            verify_ssl: false
+            on_error:
+              - lambda: |-
+                  id(http_logging_failures)++;
+                  ESP_LOGW("logging", "HTTP log failed, count: %d", id(http_logging_failures));
+              - mqtt.publish:
+                  topic: esphome/${device_name}/log/error
+                  payload: !lambda 'return std::string(tag) + ": " + message;'
+    
+    # WARN Level - Important issues
+    - level: WARN
+      then:
+        - http_request.post:
+            url: "http://YOUR_SERVER_IP:10180/log"
+            headers:
+              Content-Type: "application/json"
+            json:
+              message: !lambda 'return std::string(tag) + ": " + message;'
+              severity: "warning"
+              category: "esphome"
+              source: "${device_name}"
+            verify_ssl: false
+            on_error:
+              - mqtt.publish:
+                  topic: esphome/${device_name}/log/warn
+                  payload: !lambda 'return std::string(tag) + ": " + message;'
+    
+    # INFO Level - General information (can be noisy)
+    - level: INFO
+      then:
+        - http_request.post:
+            url: "http://YOUR_SERVER_IP:10180/log"
+            headers:
+              Content-Type: "application/json"
+            json:
+              message: !lambda 'return std::string(tag) + ": " + message;'
+              severity: "info"
+              category: "esphome"
+              source: "${device_name}"
+            verify_ssl: false
+            on_error:
+              - mqtt.publish:
+                  topic: esphome/${device_name}/log/info
+                  payload: !lambda 'return std::string(tag) + ": " + message;'
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "YOUR_API_KEY_HERE"
+
+# Enable OTA updates
+ota:
+  password: "YOUR_OTA_PASSWORD"
+
+# Boot sequence logging
+esphome:
+  on_boot:
+    priority: 600  # Early boot
+    then:
+      - logger.log: "Device starting up..."
+  
+  on_boot:
+    priority: -100  # Late boot (after WiFi connected)
+    then:
+      - logger.log: "Sending boot notification to server"
+      - delay: 2s  # Wait for network to stabilize
+      - http_request.post:
+          url: "http://YOUR_SERVER_IP:10180/log"
+          headers:
+            Content-Type: "application/json"
+          json:
+            message: !lambda |-
+              char buf[100];
+              sprintf(buf, "${device_name} started - IP: %s, MAC: %s", 
+                      WiFi.localIP().toString().c_str(),
+                      WiFi.macAddress().c_str());
+              return std::string(buf);
+            severity: "info"
+            category: "esphome"
+            source: "${device_name}"
+          verify_ssl: false
+
+# System health sensors with logging
+sensor:
+  # WiFi Signal Strength
+  - platform: wifi_signal
+    name: "${device_name} WiFi Signal"
+    id: wifi_signal_db
+    update_interval: 60s
+    on_value_range:
+      - below: -80.0
+        then:
+          - http_request.post:
+              url: "http://YOUR_SERVER_IP:10180/log"
+              headers:
+                Content-Type: "application/json"
+              json:
+                message: !lambda |-
+                  char buf[100];
+                  sprintf(buf, "WiFi signal weak: %.1f dBm", x);
+                  return std::string(buf);
+                severity: "warning"
+                category: "esphome"
+                source: "${device_name}"
+              verify_ssl: false
+  
+  # Uptime
+  - platform: uptime
+    name: "${device_name} Uptime"
+    id: device_uptime
+  
+  # Free Heap Memory
+  - platform: template
+    name: "${device_name} Free Heap"
+    lambda: return ESP.getFreeHeap();
+    unit_of_measurement: "bytes"
+    update_interval: 60s
+    on_value_range:
+      - below: 10000  # Less than 10KB free
+        then:
+          - http_request.post:
+              url: "http://YOUR_SERVER_IP:10180/log"
+              headers:
+                Content-Type: "application/json"
+              json:
+                message: !lambda |-
+                  char buf[100];
+                  sprintf(buf, "Low memory warning: %.0f bytes free", x);
+                  return std::string(buf);
+                severity: "warning"
+                category: "esphome"
+                source: "${device_name}"
+              verify_ssl: false
+
+# Binary sensors with logging
+binary_sensor:
+  # Connection status
+  - platform: status
+    name: "${device_name} Status"
+    on_state:
+      - if:
+          condition:
+            binary_sensor.is_off: ${device_name}_status
+          then:
+            - mqtt.publish:
+                topic: esphome/${device_name}/log/error
+                payload: "Device went offline"
+
+# Text sensor for IP address
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "${device_name} IP Address"
+      on_value:
+        - http_request.post:
+            url: "http://YOUR_SERVER_IP:10180/log"
+            headers:
+              Content-Type: "application/json"
+            json:
+              message: !lambda |-
+                return "IP address changed to: " + x;
+              severity: "info"
+              category: "esphome"
+              source: "${device_name}"
+            verify_ssl: false
+
+# Interval for periodic health checks
+interval:
+  - interval: 300s  # Every 5 minutes
+    then:
+      - if:
+          condition:
+            lambda: 'return id(http_logging_failures) > 10;'
+          then:
+            - logger.log:
+                format: "HTTP logging degraded - %d failures, switching to MQTT"
+                args: [ 'id(http_logging_failures)' ]
+            - mqtt.publish:
+                topic: esphome/${device_name}/log/warn
+                payload: !lambda |-
+                  char buf[100];
+                  sprintf(buf, "HTTP logging degraded - %d failures", id(http_logging_failures));
+                  return std::string(buf);
+      # Reset failure counter periodically
+      - lambda: 'id(http_logging_failures) = 0;'

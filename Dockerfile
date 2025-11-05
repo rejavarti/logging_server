@@ -60,10 +60,14 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
         process.exit(res.statusCode === 200 ? 0 : 1) \
     }).on('error', () => process.exit(1))"
 
-# Use tini for proper signal handling
-ENTRYPOINT ["/sbin/tini", "--"]
+# Copy startup script
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Start with PM2 for automatic restarts and process management
+# Use tini for proper signal handling
+ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
+
+# Default command (will be overridden by entrypoint)
 CMD ["pm2-runtime", "start", "server.js", "--name", "logging-server"]
 
 # Labels for better container management and Unraid integration

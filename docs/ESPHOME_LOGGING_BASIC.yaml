@@ -1,0 +1,99 @@
+# ============================================================================
+# ESPHome Basic Logging Configuration
+# ============================================================================
+# Send ERROR logs to your logging server (minimal network traffic)
+# Replace YOUR_SERVER_IP with your actual server IP address
+
+esphome:
+  name: my-device
+  platform: ESP32
+  board: nodemcu-32s
+
+# WiFi Configuration
+wifi:
+  ssid: "YourWiFiSSID"
+  password: "YourWiFiPassword"
+
+# Enable logging to serial and HTTP
+logger:
+  level: INFO  # Show INFO and above on serial console
+  
+# HTTP Request component for sending logs
+http_request:
+  useragent: esphome/${device_name}
+  timeout: 10s
+  verify_ssl: false
+
+# Send ERROR logs to server
+logger:
+  on_message:
+    - level: ERROR
+      then:
+        - http_request.post:
+            url: "http://YOUR_SERVER_IP:10180/log"
+            headers:
+              Content-Type: "application/json"
+            json:
+              message: !lambda 'return std::string(tag) + ": " + message;'
+              severity: "error"
+              category: "esphome"
+              source: "${device_name}"
+            verify_ssl: false
+
+# Optional: Send WARN logs too (more network traffic but catches issues)
+    - level: WARN
+      then:
+        - http_request.post:
+            url: "http://YOUR_SERVER_IP:10180/log"
+            headers:
+              Content-Type: "application/json"
+            json:
+              message: !lambda 'return std::string(tag) + ": " + message;'
+              severity: "warning"
+              category: "esphome"
+              source: "${device_name}"
+            verify_ssl: false
+
+# Enable Home Assistant API (optional but recommended)
+api:
+  encryption:
+    key: "YOUR_API_KEY_HERE"
+
+# Enable OTA updates
+ota:
+  password: "YOUR_OTA_PASSWORD"
+
+# Optional: Send boot message to verify logging works
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - http_request.post:
+          url: "http://YOUR_SERVER_IP:10180/log"
+          headers:
+            Content-Type: "application/json"
+          json:
+            message: !lambda 'return "${device_name} started successfully";'
+            severity: "info"
+            category: "esphome"
+            source: "${device_name}"
+          verify_ssl: false
+
+# Example: Log sensor values on significant change
+sensor:
+  - platform: wifi_signal
+    name: "${device_name} WiFi Signal"
+    update_interval: 60s
+    on_value_range:
+      - below: -80.0
+        then:
+          - http_request.post:
+              url: "http://YOUR_SERVER_IP:10180/log"
+              headers:
+                Content-Type: "application/json"
+              json:
+                message: !lambda 'return "${device_name} WiFi signal weak: " + to_string(x) + " dBm";'
+                severity: "warning"
+                category: "esphome"
+                source: "${device_name}"
+              verify_ssl: false
