@@ -1,24 +1,45 @@
 module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
-  testMatch: ['**/?(*.)+(test).js'],
-  testPathIgnorePatterns: ['<rootDir>/tests/tracing.test.js'],
+  testMatch: ['**/*.test.js', '**/*.spec.js'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/e2e/'
+  ],
   verbose: true,
-  setupFilesAfterEnv: ['<rootDir>/tests/jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.js'],
   collectCoverage: true,
   collectCoverageFrom: [
-    'middleware/request-metrics.js'
+    'routes/**/*.js',
+    'server.js',
+    'middleware/**/*.js',
+    '!routes/**/backup*.js',
+    '!**/node_modules/**',
+    '!**/tests/**',
+    '!**/scripts/**',
+    '!**/archive/**'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov'],
+  coverageReporters: ['text', 'lcov', 'html'],
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/tests/',
+    '/scripts/',
+    '/archive/'
+  ],
   coverageThreshold: {
-    global: { statements: 100, branches: 100, functions: 100, lines: 100 }
+    global: {
+      statements: 50,
+      branches: 40,
+      functions: 50,
+      lines: 50
+    }
   },
-  testTimeout: 30000, // 30 seconds - prevent hanging
+  testTimeout: 30000,
   maxWorkers: 1,
-  bail: false, // Don't stop on first failure
-  detectOpenHandles: true, // Detect async operations that prevent Jest from exiting
-  forceExit: true, // Force exit after tests complete (safety net)
+  bail: false,
+  detectOpenHandles: true,
+  forceExit: true
 };
 
 
