@@ -9,7 +9,7 @@ param(
     [string]$DockerUsername = "rejavarti",
     
     [Parameter(Mandatory=$false)]
-    [string]$ImageName = "rejavartis_logging_server",
+    [string]$ImageName = "logging-server",
     
     [Parameter(Mandatory=$false)]
     [string]$Version = "1.0.0",

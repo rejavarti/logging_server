@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>RejavartiLoggingServer</Name>
-  <Repository>rejavarti/rejavartis_logging_server:latest</Repository>
-  <Registry>https://hub.docker.com/r/rejavarti/rejavartis_logging_server</Registry>
+  <Repository>rejavarti/logging-server:latest</Repository>
+  <Registry>https://hub.docker.com/r/rejavarti/logging-server</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>

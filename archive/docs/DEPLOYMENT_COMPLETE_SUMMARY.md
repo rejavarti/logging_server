@@ -9,11 +9,11 @@
 ## ✅ Completed Tasks
 
 ### 1. Docker Hub Publishing
-- ✅ Built and tagged image: `rejavarti/rejavartis_logging_server:1.0.0`
-- ✅ Built and tagged image: `rejavarti/rejavartis_logging_server:latest`
+- ✅ Built and tagged image: `rejavarti/logging-server:1.0.0`
+- ✅ Built and tagged image: `rejavarti/logging-server:latest`
 - ✅ Published to Docker Hub successfully
 - ✅ Image size: 391MB
-- ✅ Repository: https://hub.docker.com/r/rejavarti/rejavartis_logging_server
+- ✅ Repository: https://hub.docker.com/r/rejavarti/logging-server
 
 ### 2. Documentation Updates
 - ✅ Updated README.md with Docker Hub installation
@@ -45,7 +45,7 @@
 
 ```bash
 # Pull image
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 
 # Run container
 docker run -d \
@@ -58,7 +58,7 @@ docker run -d \
   -e TZ=America/Denver \
   -e AUTH_USERNAME=admin \
   -e AUTH_PASSWORD=ChangeMe123! \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 **Access**: http://localhost:10180
@@ -68,7 +68,7 @@ docker run -d \
 ## 📋 Next Steps for Users
 
 1. **Pull from Docker Hub**
-   - `docker pull rejavarti/rejavartis_logging_server:latest`
+   - `docker pull rejavarti/logging-server:latest`
 
 2. **Run Container**
    - Set environment variables (especially AUTH_PASSWORD!)
@@ -154,8 +154,8 @@ docker run -d \
 ## 🌐 Access URLs
 
 ### Docker Hub
-- **Repository**: https://hub.docker.com/r/rejavarti/rejavartis_logging_server
-- **Tags**: https://hub.docker.com/r/rejavarti/rejavartis_logging_server/tags
+- **Repository**: https://hub.docker.com/r/rejavarti/logging-server
+- **Tags**: https://hub.docker.com/r/rejavarti/logging-server/tags
 
 ### After Deployment
 - **Web UI**: http://your-server:10180
@@ -175,7 +175,7 @@ docker run -d \
 - ⚠️ **CRITICAL**: Create strong admin password after first login
 - ✅ Use HTTPS with reverse proxy (Nginx Proxy Manager, Traefik)
 - ✅ Restrict network access (firewall, VPN)
-- ✅ Regular updates: `docker pull rejavarti/rejavartis_logging_server:latest`
+- ✅ Regular updates: `docker pull rejavarti/logging-server:latest`
 - ✅ Monitor audit logs in Settings
 - ✅ Backup data directory regularly
 
@@ -217,7 +217,7 @@ docker run -d \
 ## 📞 Support Resources
 
 ### For Users
-1. **Pull image**: `docker pull rejavarti/rejavartis_logging_server:latest`
+1. **Pull image**: `docker pull rejavarti/logging-server:latest`
 2. **Documentation**: See README.md for complete guide
 3. **Issues**: Report on GitHub
 4. **Questions**: Check Docker Hub page
@@ -234,14 +234,14 @@ docker run -d \
 
 ### Pull and Run
 ```bash
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 docker run -d --name rejavarti-logging-server -p 10180:10180 \
-  -e AUTH_PASSWORD=SecurePass123! rejavarti/rejavartis_logging_server:latest
+  -e AUTH_PASSWORD=SecurePass123! rejavarti/logging-server:latest
 ```
 
 ### Update Container
 ```bash
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 docker stop rejavarti-logging-server
 docker rm rejavarti-logging-server
 # Run command again with new image

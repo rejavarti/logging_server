@@ -360,23 +360,23 @@ git commit -m "v1.1.2: Production-ready analytics with API endpoints"
 git push origin main
 
 # 2. Build Docker image
-docker build -t rejavarti/rejavartis_logging_server:1.1.2 \
-             -t rejavarti/rejavartis_logging_server:latest .
+docker build -t rejavarti/logging-server:1.1.2 \
+             -t rejavarti/logging-server:latest .
 
 # 3. Push to Docker Hub
-docker push rejavarti/rejavartis_logging_server:1.1.2
-docker push rejavarti/rejavartis_logging_server:latest
+docker push rejavarti/logging-server:1.1.2
+docker push rejavarti/logging-server:latest
 
 # 4. Deploy to Unraid
 ssh root@192.168.222.3
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 docker stop RejavartiLoggingServer
 docker rm RejavartiLoggingServer
 docker run -d --name=RejavartiLoggingServer \
   -p 10180:10180 -p 10181:10181 \
   -v /mnt/user/appdata/logging-server/data:/app/data \
   --restart unless-stopped \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 
 # 5. Verify
 docker ps | grep RejavartiLoggingServer

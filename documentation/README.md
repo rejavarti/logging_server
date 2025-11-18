@@ -1,8 +1,8 @@
 # 🏢 Enterprise Logging Platform
 
-[![Docker Hub](https://img.shields.io/docker/v/rejavarti/rejavartis_logging_server?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/rejavarti/rejavartis_logging_server)
-[![Docker Pulls](https://img.shields.io/docker/pulls/rejavarti/rejavartis_logging_server)](https://hub.docker.com/r/rejavarti/rejavartis_logging_server)
-[![Docker Image Size](https://img.shields.io/docker/image-size/rejavarti/rejavartis_logging_server/latest)](https://hub.docker.com/r/rejavarti/rejavartis_logging_server)
+[![Docker Hub](https://img.shields.io/docker/v/rejavarti/logging-server?label=Docker%20Hub&logo=docker)](https://hub.docker.com/r/rejavarti/logging-server)
+[![Docker Pulls](https://img.shields.io/docker/pulls/rejavarti/logging-server)](https://hub.docker.com/r/rejavarti/logging-server)
+[![Docker Image Size](https://img.shields.io/docker/image-size/rejavarti/logging-server/latest)](https://hub.docker.com/r/rejavarti/logging-server)
 
 Universal Infrastructure Monitoring with Enterprise Authentication and Multi-Source Data Ingestion
 
@@ -27,7 +27,7 @@ This is a comprehensive enterprise-grade logging platform designed for universal
 ### **Pull from Docker Hub (Recommended)**
 
 ```bash
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 ```
 
 ### **Run with Docker**
@@ -43,7 +43,7 @@ docker run -d \
   -e TZ=America/Denver \
   -e AUTH_USERNAME=admin \
   -e AUTH_PASSWORD=ChangeMe123! \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 **Access**: http://localhost:10180
@@ -55,7 +55,7 @@ version: '3.8'
 
 services:
   logging-server:
-    image: rejavarti/rejavartis_logging_server:latest
+    image: rejavarti/logging-server:latest
     container_name: rejavarti-logging-server
     restart: unless-stopped
     ports:
@@ -117,7 +117,7 @@ docker-compose up -d
 Pull and run the pre-built image:
 
 ```bash
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 
 docker run -d \
   --name rejavarti-logging-server \
@@ -127,7 +127,7 @@ docker run -d \
   -v ./logs:/app/logs \
   -e NODE_ENV=production \
   -e TZ=America/Denver \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 ### **Option 2: Unraid GUI**
@@ -135,7 +135,7 @@ docker run -d \
 1. Go to **Docker** tab in Unraid Web UI
 2. Click **Add Container**
 3. Fill in:
-   - **Repository**: `rejavarti/rejavartis_logging_server:latest`
+   - **Repository**: `rejavarti/logging-server:latest`
    - **Port**: `10180:10180`
    - **Paths**:
      - Container: `/app/data` → Host: `/mnt/user/appdata/logging-server/data`
@@ -154,7 +154,7 @@ See [UNRAID_GUI_INSTALLATION.md](deploy-package/UNRAID_GUI_INSTALLATION.md) for 
 ```bash
 git clone https://github.com/rejavarti/logging-server.git
 cd logging-server
-docker build -t rejavarti/rejavartis_logging_server:latest .
+docker build -t rejavarti/logging-server:latest .
 docker-compose up -d
 ```
 
@@ -387,7 +387,7 @@ DELETE FROM users WHERE username='admin';
 3. **Set strong passwords** - Change AUTH_PASSWORD immediately
 4. **Regular backups** - Automated daily backups included
 5. **Monitor logs** - Check Docker logs regularly
-6. **Update regularly** - Pull latest image: `docker pull rejavarti/rejavartis_logging_server:latest`
+6. **Update regularly** - Pull latest image: `docker pull rejavarti/logging-server:latest`
 
 ### Security Best Practices
 
@@ -474,7 +474,7 @@ Contributions welcome! Please open an issue or pull request.
 
 ## 📞 Support
 
-- **Docker Hub**: https://hub.docker.com/r/rejavarti/rejavartis_logging_server
+- **Docker Hub**: https://hub.docker.com/r/rejavarti/logging-server
 - **Issues**: GitHub Issues
 - **Documentation**: See [DEPLOYMENT_GUIDE.md](deploy-package/DEPLOYMENT_GUIDE.md)
 

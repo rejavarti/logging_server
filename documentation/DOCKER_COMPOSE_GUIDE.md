@@ -88,7 +88,7 @@ version: '3.8'
 services:
   logging-server:
     # Pull from Docker Hub
-    image: rejavarti/rejavartis_logging_server:latest
+    image: rejavarti/logging-server:latest
     
     container_name: rejavarti-logging-server
     restart: unless-stopped
@@ -429,7 +429,7 @@ tail -f /mnt/user/appdata/logging-server/logs/system-*.log
 
 ## 📞 Support
 
-- **Docker Hub**: https://hub.docker.com/r/rejavarti/rejavartis_logging_server
+- **Docker Hub**: https://hub.docker.com/r/rejavarti/logging-server
 - **GitHub**: https://github.com/rejavarti/logging-server
 - **Documentation**: See README.md
 

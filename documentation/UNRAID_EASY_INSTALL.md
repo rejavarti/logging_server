@@ -44,7 +44,7 @@ chmod -R 755 /mnt/user/appdata/logging-server
 chown -R 1001:1001 /mnt/user/appdata/logging-server
 
 # Pull and run
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 
 docker run -d \
   --name rejavarti-logging-server \
@@ -56,7 +56,7 @@ docker run -d \
   -e TZ=America/Denver \
   -e AUTH_USERNAME=admin \
   -e AUTH_PASSWORD=YourSecurePassword123! \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 ---
@@ -79,7 +79,7 @@ chmod -R 755 /mnt/user/appdata/logging-server
 | Field | Value |
 |-------|-------|
 | **Name** | `rejavarti-logging-server` |
-| **Repository** | `rejavarti/rejavartis_logging_server:latest` |
+| **Repository** | `rejavarti/logging-server:latest` |
 | **Network Type** | `bridge` |
 
 5. **Add Port Mapping:**
@@ -199,7 +199,7 @@ docker stop rejavarti-logging-server
 docker rm rejavarti-logging-server
 
 # Update to latest
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 docker stop rejavarti-logging-server
 docker rm rejavarti-logging-server
 # Then run docker run command again
@@ -213,7 +213,7 @@ To update to the latest version:
 
 ```bash
 # Pull latest image
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 
 # Stop and remove old container
 docker stop rejavarti-logging-server
@@ -230,7 +230,7 @@ docker run -d \
   -e TZ=America/Denver \
   -e AUTH_USERNAME=admin \
   -e AUTH_PASSWORD=YourPassword \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 ---
@@ -271,7 +271,7 @@ netstat -tlnp | grep 10180
 
 ## 📞 Support
 
-- **Docker Hub**: https://hub.docker.com/r/rejavarti/rejavartis_logging_server
+- **Docker Hub**: https://hub.docker.com/r/rejavarti/logging-server
 - **GitHub**: https://github.com/rejavarti/logging-server
 - **Issues**: Report on GitHub
 

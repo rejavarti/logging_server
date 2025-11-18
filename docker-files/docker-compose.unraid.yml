@@ -3,7 +3,7 @@ version: '3.8'
 services:
   logging-server:
     # Use Docker Hub image (or build from source with 'build: .')
-    image: rejavarti/rejavartis_logging_server:latest
+    image: rejavarti/logging-server:latest
     # Uncomment below to build from source instead of pulling from Docker Hub
     # build:
     #   context: .

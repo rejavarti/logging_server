@@ -1,7 +1,7 @@
 {
-  "name": "enhanced-logging-platform",
-  "version": "2.2.0",
-  "description": "Enhanced Universal Logging Platform - Security Hardened",
+  "name": "logging-server",
+  "version": "1.0.0",
+  "description": "Enterprise-grade logging platform with multi-protocol ingestion, real-time analytics, and advanced search capabilities",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

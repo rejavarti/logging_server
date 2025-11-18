@@ -213,13 +213,13 @@ docker run -d \
   -e TZ=America/Denver \
   -e AUTH_USERNAME=admin \
   -e AUTH_PASSWORD=ChangeMe123! \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 ---
 
 ## Need Help?
 
-- **Docker Hub**: https://hub.docker.com/r/rejavarti/rejavartis_logging_server
+- **Docker Hub**: https://hub.docker.com/r/rejavarti/logging-server
 - **Documentation**: See README.md and other guides in the repository
 - **Health Check**: http://your-ip:10180/health

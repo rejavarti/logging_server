@@ -1,7 +1,7 @@
 # Rejavarti's Enterprise Logging Server
 
-[![Docker Image Size](https://img.shields.io/docker/image-size/rejavarti/rejavartis_logging_server/latest)](https://hub.docker.com/r/rejavarti/rejavartis_logging_server)
-[![Docker Pulls](https://img.shields.io/docker/pulls/rejavarti/rejavartis_logging_server)](https://hub.docker.com/r/rejavarti/rejavartis_logging_server)
+[![Docker Image Size](https://img.shields.io/docker/image-size/rejavarti/logging-server/latest)](https://hub.docker.com/r/rejavarti/logging-server)
+[![Docker Pulls](https://img.shields.io/docker/pulls/rejavarti/logging-server)](https://hub.docker.com/r/rejavarti/logging-server)
 
 **Universal Infrastructure Monitoring Platform** with Enterprise Authentication, Multi-User Support, and Real-Time Analytics.
 
@@ -14,7 +14,7 @@ Perfect for DSC security systems, UniFi networks, Home Assistant, Node-RED, IoT 
 ### Pull and Run
 
 ```bash
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 
 docker run -d \
   --name rejavarti-logging-server \
@@ -26,7 +26,7 @@ docker run -d \
   -e TZ=America/Denver \
   -e AUTH_USERNAME=admin \
   -e AUTH_PASSWORD=ChangeMe123! \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 **Access**: http://localhost:10180
@@ -38,7 +38,7 @@ version: '3.8'
 
 services:
   logging-server:
-    image: rejavarti/rejavartis_logging_server:latest
+    image: rejavarti/logging-server:latest
     container_name: rejavarti-logging-server
     restart: unless-stopped
     ports:
@@ -308,7 +308,7 @@ Then re-register at `/register`
 1. ✅ **Change Default Password**: Set strong AUTH_PASSWORD
 2. ✅ **Use HTTPS**: Deploy behind reverse proxy (Nginx, Traefik)
 3. ✅ **Restrict Access**: Use firewall rules or VPN
-4. ✅ **Regular Updates**: `docker pull rejavarti/rejavartis_logging_server:latest`
+4. ✅ **Regular Updates**: `docker pull rejavarti/logging-server:latest`
 5. ✅ **Monitor Logs**: Check audit logs in Settings
 6. ✅ **Backup Data**: Regular backups of `/app/data` volume
 
@@ -347,7 +347,7 @@ MIT License
 
 ## 🙏 Support
 
-- **Docker Hub**: https://hub.docker.com/r/rejavarti/rejavartis_logging_server
+- **Docker Hub**: https://hub.docker.com/r/rejavarti/logging-server
 - **GitHub**: https://github.com/rejavarti/logging-server
 - **Issues**: Report bugs or request features on GitHub
 
@@ -371,5 +371,5 @@ MIT License
 Pull and deploy in seconds! 🚀
 
 ```bash
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 ```

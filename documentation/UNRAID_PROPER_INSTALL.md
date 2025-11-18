@@ -45,7 +45,7 @@ The updated Dockerfile now includes proper labels that Unraid Community Applicat
 cd "c:\Users\Tom Nelson\Documents\Visual_Studio_Code\Node-Red-Home-Assistant\logging-server"
 
 # Rebuild with updated labels
-docker build --no-cache -t rejavarti/rejavartis_logging_server:latest -t rejavarti/rejavartis_logging_server:1.1.0 .
+docker build --no-cache -t rejavarti/logging-server:latest -t rejavarti/logging-server:1.1.0 .
 ```
 
 ### Step 2: Push to Docker Hub
@@ -55,8 +55,8 @@ docker build --no-cache -t rejavarti/rejavartis_logging_server:latest -t rejavar
 docker login
 
 # Push both tags
-docker push rejavarti/rejavartis_logging_server:1.1.0
-docker push rejavarti/rejavartis_logging_server:latest
+docker push rejavarti/logging-server:1.1.0
+docker push rejavarti/logging-server:latest
 ```
 
 ### Step 3: Wait for Community Applications to Update
@@ -125,9 +125,9 @@ cp /path/to/unraid-template.xml /boot/config/plugins/dockerMan/templates-user/Re
 ```dockerfile
 LABEL maintainer="Tom Nelson <rejavarti@github.com>" \
       org.opencontainers.image.version="1.1.0" \
-      org.opencontainers.image.url="https://hub.docker.com/r/rejavarti/rejavartis_logging_server" \
+      org.opencontainers.image.url="https://hub.docker.com/r/rejavarti/logging-server" \
       io.unraid.category="Tools: HomeAutomation: Network:Other Status:Stable" \
-      io.unraid.support="https://hub.docker.com/r/rejavarti/rejavartis_logging_server" \
+      io.unraid.support="https://hub.docker.com/r/rejavarti/logging-server" \
       io.unraid.webui="http://[IP]:[PORT:10180]/dashboard" \
       io.unraid.icon="https://raw.githubusercontent.com/rejavarti/logging-server/main/public/favicon.svg"
 ```
@@ -170,13 +170,13 @@ The XML template now includes:
 
 1. **Rebuild Docker image** with new labels:
    ```bash
-   docker build --no-cache -t rejavarti/rejavartis_logging_server:latest -t rejavarti/rejavartis_logging_server:1.1.0 .
+   docker build --no-cache -t rejavarti/logging-server:latest -t rejavarti/logging-server:1.1.0 .
    ```
 
 2. **Push to Docker Hub**:
    ```bash
-   docker push rejavarti/rejavartis_logging_server:1.1.0
-   docker push rejavarti/rejavartis_logging_server:latest
+   docker push rejavarti/logging-server:1.1.0
+   docker push rejavarti/logging-server:latest
    ```
 
 3. **Copy XML template to Unraid**:
@@ -216,9 +216,9 @@ After copying the template to Unraid:
 ### Step 1: Rebuild and Push (Required)
 ```bash
 cd "c:\Users\Tom Nelson\Documents\Visual_Studio_Code\Node-Red-Home-Assistant\logging-server"
-docker build --no-cache -t rejavarti/rejavartis_logging_server:latest -t rejavarti/rejavartis_logging_server:1.1.0 .
-docker push rejavarti/rejavartis_logging_server:1.1.0
-docker push rejavarti/rejavartis_logging_server:latest
+docker build --no-cache -t rejavarti/logging-server:latest -t rejavarti/logging-server:1.1.0 .
+docker push rejavarti/logging-server:1.1.0
+docker push rejavarti/logging-server:latest
 ```
 
 ### Step 2: Install Template on Unraid
@@ -255,7 +255,7 @@ Users can now install with a single click and all settings will be pre-configure
 
 Check if labels are in the image:
 ```bash
-docker inspect rejavarti/rejavartis_logging_server:latest | grep -A 20 Labels
+docker inspect rejavarti/logging-server:latest | grep -A 20 Labels
 ```
 
 Should show:

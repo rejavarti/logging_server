@@ -100,11 +100,11 @@ All personal information and specific passwords have been replaced with generic 
 cd "c:\Users\Tom Nelson\Documents\Visual_Studio_Code\Node-Red-Home-Assistant\logging-server"
 
 # Build with new labels and security fixes
-docker build --no-cache -t rejavarti/rejavartis_logging_server:latest -t rejavarti/rejavartis_logging_server:1.1.0 .
+docker build --no-cache -t rejavarti/logging-server:latest -t rejavarti/logging-server:1.1.0 .
 
 # Push to Docker Hub
-docker push rejavarti/rejavartis_logging_server:1.1.0
-docker push rejavarti/rejavartis_logging_server:latest
+docker push rejavarti/logging-server:1.1.0
+docker push rejavarti/logging-server:latest
 ```
 
 ---

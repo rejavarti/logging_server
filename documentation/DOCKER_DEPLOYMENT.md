@@ -29,7 +29,7 @@ docker run -d \
   -e NODE_ENV=production \
   -v ./data:/app/data \
   -v ./logs:/app/logs \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 ### 🔧 Configuration
@@ -244,12 +244,12 @@ volumes:
 <?xml version="1.0"?>
 <Container version="2">
   <Name>Enhanced-Logging-Platform</Name>
-  <Repository>rejavarti/rejavartis_logging_server:latest</Repository>
-  <Registry>https://hub.docker.com/r/rejavarti/rejavartis_logging_server</Registry>
+  <Repository>rejavarti/logging-server:latest</Repository>
+  <Registry>https://hub.docker.com/r/rejavarti/logging-server</Registry>
   <Network>bridge</Network>
   <Privileged>false</Privileged>
   <Support>https://github.com/rejavarti/logging_server</Support>
-  <Project>https://hub.docker.com/r/rejavarti/rejavartis_logging_server</Project>
+  <Project>https://hub.docker.com/r/rejavarti/logging-server</Project>
   <Overview>Enterprise Universal Logging Platform with Web Dashboard</Overview>
   <Category>Tools:HomeAutomation Network:Other Status:Stable</Category>
   <WebUI>http://[IP]:[PORT:10180]/</WebUI>

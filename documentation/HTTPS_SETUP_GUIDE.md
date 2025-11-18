@@ -184,7 +184,7 @@ certbot renew --dry-run
 ```yaml
 services:
   logging-server:
-    image: rejavarti/rejavartis_logging_server:latest
+    image: rejavarti/logging-server:latest
     container_name: rejavarti-logging-server
     restart: unless-stopped
     
@@ -295,7 +295,7 @@ docker stop rejavarti-logging-server
 docker rm rejavarti-logging-server
 
 # Pull latest image
-docker pull rejavarti/rejavartis_logging_server:latest
+docker pull rejavarti/logging-server:latest
 
 # Start with HTTPS
 docker run -d \
@@ -314,7 +314,7 @@ docker run -d \
   -e USE_HTTPS=true \
   -e SSL_CERT_PATH=/app/ssl/cert.pem \
   -e SSL_KEY_PATH=/app/ssl/key.pem \
-  rejavarti/rejavartis_logging_server:latest
+  rejavarti/logging-server:latest
 ```
 
 ---
