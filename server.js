@@ -107,7 +107,8 @@ try {
     Fuse = require('fuse.js');
     _ = require('lodash');
 } catch (error) {
-    loggers?.system?.warn('Some optional packages not available:', error.message);
+    // Logger not yet initialized at this point in the code
+    console.warn('Some optional packages not available:', error.message);
 }
 
 // Multi-Protocol Dependencies (already included in engines)
