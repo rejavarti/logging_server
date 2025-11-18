@@ -8,8 +8,13 @@ const loggers = {
 
 // Minimal DAL stub capturing inserted entries
 class DalStub {
-  constructor() { this.entries = []; }
+  constructor() { 
+    this.entries = []; 
+    this.offsets = new Map();
+  }
   async createLogEntry(entry) { this.entries.push(entry); return this.entries.length; }
+  async setFileOffset(filePath, offset) { this.offsets.set(filePath, offset); }
+  async getFileOffset(filePath) { return this.offsets.get(filePath) || 0; }
 }
 
 const FileIngestionEngine = require('../engines/file-ingestion-engine');

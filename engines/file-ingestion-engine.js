@@ -219,7 +219,11 @@ class FileIngestionEngine {
                         }
                     };
                 } catch (e) {
-                    // Fall through to regex
+                    // In jsonl mode, don't fall through to regex
+                    if (this.mode === 'jsonl') {
+                        return { entry: null, errorReason: 'invalid-json' };
+                    }
+                    // Otherwise fall through to regex
                 }
             }
         }
