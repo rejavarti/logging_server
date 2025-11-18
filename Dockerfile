@@ -51,6 +51,7 @@ RUN apk add --no-cache sqlite tzdata tini && \
 # Set timezone to Mountain Time
 ENV TZ=America/Denver
 ENV NODE_ENV=production
+ENV PORT=10180
 
 # Create app user for security
 RUN addgroup -g 1001 -S logger && \
@@ -70,14 +71,12 @@ RUN mkdir -p data/databases data/backups data/sessions logs && \
 # Switch to non-root user for security
 USER logger
 
-# Expose port 10180 for Unraid configuration
+# Expose port 10180 for Unraid configuration (matches internal app port)
 EXPOSE 10180
 
 # Health check for enterprise monitoring
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:10180/health', (res) => { \
-        process.exit(res.statusCode === 200 ? 0 : 1) \
-    }).on('error', () => process.exit(1))"
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:10180/health || exit 1
 
 # Use tini for proper signal handling
 ENTRYPOINT ["/sbin/tini", "--"]
