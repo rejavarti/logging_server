@@ -206,11 +206,11 @@ const config = {
             const allowFallback = (process.env.NODE_ENV !== 'production') || process.env.ALLOW_DEV_SECRET === 'true';
             if (allowFallback) {
                 const fallback = crypto.randomBytes(32).toString('hex');
-                loggers?.system?.warn('⚠️ Using ephemeral development JWT secret (DO NOT use in production). Set JWT_SECRET to override.');
+                console.warn('⚠️ Using ephemeral development JWT secret (DO NOT use in production). Set JWT_SECRET to override.');
                 return fallback;
             }
-            loggers?.system?.error('🚨 SECURITY WARNING: JWT_SECRET environment variable not set and no fallback allowed (production mode).');
-            loggers?.system?.error('🔧 Generate a secure secret: node -e "loggers?.system?.info(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+            console.error('🚨 SECURITY WARNING: JWT_SECRET environment variable not set and no fallback allowed (production mode).');
+            console.error('🔧 Generate a secure secret: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
             process.exit(1);
         })(),
         saltRounds: 12,
