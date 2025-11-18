@@ -136,7 +136,7 @@ router.put('/', async (req, res) => {
     try {
         const settingsData = req.body;
         
-        if (!settingsData || typeof settingsData !== 'object') {
+        if (!settingsData || typeof settingsData !== 'object' || Object.keys(settingsData).length === 0) {
             return res.status(400).json({ 
                 success: false, 
                 error: 'Settings data is required' 
@@ -470,7 +470,7 @@ router.get('/settings/export', async (req, res) => {
             }
         };
 
-        res.json({ success: true, export: exportData });
+        res.json({ success: true, settings: exportData });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error exporting settings:', error);
         res.status(500).json({ success: false, error: error.message });

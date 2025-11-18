@@ -190,13 +190,15 @@ router.get('/analytics', async (req, res) => {
 
         res.json({
             success: true,
-            totalLogs,
-            errorLogs,
-            avgPerHour: Math.round(avgPerHour),
-            activeSources,
-            hourlyData,
-            severityData,
-            categoryData
+            analytics: {
+                totalLogs,
+                errorLogs,
+                avgPerHour: Math.round(avgPerHour),
+                activeSources,
+                hourlyData,
+                severityData,
+                categoryData
+            }
         });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API logs analytics error:', error);
@@ -279,10 +281,10 @@ router.get('/count', async (req, res) => {
         if (level) { sql += ' AND level = ?'; params.push(level); }
         if (source) { sql += ' AND source = ?'; params.push(source); }
         const row = await req.dal.get(sql, params);
-        res.json({ count: row ? row.count : 0 });
+        res.json({ success: true, count: row ? row.count : 0 });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API logs count error:', error);
-        res.status(500).json({ error: 'Failed to get log count' });
+        res.status(500).json({ success: false, error: 'Failed to get log count' });
     }
 });
 
@@ -355,7 +357,7 @@ router.post('/', async (req, res) => {
             `INSERT INTO logs (level, message, source, ip, timestamp) VALUES (?, ?, ?, ?, ?)`,
             [level, message, source, req.ip || 'unknown', ts]
         );
-        return res.status(200).json({ success: true, id: result.lastID });
+        return res.status(201).json({ success: true, id: result.lastID });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API create log error:', error);
         res.status(500).json({ success: false, error: 'Failed to create log' });

@@ -248,11 +248,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -289,7 +289,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -358,7 +358,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -406,7 +406,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -423,7 +423,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span></td><td class="text"><pre class="prettyprint lang-js">/**
+<span class="cline-any cline-yes">1x</span></td><td class="text"><pre class="prettyprint lang-js">/**
  * User-specific API Routes
  * Handles user preferences, themes, and personal settings
  */
@@ -457,13 +457,13 @@ router.get('/user/theme', <span class="fstat-no" title="function not covered" >a
                     }
                 }
             } catch (dbErr) {
-<span class="cstat-no" title="statement not covered" >                console.warn('Could not load user theme from database:', dbErr.message);</span>
+<span class="cstat-no" title="statement not covered" >                req.app.locals?.loggers?.api?.warn('Could not load user theme from database:', dbErr.message);</span>
             }
         }
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        res.json({ success: true, theme: userTheme });</span>
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >        console.error('Error getting user theme:', error);</span>
+<span class="cstat-no" title="statement not covered" >        req.app.locals?.loggers?.api?.error('Error getting user theme:', error);</span>
 <span class="cstat-no" title="statement not covered" >        res.status(500).json({ success: false, error: error.message });</span>
     }
 });
@@ -513,15 +513,15 @@ router.post('/user/theme', <span class="fstat-no" title="function not covered" >
                             user_agent: req.headers['user-agent'] || 'unknown'
                         });
                     } catch (auditErr) {
-<span class="cstat-no" title="statement not covered" >                        console.warn('Failed to log theme update activity:', auditErr.message);</span>
+<span class="cstat-no" title="statement not covered" >                        req.app.locals?.loggers?.api?.warn('Failed to log theme update activity:', auditErr.message);</span>
                     }
                 }
             } catch (dbErr) {
-<span class="cstat-no" title="statement not covered" >                console.warn('Could not save user theme to database:', dbErr.message);</span>
+<span class="cstat-no" title="statement not covered" >                req.app.locals?.loggers?.api?.warn('Could not save user theme to database:', dbErr.message);</span>
             }
         }
         
-<span class="cstat-no" title="statement not covered" >        console.log(`User theme updated by user ${userId}`);</span>
+<span class="cstat-no" title="statement not covered" >        req.app.locals?.loggers?.api?.info(`User theme updated by user ${userId}`);</span>
         
 <span class="cstat-no" title="statement not covered" >        res.json({</span>
             success: true,
@@ -532,7 +532,7 @@ router.post('/user/theme', <span class="fstat-no" title="function not covered" >
             }
         });
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >        console.error('Error updating user theme:', error);</span>
+<span class="cstat-no" title="statement not covered" >        req.app.locals?.loggers?.api?.error('Error updating user theme:', error);</span>
 <span class="cstat-no" title="statement not covered" >        res.status(500).json({ success: false, error: error.message });</span>
     }
 });
@@ -564,11 +564,11 @@ router.delete('/user/theme', <span class="fstat-no" title="function not covered"
                     preferences: JSON.stringify(preferences)
                 });
             } catch (dbErr) {
-<span class="cstat-no" title="statement not covered" >                console.warn('Could not reset user theme in database:', dbErr.message);</span>
+<span class="cstat-no" title="statement not covered" >                req.app.locals?.loggers?.api?.warn('Could not reset user theme in database:', dbErr.message);</span>
             }
         }
         
-<span class="cstat-no" title="statement not covered" >        console.log(`User theme reset by user ${userId}`);</span>
+<span class="cstat-no" title="statement not covered" >        req.app.locals?.loggers?.api?.info(`User theme reset by user ${userId}`);</span>
         
 <span class="cstat-no" title="statement not covered" >        res.json({</span>
             success: true,
@@ -580,7 +580,7 @@ router.delete('/user/theme', <span class="fstat-no" title="function not covered"
             }
         });
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >        console.error('Error resetting user theme:', error);</span>
+<span class="cstat-no" title="statement not covered" >        req.app.locals?.loggers?.api?.error('Error resetting user theme:', error);</span>
 <span class="cstat-no" title="statement not covered" >        res.status(500).json({ success: false, error: error.message });</span>
     }
 });
@@ -598,7 +598,7 @@ router.get('/timezone', <span class="fstat-no" title="function not covered" >(r<
 &nbsp;
 <span class="cstat-no" title="statement not covered" >        res.json(timezone);</span>
     } catch (error) {
-<span class="cstat-no" title="statement not covered" >        console.error('Error getting timezone:', error);</span>
+<span class="cstat-no" title="statement not covered" >        req.app.locals?.loggers?.api?.error('Error getting timezone:', error);</span>
 <span class="cstat-no" title="statement not covered" >        res.status(500).json({ success: false, error: error.message });</span>
     }
 });
@@ -610,7 +610,7 @@ module.exports = router;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-12T04:50:49.638Z
+                at 2025-11-18T13:15:02.774Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

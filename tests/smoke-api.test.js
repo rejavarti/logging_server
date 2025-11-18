@@ -34,7 +34,7 @@ describe('API Smoke Tests', () => {
       .post('/api/webhooks')
       .set('Authorization', `Bearer ${token}`)
       .send(webhookData);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(201); // Webhook creation returns 201 Created
     expect(res.body.success).toBe(true);
     expect(res.body.webhook).toBeDefined();
     expect(res.body.webhook.name).toBe(webhookData.name);

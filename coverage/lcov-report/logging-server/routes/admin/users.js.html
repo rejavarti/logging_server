@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -784,32 +784,18 @@
 <a name='L719'></a><a href='#L719'>719</a>
 <a name='L720'></a><a href='#L720'>720</a>
 <a name='L721'></a><a href='#L721'>721</a>
-<a name='L722'></a><a href='#L722'>722</a>
-<a name='L723'></a><a href='#L723'>723</a>
-<a name='L724'></a><a href='#L724'>724</a>
-<a name='L725'></a><a href='#L725'>725</a>
-<a name='L726'></a><a href='#L726'>726</a>
-<a name='L727'></a><a href='#L727'>727</a>
-<a name='L728'></a><a href='#L728'>728</a>
-<a name='L729'></a><a href='#L729'>729</a>
-<a name='L730'></a><a href='#L730'>730</a>
-<a name='L731'></a><a href='#L731'>731</a>
-<a name='L732'></a><a href='#L732'>732</a>
-<a name='L733'></a><a href='#L733'>733</a>
-<a name='L734'></a><a href='#L734'>734</a>
-<a name='L735'></a><a href='#L735'>735</a>
-<a name='L736'></a><a href='#L736'>736</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<a name='L722'></a><a href='#L722'>722</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1138,22 +1124,8 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1532,7 +1504,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// routes/admin/users.js - Admin Users Management Route
 const express = require('express');
 const router = express.Router();
@@ -1721,6 +1693,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
     `;
 &nbsp;
     const contentBody = <span class="cstat-no" title="statement not covered" >`</span>
+        &lt;div class="content-header"&gt;&lt;h1&gt;User Management&lt;/h1&gt;&lt;/div&gt;
         &lt;!-- Tab Navigation --&gt;
         &lt;div style="background: var(--bg-primary); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-light); border: 1px solid var(--border-color);"&gt;
             &lt;div style="display: flex; gap: 1rem; flex-wrap: wrap;"&gt;
@@ -1985,7 +1958,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
                     \`;
                 }).join('');
             } catch (error) {
-                console.error('Error loading sessions:', error);
+                req.app.locals?.loggers?.admin?.error('Error loading sessions:', error);
                 document.getElementById('sessions-tbody').innerHTML = 
                     '&lt;tr&gt;&lt;td colspan="7" style="text-align: center; padding: 2rem; color: var(--error-color);"&gt;Failed to load sessions&lt;/td&gt;&lt;/tr&gt;';
             }
@@ -2006,7 +1979,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
                     throw new Error('Failed to terminate session');
                 }
             } catch (error) {
-                console.error('Error terminating session:', error);
+                req.app.locals?.loggers?.admin?.error('Error terminating session:', error);
                 showNotification('Failed to terminate session', 'error');
             }
         }
@@ -2015,22 +1988,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
             loadSessions();
         }
 &nbsp;
-        function formatDate(dateStr) {
-            if (!dateStr) return null;
-            try {
-                const date = new Date(dateStr);
-                if (isNaN(date.getTime())) return null;
-                return date.toLocaleString('en-US', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            } catch (e) {
-                return null;
-            }
-        }
+        // formatDate() defined at line 369 - duplicate removed
 &nbsp;
         async function loadUsers() {
             try {
@@ -2074,7 +2032,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
                     &lt;/tr&gt;
                 \`).join('');
             } catch (error) {
-                console.error('Error loading users:', error);
+                req.app.locals?.loggers?.admin?.error('Error loading users:', error);
                 document.getElementById('users-tbody').innerHTML = '&lt;tr&gt;&lt;td colspan="7" style="text-align: center; padding: 2rem; color: var(--error-color);"&gt;Failed to load users&lt;/td&gt;&lt;/tr&gt;';
             }
         }
@@ -2275,7 +2233,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-12T04:50:49.638Z
+                at 2025-11-18T13:15:02.774Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>

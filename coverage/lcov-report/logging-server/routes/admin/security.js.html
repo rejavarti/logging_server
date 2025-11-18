@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -428,18 +428,16 @@
 <a name='L363'></a><a href='#L363'>363</a>
 <a name='L364'></a><a href='#L364'>364</a>
 <a name='L365'></a><a href='#L365'>365</a>
-<a name='L366'></a><a href='#L366'>366</a>
-<a name='L367'></a><a href='#L367'>367</a>
-<a name='L368'></a><a href='#L368'>368</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L366'></a><a href='#L366'>366</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -778,8 +776,6 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -792,11 +788,11 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Admin Security Route - Security &amp; Audit Monitoring Dashboard
 // Extracted from server.js for better organization and maintainability
 &nbsp;
@@ -1013,7 +1009,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
                     html += '&lt;/tbody&gt;&lt;/table&gt;';
                     container.innerHTML = html;
                 } catch (error) { 
-                    console.error('Error loading rate limits:', error); 
+                    req.app.locals?.loggers?.admin?.error('Error loading rate limits:', error); 
                     document.getElementById('rate-limits-container').innerHTML = \`
                         &lt;div style="text-align: center; padding: 3rem; color: var(--error-color);"&gt;
                             &lt;i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"&gt;&lt;/i&gt;
@@ -1053,7 +1049,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
                         select.appendChild(option); 
                     }); 
                 } catch (error) { 
-                    console.error('Error loading users:', error); 
+                    req.app.locals?.loggers?.admin?.error('Error loading users:', error); 
                 }
             }
             
@@ -1117,7 +1113,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
                     container.innerHTML = html;
                     document.getElementById('pagination-info').textContent = \`Showing \${data.activities.length} of \${data.total} total\`;
                 } catch (error) { 
-                    console.error('Error:', error); 
+                    req.app.locals?.loggers?.admin?.error('Error:', error); 
                     document.getElementById('audit-trail-container').innerHTML = \`
                         &lt;div style="text-align: center; padding: 3rem; color: var(--error-color);"&gt;
                             &lt;i class="fas fa-exclamation-triangle"&gt;&lt;/i&gt;
@@ -1136,9 +1132,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
                 } 
             }
             
-            function showToast(message, type = 'info') {
-                console.log(\`[\${type.toUpperCase()}] \${message}\`);
-            }
+            // showToast() is provided by base.js template
             
             function formatTimestamp(timestamp) {
                 return new Date(timestamp).toLocaleString();
@@ -1171,7 +1165,7 @@ module.exports = (getPageTemplate, requireAuth) =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-12T04:50:49.638Z
+                at 2025-11-18T13:15:02.774Z
             </div>
         <script src="../../../prettify.js"></script>
         <script>
