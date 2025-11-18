@@ -1,20 +1,22 @@
 <?xml version="1.0"?>
 <Container version="2">
   <Name>EnterpriseLoggingServer</Name>
-  <Repository>node:18-alpine</Repository>
-  <Registry>https://hub.docker.com/_/node</Registry>
+  <Repository>rejavarti/logging-server:latest</Repository>
+  <Registry>https://hub.docker.com/r/rejavarti/logging-server</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/rejavarti/Node-Red-Logging</Support>
-  <Project>https://github.com/rejavarti/Node-Red-Logging</Project>
+  <Support>https://github.com/rejavarti/logging_server</Support>
+  <Project>https://github.com/rejavarti/logging_server</Project>
   <Overview>
     Enterprise-grade logging platform for centralized infrastructure monitoring. 
     Supports multiple ingestion protocols including Syslog, GELF, Beats, and Fluentd. 
     Features real-time dashboards, advanced search, automated backups, and WebSocket streaming.
     
     &#xD;
+    &#xD;
+    Version: 1.0.2 (Port 10180 internally, healthy status)&#xD;
     &#xD;
     Features:&#xD;
     • Multi-protocol log ingestion (Syslog, GELF, Beats, Fluentd)&#xD;
@@ -25,23 +27,24 @@
     • SQLite-based storage (no external dependencies)&#xD;
     • Role-based authentication&#xD;
     • PM2 process management for high reliability&#xD;
+    • Built-in healthcheck monitoring&#xD;
     &#xD;
     &#xD;
     After installation:&#xD;
-    1. Access Web UI at http://[IP]:[PORT:10180]&#xD;
+    1. Access Web UI at http://[IP]:[PORT:10180]/dashboard&#xD;
     2. Login with admin username and your configured password&#xD;
     3. Configure ingestion sources in Settings&#xD;
     4. Create dashboards for monitoring&#xD;
     &#xD;
     &#xD;
-    IMPORTANT: Change the default AUTH_PASSWORD before first use!
+    IMPORTANT: Set a secure AUTH_PASSWORD and JWT_SECRET before first use!
   </Overview>
   <Category>Tools: Status:Stable</Category>
-  <WebUI>http://[IP]:[PORT:10180]</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/rejavarti/Node-Red-Logging/master/unraid-template.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/rejavarti/Node-Red-Logging/master/public/img/logo.png</Icon>
+  <WebUI>http://[IP]:[PORT:10180]/dashboard</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/rejavarti/logging_server/main/logging-server/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/rejavarti/logging_server/main/logging-server/public/img/logo.png</Icon>
   <ExtraParams>--restart=unless-stopped</ExtraParams>
-  <PostArgs>sh -c "apk add --no-cache sqlite tini &amp;&amp; npm install -g pm2 &amp;&amp; cd /app &amp;&amp; npm install --production &amp;&amp; exec pm2-runtime start server.js --name logging-server"</PostArgs>
+  <PostArgs/>
   <CPUset/>
   <DateInstalled/>
   <DonateText/>
@@ -103,18 +106,8 @@
   </Networking>
   <Data>
     <Volume>
-      <HostDir>/mnt/user/appdata/logging-server/app</HostDir>
-      <ContainerDir>/app</ContainerDir>
-      <Mode>rw</Mode>
-    </Volume>
-    <Volume>
       <HostDir>/mnt/user/appdata/logging-server/data</HostDir>
       <ContainerDir>/app/data</ContainerDir>
-      <Mode>rw</Mode>
-    </Volume>
-    <Volume>
-      <HostDir>/mnt/user/appdata/logging-server/logs</HostDir>
-      <ContainerDir>/app/logs</ContainerDir>
       <Mode>rw</Mode>
     </Volume>
   </Data>
@@ -153,16 +146,7 @@
       <Value/>
       <Name>JWT_SECRET</Name>
       <Mode/>
-    </Variable>
-    <Variable>
-      <Value>99</Value>
-      <Name>PUID</Name>
-      <Mode/>
-    </Variable>
-    <Variable>
-      <Value>100</Value>
-      <Name>PGID</Name>
-      <Mode/>
+      <Description>JWT signing secret (REQUIRED in production - generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")</Description>
     </Variable>
   </Environment>
   <Labels/>
@@ -175,16 +159,12 @@
   <Config Name="GELF TCP" Target="12202" Default="12202" Mode="tcp" Description="GELF TCP ingestion (Graylog)" Type="Port" Display="advanced" Required="false" Mask="false">12202</Config>
   <Config Name="Beats/Logstash" Target="5044" Default="5044" Mode="tcp" Description="Beats/Logstash ingestion" Type="Port" Display="advanced" Required="false" Mask="false">5044</Config>
   <Config Name="Fluentd" Target="9880" Default="9880" Mode="tcp" Description="Fluentd ingestion" Type="Port" Display="advanced" Required="false" Mask="false">9880</Config>
-  <Config Name="AppData" Target="/app" Default="/mnt/user/appdata/logging-server/app" Mode="rw" Description="Application files" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/logging-server/app</Config>
-  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/logging-server/data" Mode="rw" Description="Database and persistent data" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/logging-server/data</Config>
-  <Config Name="Logs Directory" Target="/app/logs" Default="/mnt/user/appdata/logging-server/logs" Mode="rw" Description="Application logs" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/logging-server/logs</Config>
-  <Config Name="Web Port" Target="PORT" Default="10180" Mode="" Description="Internal web server port" Type="Variable" Display="advanced" Required="true" Mask="false">10180</Config>
+  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/logging-server/data" Mode="rw" Description="Database and persistent data (ONLY volume needed)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/logging-server/data</Config>
+  <Config Name="Web Port" Target="PORT" Default="10180" Mode="" Description="Internal web server port (matches container internal port)" Type="Variable" Display="advanced" Required="true" Mask="false">10180</Config>
   <Config Name="WebSocket Port (Internal)" Target="WS_PORT" Default="8081" Mode="" Description="Internal WebSocket port" Type="Variable" Display="advanced" Required="true" Mask="false">8081</Config>
   <Config Name="Stream Port (Internal)" Target="STREAM_PORT" Default="8082" Mode="" Description="Internal streaming port" Type="Variable" Display="advanced" Required="true" Mask="false">8082</Config>
   <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment (production/development)" Type="Variable" Display="advanced" Required="true" Mask="false">production</Config>
   <Config Name="Timezone" Target="TZ" Default="America/Denver" Mode="" Description="Container timezone (e.g., America/New_York, Europe/London)" Type="Variable" Display="always" Required="true" Mask="false">America/Denver</Config>
   <Config Name="Admin Password" Target="AUTH_PASSWORD" Default="ChangeThisSecurePassword123!" Mode="" Description="Admin authentication password (CHANGE THIS!)" Type="Variable" Display="always" Required="true" Mask="true">ChangeThisSecurePassword123!</Config>
-  <Config Name="JWT Secret" Target="JWT_SECRET" Default="" Mode="" Description="JWT signing secret (leave empty to auto-generate)" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
-  <Config Name="User ID" Target="PUID" Default="99" Mode="" Description="User ID for file permissions" Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
-  <Config Name="Group ID" Target="PGID" Default="100" Mode="" Description="Group ID for file permissions" Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
+  <Config Name="JWT Secret" Target="JWT_SECRET" Default="" Mode="" Description="JWT signing secret (REQUIRED - generate: node -e console.log(require('crypto').randomBytes(64).toString('hex')))" Type="Variable" Display="always" Required="true" Mask="true"></Config>
 </Container>
