@@ -353,8 +353,9 @@ describe('🔬 COMPREHENSIVE STATIC ANALYSIS - CONFIGURATION VALIDATION', () => 
       expect(jestConfig.coverageThreshold.global).toBeDefined();
     });
 
-    test('ignores tracing test file', () => {
-      expect(jestConfig.testPathIgnorePatterns).toContain('<rootDir>/tests/tracing.test.js');
+    test('excludes e2e tests from Jest', () => {
+      expect(jestConfig.testPathIgnorePatterns).toBeDefined();
+      expect(jestConfig.testPathIgnorePatterns).toContain('/tests/e2e/');
     });
   });
 
