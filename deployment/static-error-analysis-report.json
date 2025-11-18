@@ -1,0 +1,72 @@
+{
+  "timestamp": "2025-11-09T18:18:29.085Z",
+  "summary": {
+    "pageIssues": 0,
+    "chartIssues": 2,
+    "databaseIssues": 2,
+    "dockerIssues": 1,
+    "totalIssues": 5
+  },
+  "details": {
+    "pageErrors": [],
+    "chartErrors": [
+      {
+        "file": "routes/logs.js",
+        "issues": [
+          "Line 438: Chart data may be missing labels",
+          "Line 442: Chart data may be missing labels",
+          "Line 473: Chart data may be missing labels",
+          "Line 476: Chart data may be missing labels",
+          "Line 505: Chart data may be missing labels",
+          "Line 509: Chart data may be missing labels",
+          "No chart update mechanism found - may cause stale data"
+        ]
+      },
+      {
+        "file": "routes/dashboard.js",
+        "issues": [
+          "Line 53: Chart data may be missing labels",
+          "Line 59: Chart data may be missing labels",
+          "Line 64: Chart data may be missing labels",
+          "Line 186: Canvas missing style attributes",
+          "Line 207: Canvas missing style attributes",
+          "Line 212: Canvas missing style attributes",
+          "Line 217: Canvas missing style attributes",
+          "Line 240: Canvas missing style attributes",
+          "Line 667: Chart data may be missing labels",
+          "Line 670: Chart data may be missing labels",
+          "Line 717: Chart data may be missing labels",
+          "Line 719: Chart data may be missing labels",
+          "Line 760: Chart data may be missing labels",
+          "Line 772: Chart data may be missing labels",
+          "No chart update mechanism found - may cause stale data"
+        ]
+      }
+    ],
+    "databaseErrors": [
+      {
+        "file": "database-access-layer.js",
+        "issues": [
+          "Potential SQL injection vulnerability - string interpolation in queries"
+        ]
+      },
+      {
+        "file": "universal-sqlite-adapter.js",
+        "issues": [
+          "Potential SQL injection vulnerability - string interpolation in queries"
+        ]
+      }
+    ],
+    "jsErrors": [],
+    "configErrors": [],
+    "dockerErrors": [
+      {
+        "type": "JSON Parsing Error",
+        "description": "SyntaxError: Unexpected token in JSON.parse()",
+        "cause": "Malformed JSON requests from audit tools",
+        "severity": "Low (from testing)",
+        "solution": "Add better JSON validation middleware"
+      }
+    ]
+  }
+}

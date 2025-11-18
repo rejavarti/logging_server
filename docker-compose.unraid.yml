@@ -1,85 +1,138 @@
-version: '3.8'
+version: "3.9"
+
+# Unraid-friendly compose with optional sidecar port forwarders.
+# Main service exposes only UI by default. Enable an ingestion by starting
+# its sidecar (publishes the host port and forwards traffic to the main app).
 
 services:
   logging-server:
-    # Use Docker Hub image (or build from source with 'build: .')
-    image: rejavarti/rejavartis_logging_server:latest
-    # Uncomment below to build from source instead of pulling from Docker Hub
-    # build:
-    #   context: .
-    #   dockerfile: Dockerfile
-    
+    image: rejavarti/logging-server:latest
     container_name: rejavarti-logging-server
     restart: unless-stopped
-    
-    # Port mapping
-    ports:
-      - "10180:10180"
-    
-    # Volume mounts for persistent data (Unraid/Linux paths)
-    volumes:
-      - /mnt/user/appdata/logging-server/data:/app/data
-      - /mnt/user/appdata/logging-server/logs:/app/logs
-      # SSL certificates (optional - only if using HTTPS)
-      # Place cert.pem and key.pem in this directory
-      - /mnt/user/appdata/logging-server/ssl:/app/ssl:ro
-      - /etc/localtime:/etc/localtime:ro
-    
-    # Environment variables
     environment:
-      # Node.js environment (production/development)
-      - NODE_ENV=production
-      
-      # Application port (must match container port above)
-      - PORT=10180
-      
-      # Timezone for log timestamps (change to your timezone)
-      # Examples: America/New_York, Europe/London, Asia/Tokyo
-      - TZ=America/Denver
-      
-      # Default authentication credentials
-      # ⚠️ CHANGE THESE BEFORE PRODUCTION USE!
-      - AUTH_USERNAME=admin
-      - AUTH_PASSWORD=ChangeMe123!
-      
-      # HTTPS/SSL Configuration (optional)
-      # Set to 'true' to enable HTTPS (requires SSL certificates in /ssl directory)
-      - USE_HTTPS=false
-      # SSL certificate and key paths (only needed if USE_HTTPS=true)
-      # - SSL_CERT_PATH=/app/ssl/cert.pem
-      # - SSL_KEY_PATH=/app/ssl/key.pem
-    
-    # Resource limits (adjust based on your server)
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 256M
-    
-    # Health check for monitoring
-    healthcheck:
-      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:10180/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 15s
-    
-    # Container logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Labels for organization (optional)
-    labels:
-      - "com.rejavarti.logging-server.version=1.1.0"
-      - "com.rejavarti.logging-server.description=Enterprise Logging Platform with HTTP/HTTPS Support"
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_PASSWORD: ${AUTH_PASSWORD}
+      # CORS_ORIGIN: https://your-domain
+      # TRUST_PROXY: "1"
+      # FILE_INGESTION_ENABLED: "false"  # optional: keep listeners off internally if desired
+    ports:
+      - "10180:3000"     # Web UI
+      - "8081:8081"      # WebSocket (optional; comment out if not used)
+      # Ingestion ports are published but will be blocked by Port Guardian unless enabled in UI
+      - "514:514/udp"     # Syslog UDP
+      - "601:601"         # Syslog TCP
+      - "12201:12201/udp" # GELF UDP
+      - "12202:12202"     # GELF TCP
+      - "5044:5044"       # Beats TCP
+      - "9880:9880"       # Fluent TCP
+    volumes:
+      # Share ingestion-state with Port Guardian so UI toggles immediately affect host firewall
+      - ./data/config/ingestion-state.json:/app/data/config/ingestion-state.json
+    networks:
+      - logging_net
 
-# Network configuration
+  # Port Guardian (optional): dynamically blocks/unblocks host ports without restarting main app.
+  # It manages host firewall rules and reads desired state from data/config/ingestion-state.json.
+  # Security: grants NET_ADMIN and host network only to this small sidecar, not to the main app.
+  port-guardian:
+    build:
+      context: ./scripts/port-guardian
+    container_name: port-guardian
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - ./data/config/ingestion-state.json:/config/ingestion-state.json:ro
+    environment:
+      - CFG_FILE=/config/ingestion-state.json
+      - INTERVAL=2
+    depends_on:
+      - logging-server
+
+  # --- OPTIONAL SIDECARS (start only the ones you need) ---
+  # Each sidecar publishes a host port and forwards to the internal port
+  # of the main logging-server over the Docker network.
+
+  # Syslog UDP (514/udp)
+  syslog-udp-forwarder:
+    image: alpine/socat
+    command: ["sh","-c","socat -d -d UDP4-RECVFROM:514,fork,bind=0.0.0.0 UDP4-SENDTO:logging-server:514"]
+    restart: unless-stopped
+    depends_on: [logging-server]
+    ports:
+      - "514:514/udp"
+    networks:
+      - logging_net
+    deploy:
+      replicas: 0  # set to 1 to enable (or start via Unraid UI)
+
+  # Syslog TCP (601/tcp)
+  syslog-tcp-forwarder:
+    image: alpine/socat
+    command: ["sh","-c","socat -d -d TCP-LISTEN:601,fork,reuseaddr TCP:logging-server:601"]
+    restart: unless-stopped
+    depends_on: [logging-server]
+    ports:
+      - "601:601"
+    networks:
+      - logging_net
+    deploy:
+      replicas: 0
+
+  # GELF UDP (12201/udp)
+  gelf-udp-forwarder:
+    image: alpine/socat
+    command: ["sh","-c","socat -d -d UDP4-RECVFROM:12201,fork,bind=0.0.0.0 UDP4-SENDTO:logging-server:12201"]
+    restart: unless-stopped
+    depends_on: [logging-server]
+    ports:
+      - "12201:12201/udp"
+    networks:
+      - logging_net
+    deploy:
+      replicas: 0
+
+  # GELF TCP (12202/tcp)
+  gelf-tcp-forwarder:
+    image: alpine/socat
+    command: ["sh","-c","socat -d -d TCP-LISTEN:12202,fork,reuseaddr TCP:logging-server:12202"]
+    restart: unless-stopped
+    depends_on: [logging-server]
+    ports:
+      - "12202:12202"
+    networks:
+      - logging_net
+    deploy:
+      replicas: 0
+
+  # Beats (5044/tcp)
+  beats-forwarder:
+    image: alpine/socat
+    command: ["sh","-c","socat -d -d TCP-LISTEN:5044,fork,reuseaddr TCP:logging-server:5044"]
+    restart: unless-stopped
+    depends_on: [logging-server]
+    ports:
+      - "5044:5044"
+    networks:
+      - logging_net
+    deploy:
+      replicas: 0
+
+  # Fluent HTTP (9880/tcp)
+  fluent-forwarder:
+    image: alpine/socat
+    command: ["sh","-c","socat -d -d TCP-LISTEN:9880,fork,reuseaddr TCP:logging-server:9880"]
+    restart: unless-stopped
+    depends_on: [logging-server]
+    ports:
+      - "9880:9880"
+    networks:
+      - logging_net
+    deploy:
+      replicas: 0
+
 networks:
-  default:
-    name: logging-network
+  logging_net:
+    driver: bridge

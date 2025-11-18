@@ -6,19 +6,8 @@ const router = express.Router();
 
 module.exports = (getPageTemplate, requireAuth) => {
     // Security & Audit Monitoring (Consolidated)
-    router.get('/security', requireAuth, (req, res) => {
-        if (req.user.role !== 'admin') {
-            return res.status(403).send(getPageTemplate({
-                pageTitle: 'Access Denied',
-                pageIcon: 'fas fa-ban',
-                activeNav: '',
-                contentBody: '<div class="card"><div class="card-body"><h2 style="color: var(--error-color);"><i class="fas fa-exclamation-triangle"></i> Access Denied</h2><p>Admin privileges required to access this page.</p><a href="/dashboard" class="btn"><i class="fas fa-arrow-left"></i> Return to Dashboard</a></div></div>',
-                additionalCSS: '',
-                additionalJS: '',
-                req: req
-            }));
-        }
-
+    // Note: requireAuth and requireAdmin already applied at server.js level
+    router.get('/security', (req, res) => {
         const contentBody = `
             <!-- Tab Navigation -->
             <div style="background: var(--bg-primary); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-light); border: 1px solid var(--border-color);">
@@ -190,7 +179,9 @@ module.exports = (getPageTemplate, requireAuth) => {
                     const data = await response.json();
                     
                     const container = document.getElementById('rate-limits-container');
-                    if (!data.rateLimits || data.rateLimits.length === 0) { 
+                    
+                    // Check if data exists and rateLimits is an array
+                    if (!data || !data.rateLimits || !Array.isArray(data.rateLimits) || data.rateLimits.length === 0) { 
                         container.innerHTML = \`
                             <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
                                 <i class="fas fa-check-circle" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
@@ -223,7 +214,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                     html += '</tbody></table>';
                     container.innerHTML = html;
                 } catch (error) { 
-                    console.error('Error loading rate limits:', error); 
+                    req.app.locals?.loggers?.admin?.error('Error loading rate limits:', error); 
                     document.getElementById('rate-limits-container').innerHTML = \`
                         <div style="text-align: center; padding: 3rem; color: var(--error-color);">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
@@ -263,7 +254,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                         select.appendChild(option); 
                     }); 
                 } catch (error) { 
-                    console.error('Error loading users:', error); 
+                    req.app.locals?.loggers?.admin?.error('Error loading users:', error); 
                 }
             }
             
@@ -327,7 +318,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                     container.innerHTML = html;
                     document.getElementById('pagination-info').textContent = \`Showing \${data.activities.length} of \${data.total} total\`;
                 } catch (error) { 
-                    console.error('Error:', error); 
+                    req.app.locals?.loggers?.admin?.error('Error:', error); 
                     document.getElementById('audit-trail-container').innerHTML = \`
                         <div style="text-align: center; padding: 3rem; color: var(--error-color);">
                             <i class="fas fa-exclamation-triangle"></i>
@@ -346,9 +337,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                 } 
             }
             
-            function showToast(message, type = 'info') {
-                console.log(\`[\${type.toUpperCase()}] \${message}\`);
-            }
+            // showToast() is provided by base.js template
             
             function formatTimestamp(timestamp) {
                 return new Date(timestamp).toLocaleString();

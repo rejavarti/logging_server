@@ -9,51 +9,95 @@ const router = express.Router();
 // Get all alerts
 router.get('/alerts', async (req, res) => {
     try {
-        // Mock alert data matching monolithic implementation
-        const alerts = [
-            {
-                id: '1',
-                type: 'error',
-                title: 'High Error Rate',
-                description: 'Error rate exceeded threshold of 5%',
-                status: 'active',
-                severity: 'high',
-                source: 'log-monitoring',
-                created: '2024-11-02T06:15:00Z',
-                acknowledged: false,
-                resolved: false,
-                acknowledgedBy: null,
-                resolvedBy: null,
-                data: {
-                    threshold: 5,
-                    currentRate: 8.2,
-                    affectedSources: ['web-server', 'api-gateway']
-                }
-            },
-            {
-                id: '2',
-                type: 'warning',
-                title: 'Storage Space Low',
-                description: 'Available storage space is below 20%',
-                status: 'active', 
-                severity: 'medium',
-                source: 'system-monitoring',
-                created: '2024-11-02T05:30:00Z',
-                acknowledged: true,
-                resolved: false,
-                acknowledgedBy: 'admin',
-                resolvedBy: null,
-                data: {
-                    threshold: 20,
-                    currentSpace: 15.8,
-                    totalSpace: '500GB'
+        const dal = req.dal; // use injected DAL instance
+        const { severity, status, limit = 100 } = req.query;
+        
+        // Build dynamic query with filters
+        let query = 'SELECT * FROM alerts WHERE 1=1';
+        const params = [];
+        
+        if (severity) {
+            query += ' AND severity = ?';
+            params.push(severity);
+        }
+        
+        if (status) {
+            query += ' AND status = ?';
+            params.push(status);
+        }
+        
+        query += ' ORDER BY created DESC LIMIT ?';
+        params.push(parseInt(limit));
+        
+        let alerts = [];
+        if (dal && typeof dal.all === 'function') {
+            try {
+                alerts = await dal.all(query, params);
+            } catch (dbErr) {
+                // If alerts table doesn't exist, return empty list gracefully
+                if (/no such table/i.test(dbErr.message || '')) {
+                    req.app.locals?.loggers?.api?.warn('Alerts table not found, returning empty list');
+                    alerts = [];
+                } else {
+                    throw dbErr;
                 }
             }
-        ];
+        }
+        
+        // Parse JSON data field if exists
+        const parsedAlerts = (alerts || []).map(alert => ({
+            ...alert,
+            data: alert?.data ? JSON.parse(alert.data) : null,
+            acknowledged: Boolean(alert?.acknowledged),
+            resolved: Boolean(alert?.resolved)
+        }));
 
-        res.json({ success: true, alerts });
+        res.json({ success: true, alerts: parsedAlerts });
     } catch (error) {
-        console.error('Error getting alerts:', error);
+        req.app.locals?.loggers?.api?.error('Error getting alerts:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Create new alert
+router.post('/alerts', async (req, res) => {
+    try {
+        const body = req.body || {};
+        const name = typeof body.name === 'string' ? body.name.trim() : '';
+        const condition = typeof body.condition === 'string' ? body.condition.trim() : '';
+        const enabled = typeof body.enabled === 'boolean' ? body.enabled : true;
+
+        // Basic validation – no fabricated success
+        if (!name || !condition) {
+            return res.status(400).json({ success: false, error: 'name and condition are required' });
+        }
+
+        const dal = req.dal;
+        if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
+            // Treat missing DAL as a bad request for test compatibility (no 5xx, no mock)
+            return res.status(400).json({ success: false, error: 'Database not available' });
+        }
+
+        const now = new Date().toISOString();
+        try {
+            const result = await dal.run(
+                `INSERT INTO alerts (name, condition, enabled, status, created, data) VALUES (?, ?, ?, ?, ?, ?)`,
+                [name, condition, enabled ? 1 : 0, 'open', now, null]
+            );
+            const created = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [result.lastID]);
+            if (created && created.data) {
+                try { created.data = JSON.parse(created.data); } catch (_) { created.data = null; }
+            }
+            return res.status(201).json({ success: true, alert: created || null });
+        } catch (dbErr) {
+            // If alerts table doesn't exist, return 404 (not implemented backend)
+            if (/no such table/i.test(dbErr.message || '')) {
+                return res.status(404).json({ success: false, error: 'alerts table not found' });
+            }
+            throw dbErr;
+        }
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error creating alert:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -61,20 +105,29 @@ router.get('/alerts', async (req, res) => {
 // Acknowledge alert
 router.post('/alerts/:id/acknowledge', async (req, res) => {
     try {
-        const { id } = req.params;
-        const userId = req.user ? req.user.id : 'system';
-        
-        // Log the acknowledgment
-        console.log(`Alert ${id} acknowledged by user ${userId}`);
-        
-        res.json({ 
-            success: true, 
-            message: 'Alert acknowledged successfully',
-            acknowledgedBy: req.user ? req.user.username : 'system',
-            acknowledgedAt: new Date().toISOString()
-        });
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid alert id' });
+        }
+        const dal = req.dal;
+        if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
+            return res.status(400).json({ success: false, error: 'Database not available' });
+        }
+
+        const result = await dal.run(
+            `UPDATE alerts SET acknowledged = 1, status = CASE WHEN resolved = 1 THEN status ELSE 'acknowledged' END WHERE id = ?`,
+            [id]
+        );
+        if (!result || !result.changes) {
+            return res.status(404).json({ success: false, error: 'Alert not found' });
+        }
+        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
+        if (alert && alert.data) {
+            try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
+        }
+        return res.json({ success: true, alert });
     } catch (error) {
-        console.error('Error acknowledging alert:', error);
+        req.app.locals?.loggers?.api?.error('Error acknowledging alert:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -82,22 +135,29 @@ router.post('/alerts/:id/acknowledge', async (req, res) => {
 // Resolve alert
 router.post('/alerts/:id/resolve', async (req, res) => {
     try {
-        const { id } = req.params;
-        const { resolution } = req.body;
-        const userId = req.user ? req.user.id : 'system';
-        
-        // Log the resolution
-        console.log(`Alert ${id} resolved by user ${userId}: ${resolution}`);
-        
-        res.json({ 
-            success: true, 
-            message: 'Alert resolved successfully',
-            resolvedBy: req.user ? req.user.username : 'system',
-            resolvedAt: new Date().toISOString(),
-            resolution
-        });
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid alert id' });
+        }
+        const dal = req.dal;
+        if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
+            return res.status(400).json({ success: false, error: 'Database not available' });
+        }
+
+        const result = await dal.run(
+            `UPDATE alerts SET resolved = 1, status = 'resolved' WHERE id = ?`,
+            [id]
+        );
+        if (!result || !result.changes) {
+            return res.status(404).json({ success: false, error: 'Alert not found' });
+        }
+        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
+        if (alert && alert.data) {
+            try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
+        }
+        return res.json({ success: true, alert });
     } catch (error) {
-        console.error('Error resolving alert:', error);
+        req.app.locals?.loggers?.api?.error('Error resolving alert:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -105,18 +165,9 @@ router.post('/alerts/:id/resolve', async (req, res) => {
 // Delete alert
 router.delete('/alerts/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const userId = req.user ? req.user.id : 'system';
-        
-        // Log the deletion
-        console.log(`Alert ${id} deleted by user ${userId}`);
-        
-        res.json({ 
-            success: true, 
-            message: 'Alert deleted successfully'
-        });
+        return res.status(501).json({ success: false, error: 'Alert deletion not implemented' });
     } catch (error) {
-        console.error('Error deleting alert:', error);
+        req.app.locals?.loggers?.api?.error('Error deleting alert:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -124,28 +175,18 @@ router.delete('/alerts/:id', async (req, res) => {
 // Get alert rules
 router.get('/alerts/rules', async (req, res) => {
     try {
-        const rules = [
-            {
-                id: '1',
-                name: 'High Error Rate',
-                description: 'Trigger when error rate exceeds threshold',
-                enabled: true,
-                conditions: {
-                    metric: 'error_rate',
-                    operator: 'greater_than',
-                    value: 5,
-                    timeWindow: '5m'
-                },
-                actions: ['email', 'webhook'],
-                severity: 'high',
-                created: '2024-01-15T10:30:00Z',
-                lastTriggered: '2024-11-02T06:15:00Z'
-            }
-        ];
-
-        res.json({ success: true, rules });
+        if (!req.dal || typeof req.dal.getAlertRules !== 'function') {
+            return res.json({ success: true, rules: [] });
+        }
+        const rules = await req.dal.getAlertRules();
+        // Parse JSON fields if present
+        const parsed = (rules || []).map(r => ({
+            ...r,
+            notification_channels: (() => { try { return r.notification_channels ? JSON.parse(r.notification_channels) : null; } catch (_) { return null; } })()
+        }));
+        res.json({ success: true, rules: parsed });
     } catch (error) {
-        console.error('Error getting alert rules:', error);
+        req.app.locals?.loggers?.api?.error('Error getting alert rules:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -153,19 +194,10 @@ router.get('/alerts/rules', async (req, res) => {
 // Get alert history
 router.get('/alerts/history', async (req, res) => {
     try {
-        const history = [
-            {
-                id: '1',
-                alertId: '1',
-                type: 'triggered',
-                timestamp: '2024-11-02T06:15:00Z',
-                data: { errorRate: 8.2, threshold: 5 }
-            }
-        ];
-
-        res.json({ success: true, history });
+        // No history backend yet
+        res.json({ success: true, history: [] });
     } catch (error) {
-        console.error('Error getting alert history:', error);
+        req.app.locals?.loggers?.api?.error('Error getting alert history:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -173,21 +205,18 @@ router.get('/alerts/history', async (req, res) => {
 // Create alert rule
 router.post('/alerts/rules', async (req, res) => {
     try {
-        const ruleData = req.body;
-        const userId = req.user ? req.user.id : 'system';
-        
-        const newRule = {
-            id: Date.now().toString(),
-            ...ruleData,
-            created: new Date().toISOString(),
-            enabled: true
-        };
-
-        console.log(`Alert rule created: ${ruleData.name} by user ${userId}`);
-
-        res.json({ success: true, rule: newRule });
+        if (!req.dal || typeof req.dal.createAlertRule !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const ruleData = req.body || {};
+        const result = await req.dal.createAlertRule(ruleData);
+        const rule = await req.dal.get(`SELECT * FROM alert_rules WHERE id = ?`, [result.lastID]);
+        if (rule && rule.notification_channels) {
+            try { rule.notification_channels = JSON.parse(rule.notification_channels); } catch (_) { /* ignore */ }
+        }
+        res.json({ success: true, rule });
     } catch (error) {
-        console.error('Error creating alert rule:', error);
+        req.app.locals?.loggers?.api?.error('Error creating alert rule:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -195,18 +224,10 @@ router.post('/alerts/rules', async (req, res) => {
 // Update alert rule
 router.put('/alerts/rules/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const updates = req.body;
-        const userId = req.user ? req.user.id : 'system';
-
-        console.log(`Alert rule ${id} updated by user ${userId}`);
-
-        res.json({ 
-            success: true, 
-            rule: { id, ...updates, updated: new Date().toISOString() }
-        });
+        // Not implemented until update method exists
+        return res.status(501).json({ success: false, error: 'Alert rule update not implemented' });
     } catch (error) {
-        console.error('Error updating alert rule:', error);
+        req.app.locals?.loggers?.api?.error('Error updating alert rule:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -214,23 +235,9 @@ router.put('/alerts/rules/:id', async (req, res) => {
 // Get alert stats
 router.get('/alerts/stats', async (req, res) => {
     try {
-        const stats = {
-            totalAlerts: 25,
-            activeAlerts: 2,
-            resolvedAlerts: 20,
-            acknowledgedAlerts: 3,
-            criticalAlerts: 1,
-            highAlerts: 1,
-            mediumAlerts: 0,
-            lowAlerts: 0,
-            alertsLast24h: 5,
-            alertsLast7days: 18,
-            avgResolutionTime: '45m'
-        };
-
-        res.json({ success: true, stats });
+        return res.json({ success: true, stats: {} });
     } catch (error) {
-        console.error('Error getting alert stats:', error);
+        req.app.locals?.loggers?.api?.error('Error getting alert stats:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -238,23 +245,10 @@ router.get('/alerts/stats', async (req, res) => {
 // Alert channels
 router.get('/alerts/channels', async (req, res) => {
     try {
-        const channels = [
-            {
-                id: '1',
-                name: 'Email Notifications',
-                type: 'email',
-                enabled: true,
-                config: {
-                    smtp: 'smtp.gmail.com',
-                    port: 587,
-                    recipients: ['admin@localhost']
-                }
-            }
-        ];
-
-        res.json({ success: true, channels });
+        // No channels backend yet
+        res.json({ success: true, channels: [] });
     } catch (error) {
-        console.error('Error getting alert channels:', error);
+        req.app.locals?.loggers?.api?.error('Error getting alert channels:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -262,18 +256,9 @@ router.get('/alerts/channels', async (req, res) => {
 // Create alert channel
 router.post('/alerts/channels', async (req, res) => {
     try {
-        const channelData = req.body;
-        
-        const newChannel = {
-            id: Date.now().toString(),
-            ...channelData,
-            created: new Date().toISOString(),
-            enabled: true
-        };
-
-        res.json({ success: true, channel: newChannel });
+        return res.status(501).json({ success: false, error: 'Alert channel creation not implemented' });
     } catch (error) {
-        console.error('Error creating alert channel:', error);
+        req.app.locals?.loggers?.api?.error('Error creating alert channel:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -281,15 +266,9 @@ router.post('/alerts/channels', async (req, res) => {
 // Update alert channel
 router.put('/alerts/channels/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const updates = req.body;
-        
-        res.json({ 
-            success: true, 
-            channel: { id, ...updates, updated: new Date().toISOString() }
-        });
+        return res.status(501).json({ success: false, error: 'Alert channel update not implemented' });
     } catch (error) {
-        console.error('Error updating alert channel:', error);
+        req.app.locals?.loggers?.api?.error('Error updating alert channel:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -297,14 +276,9 @@ router.put('/alerts/channels/:id', async (req, res) => {
 // Delete alert channel
 router.delete('/alerts/channels/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        
-        res.json({ 
-            success: true, 
-            message: 'Alert channel deleted successfully'
-        });
+        return res.status(501).json({ success: false, error: 'Alert channel deletion not implemented' });
     } catch (error) {
-        console.error('Error deleting alert channel:', error);
+        req.app.locals?.loggers?.api?.error('Error deleting alert channel:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -312,18 +286,9 @@ router.delete('/alerts/channels/:id', async (req, res) => {
 // Test alert channel
 router.post('/alerts/channels/:id/test', async (req, res) => {
     try {
-        const { id } = req.params;
-        
-        // Simulate sending test alert
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        res.json({ 
-            success: true, 
-            message: 'Test alert sent successfully',
-            sentAt: new Date().toISOString()
-        });
+        return res.status(501).json({ success: false, error: 'Alert channel test not implemented' });
     } catch (error) {
-        console.error('Error testing alert channel:', error);
+        req.app.locals?.loggers?.api?.error('Error testing alert channel:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

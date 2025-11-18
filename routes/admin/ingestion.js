@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPageTemplate } = require('../../templates/base');
+const { getPageTemplate } = require('../../configs/templates/base');
 const router = express.Router();
 
 // Multi-Protocol Ingestion Management Page
@@ -207,7 +207,7 @@ router.get('/', (req, res) => {
                         updateProtocolChart(data.stats.messagesByProtocol);
                     }
                 } catch (error) {
-                    console.error('Failed to load ingestion stats:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load ingestion stats:', error);
                 }
             }
             
@@ -242,28 +242,61 @@ router.get('/', (req, res) => {
                     protocolChart.destroy();
                 }
                 
-                const protocols = Object.keys(messagesByProtocol);
-                const counts = Object.values(messagesByProtocol);
+                const protocols = Object.keys(messagesByProtocol || {});
+                const counts = Object.values(messagesByProtocol || {});
+                
+                // Handle empty state
+                const hasData = protocols.length > 0 && counts.some(c => c > 0);
+                const labels = hasData ? protocols.map(p => p.replace('-', ' ').toUpperCase()) : ['No Data'];
+                const data = hasData ? counts : [1];
+                const bgColors = hasData 
+                    ? ['#007bff', '#28a745', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c']
+                    : ['#e0e0e0'];
                 
                 protocolChart = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
-                        labels: protocols.map(p => p.replace('-', ' ').toUpperCase()),
+                        labels: labels,
                         datasets: [{
-                            data: counts,
-                            backgroundColor: ['#007bff', '#28a745', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c'],
-                            borderWidth: 2
+                            data: data,
+                            backgroundColor: bgColors,
+                            borderWidth: 2,
+                            borderColor: hasData ? '#fff' : '#ccc'
                         }]
                     },
                     options: {
                         responsive: true,
                         plugins: {
                             legend: {
-                                position: 'bottom'
+                                position: 'bottom',
+                                labels: {
+                                    color: hasData ? '#333' : '#999'
+                                }
+                            },
+                            tooltip: {
+                                enabled: hasData,
+                                callbacks: hasData ? undefined : {
+                                    label: () => 'No log data ingested yet'
+                                }
                             }
                         }
                     }
                 });
+                
+                // Show empty state message if no data
+                if (!hasData) {
+                    const chartParent = ctx.canvas.parentElement;
+                    const existingMsg = chartParent.querySelector('.empty-chart-msg');
+                    if (!existingMsg) {
+                        const emptyMsg = document.createElement('div');
+                        emptyMsg.className = 'empty-chart-msg text-center text-muted mt-2';
+                        emptyMsg.innerHTML = '<small><i class="fas fa-info-circle"></i> No protocol data yet. Send logs via Syslog, GELF, Beats, or Fluent.</small>';
+                        chartParent.appendChild(emptyMsg);
+                    }
+                } else {
+                    const existingMsg = ctx.canvas.parentElement.querySelector('.empty-chart-msg');
+                    if (existingMsg) existingMsg.remove();
+                }
             }
             
             async function testParsing() {
@@ -356,7 +389,19 @@ router.get('/', (req, res) => {
         pageIcon: 'fa-network-wired',
         activeNav: 'ingestion',
         contentBody: pageContent,
-        additionalCSS: '',
+        additionalCSS: `
+            .text-muted { 
+                color: var(--text-secondary) !important;
+                opacity: 0.85;
+            }
+            small.text-muted { 
+                color: var(--text-secondary) !important;
+            }
+            .stats-grid h4 {
+                color: var(--text-primary) !important;
+                font-weight: 600;
+            }
+        `,
         additionalJS: '',
         req: req
     }));

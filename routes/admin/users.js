@@ -2,24 +2,14 @@
 const express = require('express');
 const router = express.Router();
 
-/**
- * Admin Users Management Route
- * GET /admin/users
- * Handles user management with tabs for users and sessions
- */
-router.get('/users', (req, res) => {
-    if (req.user.role !== 'admin') {
-        return res.status(403).send(req.getPageTemplate({
-            pageTitle: 'Access Denied',
-            pageIcon: 'fas fa-ban',
-            activeNav: '',
-            contentBody: '<div class="card"><div class="card-body"><h2 style="color: var(--error-color);"><i class="fas fa-exclamation-triangle"></i> Access Denied</h2><p>Admin privileges required to access this page.</p><a href="/dashboard" class="btn"><i class="fas fa-arrow-left"></i> Return to Dashboard</a></div></div>',
-            additionalCSS: '',
-            additionalJS: '',
-            req: req
-        }));
-    }
-    
+module.exports = (getPageTemplate, requireAuth) => {
+    /**
+     * Admin Users Management Route
+     * GET /admin/users (mounted at /admin/users, so this handles /)
+     * Handles user management with tabs for users and sessions
+     * Note: requireAuth and requireAdmin already applied at server.js level
+     */
+    router.get('/', (req, res) => {
     const additionalCSS = `
         .tab-button.active {
             color: var(--accent-primary) !important;
@@ -196,6 +186,7 @@ router.get('/users', (req, res) => {
     `;
 
     const contentBody = `
+        <div class="content-header"><h1>User Management</h1></div>
         <!-- Tab Navigation -->
         <div style="background: var(--bg-primary); border-radius: 12px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-light); border: 1px solid var(--border-color);">
             <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
@@ -217,23 +208,25 @@ router.get('/users', (req, res) => {
                         <i class="fas fa-user-plus"></i> Add User
                     </button>
                 </div>
-                <div class="card-body" style="padding: 0; overflow-x: auto;">
-                    <table class="user-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Email</th>
-                                <th>Role</th>
-                                <th>Status</th>
-                                <th>Created</th>
-                                <th>Last Login</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-tbody">
-                            <tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading users...</td></tr>
-                        </tbody>
-                    </table>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-responsive">
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Created</th>
+                                    <th>Last Login</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-tbody">
+                                <tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading users...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -247,23 +240,25 @@ router.get('/users', (req, res) => {
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
                 </div>
-                <div class="card-body" style="padding: 0; overflow-x: auto;">
-                    <table class="user-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>IP Address</th>
-                                <th>User Agent</th>
-                                <th>Login Time</th>
-                                <th>Last Activity</th>
-                                <th>Duration</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sessions-tbody">
-                            <tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading sessions...</td></tr>
-                        </tbody>
-                    </table>
+                <div class="card-body" style="padding: 0;">
+                    <div class="table-responsive">
+                        <table class="user-table">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>IP Address</th>
+                                    <th>User Agent</th>
+                                    <th>Login Time</th>
+                                    <th>Last Activity</th>
+                                    <th>Duration</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sessions-tbody">
+                                <tr><td colspan="7" style="text-align: center; padding: 2rem;">Loading sessions...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -278,7 +273,7 @@ router.get('/users', (req, res) => {
                 <form id="addUserForm">
                     <div class="form-group">
                         <label for="newUsername">Username *</label>
-                        <input type="text" id="newUsername" name="username" required minlength="3">
+                        <input type="text" id="newUsername" name="username" required minlength="3" autocomplete="username">
                         <small>Minimum 3 characters</small>
                     </div>
                     <div class="form-group">
@@ -316,7 +311,7 @@ router.get('/users', (req, res) => {
                     <input type="hidden" id="editUserId" name="userId">
                     <div class="form-group">
                         <label for="editUsername">Username</label>
-                        <input type="text" id="editUsername" name="username" readonly style="opacity: 0.7; cursor: not-allowed;">
+                        <input type="text" id="editUsername" name="username" readonly style="opacity: 0.7; cursor: not-allowed;" autocomplete="username">
                         <small>Username cannot be changed</small>
                     </div>
                     <div class="form-group">
@@ -371,13 +366,61 @@ router.get('/users', (req, res) => {
             }
         }
 
+        function formatDate(dateStr) {
+            if (!dateStr) return null;
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return null;
+                return date.toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function formatDuration(startDateStr) {
+            if (!startDateStr) return 'N/A';
+            try {
+                const startDate = new Date(startDateStr);
+                if (isNaN(startDate.getTime())) return 'N/A';
+                
+                const now = new Date();
+                const durationMs = now.getTime() - startDate.getTime();
+                if (durationMs < 0) return 'N/A';
+                
+                const minutes = Math.floor(durationMs / 1000 / 60);
+                const hours = Math.floor(minutes / 60);
+                const days = Math.floor(hours / 24);
+                
+                if (days > 0) {
+                    return \`\${days}d \${hours % 24}h\`;
+                } else if (hours > 0) {
+                    return \`\${hours}h \${minutes % 60}m\`;
+                } else {
+                    return \`\${minutes}m\`;
+                }
+            } catch (e) {
+                return 'N/A';
+            }
+        }
+
         async function loadSessions() {
             try {
                 const response = await fetch('/api/admin/sessions');
                 if (!response.ok) throw new Error('Failed to fetch sessions');
                 
                 const data = await response.json();
-                allSessions = data.sessions || data;
+                allSessions = (data.sessions || data).map(session => ({
+                    ...session,
+                    created_at_formatted: formatDate(session.created_at),
+                    last_activity_formatted: formatDate(session.last_activity),
+                    duration_formatted: formatDuration(session.created_at)
+                }));
                 const tbody = document.getElementById('sessions-tbody');
                 
                 if (!allSessions || allSessions.length === 0) {
@@ -386,13 +429,6 @@ router.get('/users', (req, res) => {
                 }
                 
                 tbody.innerHTML = allSessions.map(session => {
-                    // Parse UTC timestamps correctly and calculate duration
-                    const loginTime = new Date(session.created_at + ' UTC');
-                    const lastActivity = new Date(session.last_activity + ' UTC');
-                    const now = new Date();
-                    const durationMs = now.getTime() - loginTime.getTime();
-                    const duration = Math.floor(durationMs / 1000 / 60); // minutes
-                    
                     return \`
                         <tr>
                             <td>
@@ -405,7 +441,7 @@ router.get('/users', (req, res) => {
                             </td>
                             <td>\${session.created_at_formatted || 'N/A'}</td>
                             <td>\${session.last_activity_formatted || 'N/A'}</td>
-                            <td>\${duration < 60 ? duration + ' min' : Math.floor(duration / 60) + 'h ' + (duration % 60) + 'm'}</td>
+                            <td>\${session.duration_formatted || 'N/A'}</td>
                             <td>
                                 <button onclick="terminateSession('\${session.id}')" class="btn-small btn-danger" title="Terminate Session">
                                     <i class="fas fa-sign-out-alt"></i> Terminate
@@ -415,7 +451,7 @@ router.get('/users', (req, res) => {
                     \`;
                 }).join('');
             } catch (error) {
-                console.error('Error loading sessions:', error);
+                req.app.locals?.loggers?.admin?.error('Error loading sessions:', error);
                 document.getElementById('sessions-tbody').innerHTML = 
                     '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--error-color);">Failed to load sessions</td></tr>';
             }
@@ -436,7 +472,7 @@ router.get('/users', (req, res) => {
                     throw new Error('Failed to terminate session');
                 }
             } catch (error) {
-                console.error('Error terminating session:', error);
+                req.app.locals?.loggers?.admin?.error('Error terminating session:', error);
                 showNotification('Failed to terminate session', 'error');
             }
         }
@@ -445,13 +481,19 @@ router.get('/users', (req, res) => {
             loadSessions();
         }
 
+        // formatDate() defined at line 369 - duplicate removed
+
         async function loadUsers() {
             try {
                 const response = await fetch('/api/users');
                 if (!response.ok) throw new Error('Failed to fetch users');
                 
                 const data = await response.json();
-                allUsers = data.users || data; // Handle both {users: []} and direct array
+                allUsers = (data.users || data).map(user => ({
+                    ...user,
+                    created_at_formatted: formatDate(user.created || user.created_at),
+                    last_login_formatted: formatDate(user.lastLogin || user.last_login)
+                }));
                 const tbody = document.getElementById('users-tbody');
                 
                 if (!allUsers || allUsers.length === 0) {
@@ -467,7 +509,7 @@ router.get('/users', (req, res) => {
                         </td>
                         <td>\${user.email || '<em style="color: var(--text-muted);">Not set</em>'}</td>
                         <td><span class="role-badge role-\${user.role}">\${user.role}</span></td>
-                        <td><span class="role-badge status-\${user.is_active ? 'active' : 'inactive'}">\${user.is_active ? 'Active' : 'Inactive'}</span></td>
+                        <td><span class="role-badge status-\${user.is_active || user.status === 'active' ? 'active' : 'inactive'}">\${user.is_active || user.status === 'active' ? 'Active' : 'Inactive'}</span></td>
                         <td>\${user.created_at_formatted || 'N/A'}</td>
                         <td>\${user.last_login_formatted || '<em style="color: var(--text-muted);">Never</em>'}</td>
                         <td>
@@ -483,7 +525,7 @@ router.get('/users', (req, res) => {
                     </tr>
                 \`).join('');
             } catch (error) {
-                console.error('Error loading users:', error);
+                req.app.locals?.loggers?.admin?.error('Error loading users:', error);
                 document.getElementById('users-tbody').innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--error-color);">Failed to load users</td></tr>';
             }
         }
@@ -539,31 +581,84 @@ router.get('/users', (req, res) => {
 
         document.getElementById('addUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Validate form
+            const validation = validateForm(document.getElementById('addUserForm'), {
+                'newUsername': {
+                    label: 'Username',
+                    required: true,
+                    minLength: 3,
+                    maxLength: 50,
+                    pattern: '^[a-zA-Z0-9_-]+$',
+                    patternMessage: 'Username can only contain letters, numbers, underscores, and hyphens'
+                },
+                'newPassword': {
+                    label: 'Password',
+                    required: true,
+                    minLength: 6
+                },
+                'newRole': {
+                    label: 'Role',
+                    required: true
+                }
+            });
+            
+            if (!validation.valid) {
+                return;
+            }
+            
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
+            const submitBtn = e.target.querySelector('button[type="submit"]');
             
-            try {
-                const response = await fetch('/api/users', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    alert(\`User "\${data.username}" created successfully\`);
-                    hideAddUserModal();
-                    loadUsers();
-                } else {
-                    const error = await response.json();
-                    alert('Failed to create user: ' + (error.error || 'Unknown error'));
+            await withLoading(submitBtn, (async () => {
+                try {
+                    const response = await fetch('/api/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (response.ok) {
+                        showToast('User "' + data.username + '" created successfully', 'success');
+                        hideAddUserModal();
+                        loadUsers();
+                    } else {
+                        const error = await response.json();
+                        showToast('Failed to create user: ' + (error.error || 'Unknown error'), 'error');
+                    }
+                } catch (error) {
+                    showToast('Error creating user: ' + error.message, 'error');
                 }
-            } catch (error) {
-                alert('Error creating user: ' + error.message);
-            }
+            })());
         });
 
         document.getElementById('editUserForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // Build validation rules
+            const rules = {
+                'editRole': {
+                    label: 'Role',
+                    required: true
+                }
+            };
+            
+            // Only validate password if it's being changed
+            const passwordField = document.getElementById('editPassword');
+            if (passwordField && passwordField.value.trim()) {
+                rules['editPassword'] = {
+                    label: 'Password',
+                    minLength: 6
+                };
+            }
+            
+            const validation = validateForm(document.getElementById('editUserForm'), rules);
+            
+            if (!validation.valid) {
+                return;
+            }
+            
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
             const userId = data.userId;
@@ -575,24 +670,28 @@ router.get('/users', (req, res) => {
                 delete data.password;
             }
             
-            try {
-                const response = await fetch(\`/api/users/\${userId}\`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    alert('User updated successfully');
-                    hideEditUserModal();
-                    loadUsers();
-                } else {
-                    const error = await response.json();
-                    alert('Failed to update user: ' + (error.error || 'Unknown error'));
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            await withLoading(submitBtn, (async () => {
+                try {
+                    const response = await fetch(\`/api/users/\${userId}\`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (response.ok) {
+                        showToast('User updated successfully', 'success');
+                        hideEditUserModal();
+                        loadUsers();
+                    } else {
+                        const error = await response.json();
+                        showToast('Failed to update user: ' + (error.error || 'Unknown error'), 'error');
+                    }
+                } catch (error) {
+                    showToast('Error updating user: ' + error.message, 'error');
                 }
-            } catch (error) {
-                alert('Error updating user: ' + error.message);
-            }
+            })());
         });
 
         // Close modals when clicking outside
@@ -608,7 +707,7 @@ router.get('/users', (req, res) => {
         loadUsers();
     `;
 
-    res.send(req.getPageTemplate({
+    res.send(getPageTemplate({
         pageTitle: 'User Management',
         pageIcon: 'fas fa-users',
         activeNav: 'users',
@@ -619,4 +718,5 @@ router.get('/users', (req, res) => {
     }));
 });
 
-module.exports = router;
+    return router;
+};

@@ -10,7 +10,8 @@ router.get('/', async (req, res) => {
             userId,
             action,
             startDate,
-            endDate
+            endDate,
+            resourceType
         } = req.query;
 
         const filters = {
@@ -18,10 +19,12 @@ router.get('/', async (req, res) => {
             offset: parseInt(offset)
         };
 
-        if (userId) filters.userId = userId;
+        // Map API params to DAL expected params
+        if (userId) filters.user_id = userId;
         if (action) filters.action = action;
-        if (startDate) filters.startDate = startDate;
-        if (endDate) filters.endDate = endDate;
+        if (resourceType) filters.resource_type = resourceType;
+        if (startDate) filters.start_date = startDate;
+        if (endDate) filters.end_date = endDate;
 
         const activities = await req.dal.getAllActivity(filters);
         
@@ -30,7 +33,7 @@ router.get('/', async (req, res) => {
             total: activities.total || activities.length
         });
     } catch (error) {
-        console.error('API activity error:', error);
+        req.app.locals?.loggers?.api?.error('API activity error:', error);
         res.status(500).json({ error: 'Failed to fetch activities' });
     }
 });
@@ -38,16 +41,27 @@ router.get('/', async (req, res) => {
 // GET /api/activity/latest - Get latest activities for real-time updates
 router.get('/latest', async (req, res) => {
     try {
-        const { since } = req.query;
+        let { since } = req.query;
         
         if (!since) {
-            return res.status(400).json({ error: 'since parameter required' });
+            // Default to last 5 minutes if not provided
+            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+            since = fiveMinutesAgo;
+        }
+        
+        // Validate timestamp format
+        const sinceDate = new Date(since);
+        if (isNaN(sinceDate.getTime())) {
+            return res.status(400).json({ 
+                error: 'Invalid timestamp format',
+                message: 'since parameter must be a valid ISO 8601 timestamp'
+            });
         }
 
         const activities = await req.dal.getActivitiesSince(since);
-        res.json({ activities });
+        res.json({ activities: activities || [] });
     } catch (error) {
-        console.error('API activity latest error:', error);
+        req.app.locals?.loggers?.api?.error('API activity latest error:', error);
         res.status(500).json({ error: 'Failed to fetch latest activities' });
     }
 });
@@ -63,7 +77,7 @@ router.get('/:id', async (req, res) => {
         
         res.json({ activity });
     } catch (error) {
-        console.error('API activity by ID error:', error);
+        req.app.locals?.loggers?.api?.error('API activity by ID error:', error);
         res.status(500).json({ error: 'Failed to fetch activity' });
     }
 });
@@ -91,7 +105,7 @@ router.get('/export', async (req, res) => {
             res.json({ activities });
         }
     } catch (error) {
-        console.error('API activity export error:', error);
+        req.app.locals?.loggers?.api?.error('API activity export error:', error);
         res.status(500).json({ error: 'Failed to export activities' });
     }
 });

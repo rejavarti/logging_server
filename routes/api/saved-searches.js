@@ -9,40 +9,13 @@ const router = express.Router();
 // Get saved searches
 router.get('/saved-searches', async (req, res) => {
     try {
-        const savedSearches = [
-            {
-                id: '1',
-                name: 'Error Logs Last 24h',
-                query: 'level:error',
-                filters: {
-                    timeRange: '24h',
-                    level: ['error'],
-                    source: []
-                },
-                created: '2024-10-30T14:20:00Z',
-                lastUsed: '2024-11-02T06:15:00Z',
-                useCount: 23,
-                createdBy: 'admin'
-            },
-            {
-                id: '2',
-                name: 'ESP32 Device Logs',
-                query: 'source:esp32',
-                filters: {
-                    timeRange: '7d',
-                    level: [],
-                    source: ['esp32']
-                },
-                created: '2024-10-25T09:15:00Z',
-                lastUsed: '2024-11-01T18:30:00Z',
-                useCount: 45,
-                createdBy: 'admin'
-            }
-        ];
-
-        res.json({ success: true, searches: savedSearches });
+        if (!req.dal || !req.dal.getSavedSearches) {
+            return res.json({ success: true, searches: [] });
+        }
+        const searches = await req.dal.getSavedSearches(req.user?.id);
+        res.json({ success: true, searches: Array.isArray(searches) ? searches : [] });
     } catch (error) {
-        console.error('Error getting saved searches:', error);
+        req.app.locals?.loggers?.api?.error('Error getting saved searches:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -50,22 +23,23 @@ router.get('/saved-searches', async (req, res) => {
 // Create saved search
 router.post('/saved-searches', async (req, res) => {
     try {
+        if (!req.dal || !req.dal.createSavedSearch) {
+            return res.status(501).json({ success: false, error: 'Saved search creation not implemented' });
+        }
         const { name, query, filters } = req.body;
-        
-        const savedSearch = {
-            id: Date.now().toString(),
+        if (!name || !query) {
+            return res.status(400).json({ success: false, error: 'Name and query are required' });
+        }
+        const result = await req.dal.createSavedSearch({
+            user_id: req.user?.id || null,
             name,
             query,
-            filters,
-            created: new Date().toISOString(),
-            lastUsed: null,
-            useCount: 0,
-            createdBy: req.user ? req.user.username : 'system'
-        };
-
-        res.json({ success: true, search: savedSearch });
+            filters: filters || {}
+        });
+        const created = await req.dal.getSavedSearchById(result.lastID, req.user?.id || null);
+        res.json({ success: true, search: created });
     } catch (error) {
-        console.error('Error creating saved search:', error);
+        req.app.locals?.loggers?.api?.error('Error creating saved search:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -73,19 +47,17 @@ router.post('/saved-searches', async (req, res) => {
 // Update saved search
 router.put('/saved-searches/:id', async (req, res) => {
     try {
+        if (!req.dal || !req.dal.updateSavedSearch) {
+            return res.status(501).json({ success: false, error: 'Saved search update not implemented' });
+        }
         const { id } = req.params;
-        const updates = req.body;
-        
-        res.json({
-            success: true,
-            search: {
-                id,
-                ...updates,
-                updated: new Date().toISOString()
-            }
-        });
+        const updates = req.body || {};
+        await req.dal.updateSavedSearch(id, req.user?.id || null, updates);
+        const updated = await req.dal.getSavedSearchById(id, req.user?.id || null);
+        if (!updated) return res.status(404).json({ success: false, error: 'Saved search not found' });
+        res.json({ success: true, search: updated });
     } catch (error) {
-        console.error('Error updating saved search:', error);
+        req.app.locals?.loggers?.api?.error('Error updating saved search:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -93,14 +65,17 @@ router.put('/saved-searches/:id', async (req, res) => {
 // Delete saved search
 router.delete('/saved-searches/:id', async (req, res) => {
     try {
+        if (!req.dal || !req.dal.deleteSavedSearch) {
+            return res.status(501).json({ success: false, error: 'Saved search deletion not implemented' });
+        }
         const { id } = req.params;
-        
-        res.json({
-            success: true,
-            message: 'Saved search deleted successfully'
-        });
+        const result = await req.dal.deleteSavedSearch(id, req.user?.id || null);
+        if ((result?.changes || 0) === 0) {
+            return res.status(404).json({ success: false, error: 'Saved search not found' });
+        }
+        res.json({ success: true, message: 'Saved search deleted successfully' });
     } catch (error) {
-        console.error('Error deleting saved search:', error);
+        req.app.locals?.loggers?.api?.error('Error deleting saved search:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -110,27 +85,19 @@ router.post('/saved-searches/:id/use', async (req, res) => {
     try {
         const { id } = req.params;
         
-        // Mock search execution
-        const results = {
-            searchId: id,
-            query: 'level:error',
-            totalResults: 156,
-            results: [
-                {
-                    id: '1',
-                    timestamp: '2024-11-02T06:15:00Z',
-                    level: 'error',
-                    message: 'Database connection failed',
-                    source: 'api-server'
-                }
-            ],
-            executedAt: new Date().toISOString(),
-            executionTime: '125ms'
-        };
+        // Require real implementation - no mock search execution
+        if (!req.dal || !req.dal.executeSavedSearch) {
+            return res.status(501).json({ 
+                success: false, 
+                error: 'Saved search execution not implemented - database access layer unavailable' 
+            });
+        }
+        
+        const results = await req.dal.executeSavedSearch(id);
 
         res.json({ success: true, ...results });
     } catch (error) {
-        console.error('Error executing saved search:', error);
+        req.app.locals?.loggers?.api?.error('Error executing saved search:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

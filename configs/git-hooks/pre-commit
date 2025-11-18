@@ -1,0 +1,26 @@
+#!/bin/bash
+# Git pre-commit hook to prevent accidental local file commits
+# Place in .git/hooks/pre-commit and make executable
+
+echo "🔍 Checking for accidental local edits..."
+
+# Files that should only be edited in Docker
+protected_files=(
+    "server.js"
+    "universal-sqlite-database.js" 
+    "database-access-layer.js"
+    "package.json"
+)
+
+# Check if any protected files are being committed
+for file in "${protected_files[@]}"; do
+    if git diff --cached --name-only | grep -q "$file"; then
+        echo "❌ BLOCKED: $file should only be edited in Docker!"
+        echo "💡 Use: ./docker-dev.ps1 edit $file"
+        echo "   Or: docker exec -it enhanced-logging-dev nano /app/$file"
+        exit 1
+    fi
+done
+
+echo "✅ No protected files in commit"
+exit 0

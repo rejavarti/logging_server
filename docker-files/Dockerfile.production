@@ -1,0 +1,65 @@
+# Enhanced Universal Logging Platform - Production Docker
+# Security-hardened version for production deployment
+
+FROM node:20-alpine AS production
+
+# Install runtime dependencies
+RUN apk add --no-cache sqlite tzdata tini openssl && \
+    npm install -g pm2@latest
+
+# Set timezone to Mountain Time
+ENV TZ=America/Denver
+ENV NODE_ENV=production
+
+# Create app user for security
+RUN addgroup -g 1001 -S logger && \
+    adduser -S logger -u 1001 -G logger
+
+# Set working directory
+WORKDIR /app
+
+# Copy only essential files for production
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install --omit=dev && npm cache clean --force
+
+# Copy application files
+COPY server.js database-access-layer.js dual-database-manager.js ./
+COPY log-parser-engine.js encryption-system.js universal-sqlite-adapter.js ./
+COPY routes/ routes/
+COPY public/ public/
+COPY managers/ managers/
+COPY engines/ engines/
+COPY api/ api/
+COPY configs/ configs/
+COPY archive/migrations/ archive/migrations/
+COPY sample-logs/ sample-logs/
+
+# Create data directories with proper permissions
+RUN mkdir -p data/databases data/backups data/sessions logs && \
+    chown -R logger:logger /app && \
+    chmod -R 755 /app
+
+# Switch to non-root user for security
+USER logger
+
+# Expose port 3000 (mapped to host port 10180)
+EXPOSE 3000
+
+# Health check for monitoring
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3000/health', (res) => { \
+        process.exit(res.statusCode === 200 ? 0 : 1) \
+    }).on('error', () => process.exit(1))"
+
+# Use tini for proper signal handling and start server directly
+ENTRYPOINT ["/sbin/tini", "--", "node", "server.js"]
+
+# Labels for better container management
+LABEL maintainer="Tom Nelson" \
+      description="Enhanced Universal Logging Platform - Security Hardened Production" \
+      version="2.2.0-security-hardened" \
+      org.opencontainers.image.title="Enhanced Universal Logging Server" \
+      org.opencontainers.image.description="Enterprise-grade logging server with web dashboard, real-time monitoring, and API endpoints." \
+      org.opencontainers.image.version="2.2.0-security-hardened"

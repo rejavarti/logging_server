@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPageTemplate } = require('../../templates/base');
+const { getPageTemplate } = require('../../configs/templates/base');
 const router = express.Router();
 
 // Advanced Dashboard Builder Management Page
@@ -97,37 +97,39 @@ router.get('/', (req, res) => {
         </div>
 
         <!-- Create Dashboard Modal -->
-        <div class="modal fade" id="createDashboardModal" tabindex="-1">
+        <div class="modal fade" id="createDashboardModal" tabindex="-1" style="display:none;">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">Create New Dashboard</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        <button type="button" class="btn-close" onclick="closeCreateDashboardModal()" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
                     </div>
                     <div class="modal-body">
                         <form id="createDashboardForm">
                             <div class="mb-3">
                                 <label for="dashboardName" class="form-label">Dashboard Name</label>
-                                <input type="text" class="form-control" id="dashboardName" required>
+                                <input type="text" class="form-control" id="dashboardName" required autocomplete="off">
                             </div>
                             <div class="mb-3">
                                 <label for="dashboardDescription" class="form-label">Description</label>
-                                <textarea class="form-control" id="dashboardDescription" rows="3"></textarea>
+                                <textarea class="form-control" id="dashboardDescription" rows="3" autocomplete="off"></textarea>
                             </div>
                             <div class="mb-3">
                                 <label for="dashboardTags" class="form-label">Tags (comma-separated)</label>
-                                <input type="text" class="form-control" id="dashboardTags" placeholder="monitoring, alerts, metrics">
+                                <input type="text" class="form-control" id="dashboardTags" placeholder="monitoring, alerts, metrics" autocomplete="off">
                             </div>
                             <div class="form-check mb-3">
                                 <input class="form-check-input" type="checkbox" id="dashboardPublic">
                                 <label class="form-check-label" for="dashboardPublic">
                                     Make dashboard public
-                                </label>
+                                label>
                             </div>
                         </form>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeCreateDashboardModal()">Cancel</button>
                         <button type="button" class="btn btn-primary" onclick="submitCreateDashboard()">Create Dashboard</button>
                     </div>
                 </div>
@@ -208,6 +210,103 @@ router.get('/', (req, res) => {
             .dashboard-item:hover .dashboard-actions {
                 opacity: 1;
             }
+            
+            /* Custom modal styles since Bootstrap JS may not be loaded */
+            .modal {
+                position: fixed;
+                top: 0;
+                left: 0;
+                z-index: 1055;
+                width: 100%;
+                height: 100%;
+                overflow-x: hidden;
+                overflow-y: auto;
+                outline: 0;
+            }
+            
+            .modal-dialog {
+                position: relative;
+                width: auto;
+                margin: 1.75rem auto;
+                max-width: 500px;
+                pointer-events: none;
+            }
+            
+            .modal.show .modal-dialog {
+                transform: none;
+            }
+            
+            .modal-content {
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                width: 100%;
+                pointer-events: auto;
+                background-color: var(--bg-primary);
+                background-clip: padding-box;
+                border: 1px solid var(--border-color);
+                border-radius: 0.5rem;
+                outline: 0;
+            }
+            
+            .modal-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 1rem;
+                border-bottom: 1px solid var(--border-color);
+            }
+            
+            .modal-title {
+                margin: 0;
+                line-height: 1.5;
+                color: var(--text-primary);
+            }
+            
+            .modal-body {
+                position: relative;
+                flex: 1 1 auto;
+                padding: 1rem;
+            }
+            
+            .modal-footer {
+                display: flex;
+                flex-wrap: wrap;
+                align-items: center;
+                justify-content: flex-end;
+                padding: 0.75rem;
+                border-top: 1px solid var(--border-color);
+                gap: 0.5rem;
+            }
+            
+            .modal-backdrop {
+                position: fixed;
+                top: 0;
+                left: 0;
+                z-index: 1050;
+                width: 100vw;
+                height: 100vh;
+                background-color: rgba(0, 0, 0, 0.5);
+            }
+            
+            .modal-backdrop.show {
+                opacity: 0.5;
+            }
+            
+            .btn-close {
+                background: transparent;
+                border: 0;
+                font-size: 1.5rem;
+                font-weight: 700;
+                line-height: 1;
+                color: var(--text-muted);
+                opacity: 0.5;
+                cursor: pointer;
+            }
+            
+            .btn-close:hover {
+                opacity: 0.75;
+            }
         </style>
 
         <script>
@@ -234,7 +333,7 @@ router.get('/', (req, res) => {
                         document.getElementById('dashboardList').innerHTML = '<div class="alert alert-warning">No dashboards found</div>';
                     }
                 } catch (error) {
-                    console.error('Failed to load dashboards:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load dashboards:', error);
                     document.getElementById('dashboardList').innerHTML = '<div class="alert alert-danger">Failed to load dashboards</div>';
                 }
             }
@@ -249,7 +348,7 @@ router.get('/', (req, res) => {
                         document.getElementById('widgetTypesCount').textContent = data.data.length;
                     }
                 } catch (error) {
-                    console.error('Failed to load widget types:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load widget types:', error);
                     document.getElementById('widgetTypes').innerHTML = '<div class="alert alert-danger">Failed to load widget types</div>';
                 }
             }
@@ -272,7 +371,7 @@ router.get('/', (req, res) => {
                         document.getElementById('activeUsers').textContent = '1'; // Current user
                     }
                 } catch (error) {
-                    console.error('Failed to load dashboard stats:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load dashboard stats:', error);
                 }
             }
 
@@ -353,8 +452,34 @@ router.get('/', (req, res) => {
             }
 
             function createDashboard() {
-                const modal = new bootstrap.Modal(document.getElementById('createDashboardModal'));
-                modal.show();
+                // Use custom modal since Bootstrap may not be loaded
+                const modal = document.getElementById('createDashboardModal');
+                modal.style.display = 'block';
+                modal.classList.add('show');
+                modal.setAttribute('aria-modal', 'true');
+                modal.setAttribute('role', 'dialog');
+                document.body.classList.add('modal-open');
+                
+                // Add backdrop
+                if (!document.querySelector('.modal-backdrop')) {
+                    const backdrop = document.createElement('div');
+                    backdrop.className = 'modal-backdrop fade show';
+                    backdrop.onclick = () => closeCreateDashboardModal();
+                    document.body.appendChild(backdrop);
+                }
+            }
+            
+            function closeCreateDashboardModal() {
+                const modal = document.getElementById('createDashboardModal');
+                modal.style.display = 'none';
+                modal.classList.remove('show');
+                modal.removeAttribute('aria-modal');
+                modal.removeAttribute('role');
+                document.body.classList.remove('modal-open');
+                
+                // Remove backdrop
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) backdrop.remove();
             }
 
             async function submitCreateDashboard() {
@@ -382,8 +507,7 @@ router.get('/', (req, res) => {
                     const data = await response.json();
                     
                     if (data.success) {
-                        const modal = bootstrap.Modal.getInstance(document.getElementById('createDashboardModal'));
-                        modal.hide();
+                        closeCreateDashboardModal();
                         document.getElementById('createDashboardForm').reset();
                         loadDashboards();
                         loadDashboardStats();
@@ -392,7 +516,7 @@ router.get('/', (req, res) => {
                         showToast('Failed to create dashboard: ' + (data.error || 'Unknown error'), 'error');
                     }
                 } catch (error) {
-                    console.error('Create dashboard error:', error);
+                    req.app.locals?.loggers?.admin?.error('Create dashboard error:', error);
                     showToast('Failed to create dashboard', 'error');
                 }
             }
@@ -422,36 +546,12 @@ router.get('/', (req, res) => {
                         showToast('Failed to delete dashboard: ' + (data.error || 'Unknown error'), 'error');
                     }
                 } catch (error) {
-                    console.error('Delete dashboard error:', error);
+                    req.app.locals?.loggers?.admin?.error('Delete dashboard error:', error);
                     showToast('Failed to delete dashboard', 'error');
                 }
             }
 
-            function showToast(message, type) {
-                // Simple toast implementation
-                console.log(\`[\${type.toUpperCase()}] \${message}\`);
-                
-                const alertClass = type === 'error' ? 'alert-danger' : 
-                                 type === 'warning' ? 'alert-warning' : 
-                                 type === 'success' ? 'alert-success' : 'alert-info';
-                
-                const toastHtml = \`
-                    <div class="alert \${alertClass} alert-dismissible fade show position-fixed" role="alert" style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
-                        \${message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                \`;
-                
-                document.body.insertAdjacentHTML('beforeend', toastHtml);
-                
-                // Auto-remove after 5 seconds
-                setTimeout(() => {
-                    const alerts = document.querySelectorAll('.alert');
-                    if (alerts.length > 0) {
-                        alerts[alerts.length - 1].remove();
-                    }
-                }, 5000);
-            }
+            // showToast() is provided by base.js template
         </script>
     `;
 

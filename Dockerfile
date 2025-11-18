@@ -1,4 +1,4 @@
-# Enterprise Logging Platform
+# Enterprise Logging Platform - MODULAR ARCHITECTURE
 # Multi-Source Infrastructure Monitoring
 # Docker Configuration for Unraid Server with Enterprise Features
 
@@ -10,17 +10,36 @@ RUN apk add --no-cache python3 make g++ sqlite
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first for better layer caching
 COPY package*.json ./
 
-# Install all dependencies for build
-RUN npm ci && npm cache clean --force
+# Install all dependencies for build (use npm install since package-lock may be out of sync)
+RUN npm install && npm cache clean --force
 
-# Copy application files
-COPY . .
+# Copy MODULAR application files
+COPY server.js ./
+COPY database-access-layer.js ./
+COPY dual-database-manager.js ./
+COPY log-parser-engine.js ./
+COPY encryption-system.js ./
+COPY universal-sqlite-adapter.js ./
+COPY seed-logs.sql ./
+COPY start.js ./
+
+# Copy modular directories
+COPY routes/ ./routes/
+COPY api/ ./api/
+COPY engines/ ./engines/
+COPY managers/ ./managers/
+COPY middleware/ ./middleware/
+COPY configs/ ./configs/
+COPY scripts/ ./scripts/
+COPY public/ ./public/
+COPY archive/ ./archive/
+COPY utils/ ./utils/
 
 # Remove development files
-RUN rm -rf .git .gitignore README.md
+RUN rm -rf .git .gitignore README.md *.md 2>/dev/null || true
 
 # Production stage
 FROM node:18-alpine AS production
@@ -60,28 +79,16 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
         process.exit(res.statusCode === 200 ? 0 : 1) \
     }).on('error', () => process.exit(1))"
 
-# Copy startup script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
 # Use tini for proper signal handling
-ENTRYPOINT ["/sbin/tini", "--", "/usr/local/bin/docker-entrypoint.sh"]
+ENTRYPOINT ["/sbin/tini", "--"]
 
-# Default command (will be overridden by entrypoint)
+# Start with PM2 for automatic restarts and process management
 CMD ["pm2-runtime", "start", "server.js", "--name", "logging-server"]
 
-# Labels for better container management and Unraid integration
-LABEL maintainer="Rejavarti <rejavarti@github.com>" \
-      description="Enterprise Logging Platform - Multi-Source Infrastructure Monitoring with Web Dashboard" \
-      version="1.1.2" \
-      org.opencontainers.image.title="Enhanced Universal Logging Server" \
-      org.opencontainers.image.description="Enterprise-grade logging server with web dashboard, real-time monitoring, MQTT integration, and API endpoints. Perfect for ESP32, IoT devices, home automation, and system logging." \
-      org.opencontainers.image.version="1.1.2" \
-      org.opencontainers.image.url="https://hub.docker.com/r/rejavarti/rejavartis_logging_server" \
-      org.opencontainers.image.documentation="https://github.com/rejavarti/logging_server" \
-      org.opencontainers.image.source="https://github.com/rejavarti/logging_server" \
-      com.docker.extension.publisher-url="https://hub.docker.com/r/rejavarti/rejavartis_logging_server" \
-      io.unraid.category="Tools: HomeAutomation: Network:Other Status:Stable" \
-      io.unraid.support="https://github.com/rejavarti/logging_server" \
-      io.unraid.webui="http://[IP]:[PORT:10180]/dashboard" \
-      io.unraid.icon="https://raw.githubusercontent.com/rejavarti/logging_server/main/public/favicon.svg"
+# Labels for better container management
+LABEL maintainer="Tom Nelson" \
+      description="Enterprise Logging Platform - Multi-Source Infrastructure Monitoring (MODULAR)" \
+      version="2.1.0-stable-enhanced" \
+      org.opencontainers.image.title="Enterprise Logging Platform" \
+      org.opencontainers.image.description="Universal infrastructure monitoring with enterprise authentication" \
+      org.opencontainers.image.version="2.1.0"

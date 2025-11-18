@@ -1,0 +1,181 @@
+
+> enhanced-logging-platform@2.2.0 test:playwright
+> cross-env AUTH_PASSWORD=testAdmin123! playwright test
+
+[WebServer] ΓÜá∩╕Å Using ephemeral development JWT secret (DO NOT use in production). Set JWT_SECRET to override.
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒÜÇ Starting Enhanced Universal Logging Platform...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒöº Running database migration...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Connected to database for migration
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒÜÇ Starting database migration...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Creating core system tables...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôï activity_log existing columns: id, user_id, action, resource_type, resource_id, details, ip_address, user_agent, timestamp, created_at
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à activity_log already has timestamp column
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Creating webhooks and integrations tables...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Creating search and alerting tables...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Creating enterprise engine tables...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒöä Creating Log File Analyzer tables...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Creating database indexes for performance...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Database indexes created
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Database migration completed successfully!
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Database connection closed
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Database migration completed successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ΓÅ│ Ensuring database is fully ready...
+[2m[WebServer] [22m
+[2m[WebServer] [22m≡ƒöì Universal SQLite Adapter - Environment Detection
+[2m[WebServer] [22mΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+[2m[WebServer] [22m≡ƒûÑ∩╕Å  Platform: win32
+[2m[WebServer] [22m≡ƒÉ│ Docker Environment: false
+[2m[WebServer] [22m≡ƒÅá Node.js Version: v25.0.0
+[2m[WebServer] [22mΓ£à Using sql.js (WebAssembly Compatibility)
+[2m[WebServer] [22mΓÜá∩╕Å  sql.js requires async init, falling back to sqlite3
+[2m[WebServer] [22m≡ƒÜÇ Database initialized with sqlite3
+[2m[WebServer] [22mΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöüΓöü
+[2m[WebServer] [22m
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Database initialized with sqlite3 (Legacy (Slowest - Callback-based))
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à System settings loaded via DAL:
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Database Access Layer initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒöº Initializing system components...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôè Initializing Metrics Manager...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Metrics Manager initialized
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒöî Initializing integrations...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[33mwarn[39m] ΓÅ¡∩╕Å Skipping WebSocket server startup in test mode
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à All integrations initialized
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à WebhookManager initialized
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒöì Database schema validated during migration - proceeding with engine initialization
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒÜ¿ Initializing Enhanced Real-time Alerting Engine...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôï Loaded 4 alert rules from database
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Admin user lookup successful
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] No notification channels in database
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Enhanced Alerting Engine initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒöì Initializing Advanced Search Engine...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Advanced Search Engine initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[33mwarn[39m] ΓÅ¡∩╕Å Skipping Multi-Protocol Ingestion Engine initialization in test mode
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôü File Ingestion Engine disabled via FILE_INGESTION_ENABLED
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Retention schema created successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôï Loaded 2 retention policies
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôà Scheduled retention tasks
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Data Retention Engine initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[33mwarn[39m] ΓÅ¡∩╕Å Skipping Real-time Streaming Engine initialization in test mode
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Loaded 5 anomaly detection rules
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Loaded 0 baseline patterns
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Scheduled anomaly detection tasks
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] AI-Powered Anomaly Detection Engine initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒöù Initializing Log Correlation Engine...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Log Correlation Engine initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒÜÇ Initializing Performance Optimization Engine...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Performance Optimization Engine initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôè Initializing Advanced Dashboard Builder...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Dashboard database tables verified
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôè Loaded 0 dashboard(s)
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒÄ¢∩╕Å Loaded 0 widget(s)
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôï Initialized 4 default widget templates
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à Advanced Dashboard Builder initialized
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Widget Types: 12 available
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Drag & Drop: Enabled
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Real-time Updates: Active
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Custom Layouts: Supported
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒ¢░∩╕Å Distributed Tracing disabled (set TRACING_ENABLED=true to activate)
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à All system components initialized successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒôè System Summary:
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Database: SQLite with DAL optimization
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Engines: 10 enterprise engines loaded (including File Ingestion)
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Integrations: WebSocket, MQTT, Multi-protocol
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Security: Rate limiting, JWT auth, audit logging
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m]    ΓÇó Performance: Caching, streaming, optimization
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒ¢ú∩╕Å Setting up application routes...
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] Γ£à All routes configured successfully
+[2m[WebServer] [22m2025-11-14 16:35:01 [[32minfo[39m] ≡ƒÜÇ HTTP Server running on port 3000 (bound to 0.0.0.0)
+[2m[WebServer] [22m
+[2m[WebServer] [22m≡ƒÄ» Enhanced Universal Logging Platform Started Successfully!
+[2m[WebServer] [22mΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+[2m[WebServer] [22m≡ƒîÉ Web Interface: http://localhost:3000/dashboard
+[2m[WebServer] [22m≡ƒöÉ Login: admin / [AUTH_PASSWORD from environment]
+[2m[WebServer] [22m≡ƒôè API Endpoints: http://localhost:3000/api/
+[2m[WebServer] [22m≡ƒöÆ ESP32 Endpoint: http://localhost:3000/log
+[2m[WebServer] [22m≡ƒÆÜ Health Check: http://localhost:3000/health
+[2m[WebServer] [22m≡ƒöù WebSocket Server: ws://localhost:8081
+[2m[WebServer] [22mΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+[2m[WebServer] [22m
+
+Running 90 tests using 1 worker
+
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô   1 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:36:3 ΓÇ║ Authentication Flow ΓÇ║ should login successfully and redirect to dashboard (3.4s)
+  Γ£ÿ   2 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:56:3 ΓÇ║ Authentication Flow ΓÇ║ should reject invalid credentials (1.5s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô   3 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:71:3 ΓÇ║ Authentication Flow ΓÇ║ should logout successfully (3.5s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ÿ   4 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:84:3 ΓÇ║ Theme System ΓÇ║ should cycle through all themes (7.7s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô   5 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:127:5 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate to Dashboard and verify page loads (3.3s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô   6 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:127:5 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate to Logs and verify page loads (2.7s)
+[WebServer] The system cannot find the path specified.
+[2m[WebServer] [22m2025-11-14 16:35:31 [[32minfo[39m] ≡ƒº╣ Optimizing memory usage...
+[WebServer] The system cannot find the path specified.
+  Γ£ô   7 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:127:5 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate to Advanced Search and verify page loads (2.9s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô   8 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:127:5 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate to Integrations and verify page loads (2.7s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô   9 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:127:5 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate to Webhooks and verify page loads (2.8s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  10 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:127:5 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate to Activity and verify page loads (2.8s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  11 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:127:5 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate to Advanced Analytics and verify page loads (2.6s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ÿ  12 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:142:3 ΓÇ║ Sidebar Navigation ΓÇ║ should navigate admin pages (admin role only) (7.6s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  13 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:169:3 ΓÇ║ Notification Bell ΓÇ║ should show notification bell and handle clicks (3.0s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  14 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:184:3 ΓÇ║ Notification Bell ΓÇ║ should display empty state when no notifications (2.5s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[2m[WebServer] [22m2025-11-14 16:36:01 [[32minfo[39m] ≡ƒº╣ Optimizing memory usage...
+  Γ£ÿ  15 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:199:3 ΓÇ║ Dashboard Page ΓÇ║ should display system stats without mock data (7.7s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  16 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:215:3 ΓÇ║ Dashboard Page ΓÇ║ should update time display (5.0s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ÿ  17 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:233:3 ΓÇ║ Logs Page ΓÇ║ should load logs table or empty state (3.5s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  18 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:247:3 ΓÇ║ Logs Page ΓÇ║ should allow filtering logs (2.8s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ÿ  19 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:263:3 ΓÇ║ Search Page ΓÇ║ should display search form and controls (2.5s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  20 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:280:3 ΓÇ║ Integrations Page ΓÇ║ should display integrations without static mock list (3.9s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+[2m[WebServer] [22m2025-11-14 16:36:31 [[32minfo[39m] ≡ƒº╣ Optimizing memory usage...
+  Γ£ÿ  21 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:293:3 ΓÇ║ Integrations Page ΓÇ║ should allow toggling integrations (12.6s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ÿ  22 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:315:3 ΓÇ║ Webhooks Page ΓÇ║ should display webhooks table or empty state (4.2s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ô  23 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:335:3 ΓÇ║ Activity Page ΓÇ║ should display activity timeline (3.7s)
+[WebServer] The system cannot find the path specified.
+[WebServer] The system cannot find the path specified.
+  Γ£ÿ  24 [chromium-desktop] ΓÇ║ tests\e2e\ui-comprehensive.spec.js:353:3 ΓÇ║ Admin: Users Page ΓÇ║ should display users table (3.8s)
+[WebServer] The system cannot find the path specified.

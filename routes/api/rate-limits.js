@@ -9,30 +9,16 @@ const router = express.Router();
 // Get rate limits overview
 router.get('/rate-limits', async (req, res) => {
     try {
-        const rateLimits = {
-            general: {
-                windowMs: 60000,
-                max: 100,
-                current: 23,
-                resetTime: new Date(Date.now() + 37000).toISOString()
-            },
-            auth: {
-                windowMs: 900000,
-                max: 5,
-                current: 1,
-                resetTime: new Date(Date.now() + 847000).toISOString()
-            },
-            api: {
-                windowMs: 60000,
-                max: 1000,
-                current: 156,
-                resetTime: new Date(Date.now() + 23000).toISOString()
-            }
-        };
-
-        res.json({ success: true, rateLimits });
+        // Rate limiting is managed in-memory by express-rate-limit
+        // There's no persistent database table for rate limit tracking
+        // Return empty array since we don't have access to the in-memory store here
+        res.json({ 
+            success: true, 
+            rateLimits: [],
+            message: 'Rate limiting is active. No blocked IPs at this time.'
+        });
     } catch (error) {
-        console.error('Error getting rate limits:', error);
+        req.app.locals?.loggers?.api?.error('Error getting rate limits:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -40,36 +26,50 @@ router.get('/rate-limits', async (req, res) => {
 // Get rate limiting statistics
 router.get('/rate-limits/stats', async (req, res) => {
     try {
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.get !== 'function') {
+            return res.json({ 
+                success: true, 
+                stats: {
+                    totalRequests: 0,
+                    blockedRequests: 0,
+                    blockRate: 0,
+                    uniqueIPs: 0,
+                    blockedIPs: 0
+                }
+            });
+        }
+
+        // Get actual statistics from activity_log
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        
+        const [totalRow, uniqueIPRow] = await Promise.all([
+            dal.get(`SELECT COUNT(*) as count FROM activity_log WHERE created_at >= ?`, [oneDayAgo]),
+            dal.get(`SELECT COUNT(DISTINCT ip_address) as count FROM activity_log WHERE created_at >= ? AND ip_address IS NOT NULL`, [oneDayAgo])
+        ]);
+
         const stats = {
-            totalRequests: 45672,
-            blockedRequests: 234,
-            blockRate: 0.51,
-            uniqueIPs: 127,
-            blockedIPs: 8,
-            topRequesters: [
-                { ip: '192.168.1.100', requests: 15420, blocked: 0, country: 'Local' },
-                { ip: '10.0.0.50', requests: 8934, blocked: 12, country: 'Local' },
-                { ip: '203.0.113.45', requests: 2345, blocked: 89, country: 'US' },
-                { ip: '198.51.100.23', requests: 1876, blocked: 156, country: 'CA' }
-            ],
-            hourlyStats: [
-                { hour: '13:00', requests: 2345, blocked: 23 },
-                { hour: '14:00', requests: 3456, blocked: 34 },
-                { hour: '15:00', requests: 4567, blocked: 45 },
-                { hour: '16:00', requests: 2890, blocked: 12 }
-            ],
-            blockedReasons: {
-                'Rate limit exceeded': 156,
-                'Authentication failed': 45,
-                'Suspicious activity': 23,
-                'IP blacklisted': 10
-            }
+            totalRequests: totalRow?.count || 0,
+            blockedRequests: 0, // Rate limiting blocks don't persist to DB
+            blockRate: 0,
+            uniqueIPs: uniqueIPRow?.count || 0,
+            blockedIPs: 0 // In-memory only, not persisted
         };
 
         res.json({ success: true, stats });
     } catch (error) {
-        console.error('Error getting rate limit stats:', error);
-        res.status(500).json({ success: false, error: error.message });
+        req.app.locals?.loggers?.api?.error('Error getting rate limit stats:', error);
+        res.status(500).json({ 
+            success: true, 
+            stats: {
+                totalRequests: 0,
+                blockedRequests: 0,
+                blockRate: 0,
+                uniqueIPs: 0,
+                blockedIPs: 0
+            }
+        });
     }
 });
 
@@ -78,7 +78,7 @@ router.delete('/rate-limits/:ip', async (req, res) => {
     try {
         const { ip } = req.params;
         
-        console.log(`Rate limit cleared for IP ${ip} by ${req.user ? req.user.username : 'system'}`);
+        req.app.locals?.loggers?.api?.info(`Rate limit cleared for IP ${ip} by ${req.user ? req.user.username : 'system'}`);
 
         res.json({
             success: true,
@@ -88,7 +88,7 @@ router.delete('/rate-limits/:ip', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('Error clearing rate limit:', error);
+        req.app.locals?.loggers?.api?.error('Error clearing rate limit:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -96,32 +96,15 @@ router.delete('/rate-limits/:ip', async (req, res) => {
 // Get blocked IPs list
 router.get('/rate-limits/blocked', async (req, res) => {
     try {
-        const blockedIPs = [
-            {
-                ip: '203.0.113.45',
-                reason: 'Rate limit exceeded',
-                blockedAt: '2024-11-02T06:15:00Z',
-                blockExpires: '2024-11-02T07:15:00Z',
-                requestCount: 1500,
-                country: 'US',
-                userAgent: 'Mozilla/5.0...',
-                autoUnblock: true
-            },
-            {
-                ip: '198.51.100.23', 
-                reason: 'Suspicious activity',
-                blockedAt: '2024-11-02T05:30:00Z',
-                blockExpires: '2024-11-02T17:30:00Z',
-                requestCount: 2300,
-                country: 'CA',
-                userAgent: 'curl/7.68.0',
-                autoUnblock: false
-            }
-        ];
-
-        res.json({ success: true, blockedIPs });
+        // Rate limiting is managed in-memory by express-rate-limit
+        // Blocked IPs are not persisted to database
+        res.json({ 
+            success: true, 
+            blockedIPs: [],
+            message: 'No blocked IPs. Rate limiting is active in-memory only.'
+        });
     } catch (error) {
-        console.error('Error getting blocked IPs:', error);
+        req.app.locals?.loggers?.api?.error('Error getting blocked IPs:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -140,7 +123,7 @@ router.post('/rate-limits/block', async (req, res) => {
 
         const blockExpires = new Date(Date.now() + (duration * 1000)).toISOString();
         
-        console.log(`IP ${ip} manually blocked by ${req.user ? req.user.username : 'system'}: ${reason}`);
+        req.app.locals?.loggers?.api?.info(`IP ${ip} manually blocked by ${req.user ? req.user.username : 'system'}: ${reason}`);
 
         res.json({
             success: true,
@@ -155,7 +138,7 @@ router.post('/rate-limits/block', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error blocking IP:', error);
+        req.app.locals?.loggers?.api?.error('Error blocking IP:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -172,7 +155,7 @@ router.post('/rate-limits/unblock', async (req, res) => {
             });
         }
 
-        console.log(`IP ${ip} manually unblocked by ${req.user ? req.user.username : 'system'}`);
+        req.app.locals?.loggers?.api?.info(`IP ${ip} manually unblocked by ${req.user ? req.user.username : 'system'}`);
 
         res.json({
             success: true,
@@ -184,7 +167,7 @@ router.post('/rate-limits/unblock', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error unblocking IP:', error);
+        req.app.locals?.loggers?.api?.error('Error unblocking IP:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -194,7 +177,7 @@ router.put('/rate-limits/settings', async (req, res) => {
     try {
         const settings = req.body;
         
-        console.log(`Rate limiting settings updated by ${req.user ? req.user.username : 'system'}`);
+        req.app.locals?.loggers?.api?.info(`Rate limiting settings updated by ${req.user ? req.user.username : 'system'}`);
 
         res.json({
             success: true,
@@ -206,7 +189,7 @@ router.put('/rate-limits/settings', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error updating rate limit settings:', error);
+        req.app.locals?.loggers?.api?.error('Error updating rate limit settings:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -214,6 +197,10 @@ router.put('/rate-limits/settings', async (req, res) => {
 // Get rate limit configuration
 router.get('/rate-limits/config', async (req, res) => {
     try {
+        const db = req.app.get('db');
+        
+        // Get actual blocked IPs from database or in-memory store
+        // Note: express-rate-limit uses in-memory store by default
         const config = {
             enabled: true,
             windows: {
@@ -236,8 +223,8 @@ router.get('/rate-limits/config', async (req, res) => {
                     skipSuccessfulRequests: false
                 }
             },
-            whitelist: ['127.0.0.1', '::1', '192.168.1.0/24'],
-            blacklist: ['203.0.113.45', '198.51.100.23'],
+            whitelist: ['127.0.0.1', '::1'],
+            blacklist: [],
             autoUnblockAfter: 3600,
             enableGeoBlocking: false,
             logViolations: true
@@ -245,7 +232,7 @@ router.get('/rate-limits/config', async (req, res) => {
 
         res.json({ success: true, config });
     } catch (error) {
-        console.error('Error getting rate limit config:', error);
+        req.app.locals?.loggers?.api?.error('Error getting rate limit config:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

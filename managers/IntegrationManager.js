@@ -39,6 +39,10 @@ class IntegrationManager {
 
     async initializeWebSocket() {
         try {
+            if (process.env.NODE_ENV === 'test' || process.env.TEST_DISABLE_NETWORK === 'true') {
+                this.loggers.system.warn('⏭️ Skipping WebSocket server startup in test mode');
+                return;
+            }
             this.wsServer = new WebSocket.Server({ port: this.config.integrations.websocket.port });
             
             this.wsServer.on('connection', (ws, req) => {
@@ -72,6 +76,10 @@ class IntegrationManager {
 
     async initializeMQTT() {
         try {
+            if (process.env.NODE_ENV === 'test' || process.env.TEST_DISABLE_NETWORK === 'true') {
+                this.loggers.system.warn('⏭️ Skipping MQTT connection in test mode');
+                return;
+            }
             this.loggers.system.info('🔗 Connecting to MQTT broker...');
             
             const mqttOptions = {};

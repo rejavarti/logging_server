@@ -1,308 +1,267 @@
 /**
  * API Keys Management Routes
- * Handles API key CRUD operations with full functionality
+ * DB-backed CRUD aligned with schema: api_keys(id, name, key_hash, permissions, enabled, expires_at, user_id,...)
  */
 
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 
+// Helpers
+function hashKey(plain) {
+    return crypto.createHash('sha256').update(plain).digest('hex');
+}
+function maskFromHash(keyHash) {
+    if (!keyHash || typeof keyHash !== 'string') return 'elk_••••••••••';
+    return `elk_${keyHash.slice(0, 8)}...${keyHash.slice(-4)}`;
+}
+
 // Get all API keys
 router.get('/api-keys', async (req, res) => {
     try {
-        const apiKeys = [
-            {
-                id: '1',
-                name: 'ESP32 Device Key',
-                key: 'elk_****_****_****_1234',
-                description: 'Key for ESP32 IoT devices to send logs',
-                created: '2024-01-15T10:30:00Z',
-                createdBy: 'admin',
-                lastUsed: '2024-11-02T06:15:00Z',
-                expiresAt: '2025-01-15T10:30:00Z',
-                permissions: ['log:write'],
-                status: 'active',
-                usageCount: 1247,
-                ipWhitelist: ['192.168.1.100', '192.168.1.101']
-            },
-            {
-                id: '2', 
-                name: 'Dashboard API Key',
-                key: 'elk_****_****_****_5678',
-                description: 'API key for external dashboard access',
-                created: '2024-01-20T14:20:00Z',
-                createdBy: 'admin',
-                lastUsed: '2024-11-01T22:45:00Z',
-                expiresAt: null,
-                permissions: ['log:read', 'dashboard:read', 'search:read'],
-                status: 'active',
-                usageCount: 856,
-                ipWhitelist: []
-            },
-            {
-                id: '3',
-                name: 'Analytics Service',
-                key: 'elk_****_****_****_9012',
-                description: 'Key for analytics microservice integration',
-                created: '2024-02-01T09:15:00Z',
-                createdBy: 'admin',
-                lastUsed: null,
-                expiresAt: '2024-12-01T09:15:00Z',
-                permissions: ['log:read', 'search:read', 'analytics:read'],
-                status: 'expired',
-                usageCount: 0,
-                ipWhitelist: ['10.0.0.50']
-            }
-        ];
+        if (!req.dal || !req.dal.all) {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
 
-        res.json({ success: true, apiKeys });
+        const rows = await req.dal.all(
+            `SELECT 
+                ak.id,
+                ak.name,
+                ak.key_hash,
+                ak.permissions,
+                ak.enabled,
+                ak.expires_at,
+                ak.user_id,
+                ak.created_at,
+                ak.updated_at,
+                u.username AS created_by_username
+             FROM api_keys ak
+             LEFT JOIN users u ON ak.user_id = u.id
+             ORDER BY ak.created_at DESC`
+        );
+
+        const keys = (rows || []).map(r => ({
+            id: r.id,
+            name: r.name,
+            key_value: maskFromHash(r.key_hash), // masked for UI list
+            permissions: (() => { try { return JSON.parse(r.permissions || '[]'); } catch { return []; } })(),
+            is_active: r.enabled === 1 || r.enabled === true,
+            expires_at: r.expires_at || null,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+            created_by: r.user_id,
+            created_by_username: r.created_by_username || null,
+            // Compatibility fields expected by UI
+            usage_count: 0,
+            last_used: null,
+            description: null
+        }));
+
+        res.json({ success: true, keys });
     } catch (error) {
-        console.error('Error getting API keys:', error);
-        res.status(500).json({ success: false, error: error.message });
+        req.app.locals.loggers?.api?.error('API keys list error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch API keys: ' + error.message });
     }
 });
 
-// Create new API key
+// Create new API key (returns plaintext once)
 router.post('/api-keys', async (req, res) => {
     try {
-        const { name, description, permissions = [], expiresIn, ipWhitelist = [] } = req.body;
-        
-        if (!name) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'API key name is required' 
-            });
+        const { name, permissions, expires_in_days } = req.body || {};
+        const userId = req.user?.id || null;
+
+        if (!name || !String(name).trim()) {
+            return res.status(400).json({ success: false, error: 'Name is required' });
         }
 
-        // Generate secure API key
-        const keyValue = 'elk_' + crypto.randomBytes(32).toString('hex');
-        
-        // Calculate expiration date
+        // Generate secure random API key
+        const keyValue = `elk_${crypto.randomBytes(32).toString('hex')}`;
+        const keyHash = hashKey(keyValue);
+
+        // Calculate expiry date (stored as ISO text)
         let expiresAt = null;
-        if (expiresIn && expiresIn !== 'never') {
-            const days = parseInt(expiresIn);
-            if (!isNaN(days) && days > 0) {
-                expiresAt = new Date(Date.now() + (days * 24 * 60 * 60 * 1000)).toISOString();
-            }
+        if (expires_in_days && Number(expires_in_days) > 0) {
+            const expiryDate = new Date();
+            expiryDate.setDate(expiryDate.getDate() + Number(expires_in_days));
+            expiresAt = expiryDate.toISOString();
         }
 
-        const newApiKey = {
-            id: Date.now().toString(),
-            name,
-            key: keyValue,
-            description: description || '',
-            created: new Date().toISOString(),
-            createdBy: req.user ? req.user.username : 'system',
-            lastUsed: null,
-            expiresAt,
-            permissions,
-            status: 'active',
-            usageCount: 0,
-            ipWhitelist
+        const permissionsStr = JSON.stringify(Array.isArray(permissions) ? permissions : []);
+
+        const result = await req.dal.run(
+            `INSERT INTO api_keys (name, key_hash, permissions, enabled, expires_at, user_id, created_at)
+             VALUES (?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP)`,
+            [name.trim(), keyHash, permissionsStr, expiresAt, userId]
+        );
+
+        const row = await req.dal.get(
+            `SELECT ak.id, ak.name, ak.key_hash, ak.permissions, ak.enabled, ak.expires_at, ak.user_id, ak.created_at, ak.updated_at,
+                    u.username AS created_by_username
+             FROM api_keys ak
+             LEFT JOIN users u ON ak.user_id = u.id
+             WHERE ak.id = ?`,
+            [result.lastID]
+        );
+
+        const key = {
+            id: row.id,
+            name: row.name,
+            key_value: keyValue, // Show full key once
+            permissions: (() => { try { return JSON.parse(row.permissions || '[]'); } catch { return []; } })(),
+            is_active: row.enabled === 1 || row.enabled === true,
+            expires_at: row.expires_at || null,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            created_by: row.user_id,
+            created_by_username: row.created_by_username || null,
+            usage_count: 0,
+            last_used: null,
+            description: null
         };
 
-        console.log(`API key created: ${name} by ${req.user ? req.user.username : 'system'}`);
-
-        res.json({ success: true, apiKey: newApiKey });
+        req.app.locals.loggers?.security?.info(`API key created: ${name} by ${req.user?.username || 'system'}`);
+        res.json({ success: true, key });
     } catch (error) {
-        console.error('Error creating API key:', error);
-        res.status(500).json({ success: false, error: error.message });
+        req.app.locals.loggers?.api?.error('API key creation error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create API key: ' + error.message });
     }
 });
 
-// Update API key
+// Update API key enabled status
 router.put('/api-keys/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        const updates = req.body;
-        
-        // Don't allow key value to be updated directly
-        delete updates.key;
-        delete updates.created;
-        delete updates.createdBy;
+        const keyId = req.params.id;
+        const { is_active } = req.body || {};
 
-        const updatedKey = {
-            id,
-            ...updates,
-            updated: new Date().toISOString(),
-            updatedBy: req.user ? req.user.username : 'system'
-        };
+        if (typeof is_active === 'undefined') {
+            return res.status(400).json({ success: false, error: 'is_active field required' });
+        }
 
-        console.log(`API key ${id} updated by ${req.user ? req.user.username : 'system'}`);
+        await req.dal.run(
+            `UPDATE api_keys SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            [is_active ? 1 : 0, keyId]
+        );
 
-        res.json({ success: true, apiKey: updatedKey });
+        req.app.locals.loggers?.security?.info(`API key ${keyId} ${is_active ? 'activated' : 'deactivated'} by ${req.user?.username || 'unknown'}`);
+        res.json({ success: true, message: `API key ${is_active ? 'activated' : 'deactivated'}` });
     } catch (error) {
-        console.error('Error updating API key:', error);
-        res.status(500).json({ success: false, error: error.message });
+        req.app.locals.loggers?.api?.error('API key update error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update API key' });
     }
 });
 
 // Delete API key
 router.delete('/api-keys/:id', async (req, res) => {
     try {
-        const { id } = req.params;
-        
-        console.log(`API key ${id} deleted by ${req.user ? req.user.username : 'system'}`);
+        const keyId = req.params.id;
 
-        res.json({ 
-            success: true, 
-            message: 'API key deleted successfully'
-        });
+        // Get key name for logging
+        const key = await req.dal.get(`SELECT name FROM api_keys WHERE id = ?`, [keyId]);
+
+        // Delete from database
+        await req.dal.run(`DELETE FROM api_keys WHERE id = ?`, [keyId]);
+
+        req.app.locals.loggers?.security?.warn(`API key "${key?.name || keyId}" revoked by ${req.user?.username || 'unknown'}`);
+        res.json({ success: true, message: 'API key revoked' });
     } catch (error) {
-        console.error('Error deleting API key:', error);
-        res.status(500).json({ success: false, error: error.message });
+        req.app.locals.loggers?.api?.error('API key deletion error:', error);
+        res.status(500).json({ success: false, error: 'Failed to revoke API key' });
     }
 });
 
-// Regenerate API key
+// Regenerate API key (returns new plaintext once)
 router.post('/api-keys/:id/regenerate', async (req, res) => {
     try {
-        const { id } = req.params;
-        
-        // Generate new secure key
-        const newKeyValue = 'elk_' + crypto.randomBytes(32).toString('hex');
-        
-        const regeneratedKey = {
-            id,
-            key: newKeyValue,
-            regenerated: new Date().toISOString(),
-            regeneratedBy: req.user ? req.user.username : 'system',
-            previousKeyInvalidated: true
-        };
+        const keyId = req.params.id;
 
-        console.log(`API key ${id} regenerated by ${req.user ? req.user.username : 'system'}`);
+        const newKeyValue = `elk_${crypto.randomBytes(32).toString('hex')}`;
+        const newKeyHash = hashKey(newKeyValue);
 
-        res.json({ success: true, apiKey: regeneratedKey });
+        await req.dal.run(
+            `UPDATE api_keys 
+             SET key_hash = ?, 
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`,
+            [newKeyHash, keyId]
+        );
+
+        const row = await req.dal.get(
+            `SELECT ak.id, ak.name, ak.key_hash, ak.permissions, ak.enabled, ak.expires_at, ak.user_id, ak.created_at, ak.updated_at,
+                    u.username AS created_by_username
+             FROM api_keys ak
+             LEFT JOIN users u ON ak.user_id = u.id
+             WHERE ak.id = ?`,
+            [keyId]
+        );
+
+        req.app.locals.loggers?.security?.warn(`API key ${keyId} regenerated by ${req.user?.username || 'unknown'}`);
+        res.json({ 
+            success: true, 
+            key_value: newKeyValue,
+            key: {
+                id: row.id,
+                name: row.name,
+                key_value: maskFromHash(row.key_hash),
+                permissions: (() => { try { return JSON.parse(row.permissions || '[]'); } catch { return []; } })(),
+                is_active: row.enabled === 1 || row.enabled === true,
+                expires_at: row.expires_at || null,
+                created_at: row.created_at,
+                updated_at: row.updated_at,
+                created_by: row.user_id,
+                created_by_username: row.created_by_username || null,
+                usage_count: 0,
+                last_used: null
+            }
+        });
     } catch (error) {
-        console.error('Error regenerating API key:', error);
-        res.status(500).json({ success: false, error: error.message });
+        req.app.locals.loggers?.api?.error('API key regeneration error:', error);
+        res.status(500).json({ success: false, error: 'Failed to regenerate API key' });
     }
 });
 
-// Get API key usage statistics
-router.get('/api-keys/:id/stats', async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        const stats = {
-            keyId: id,
-            totalRequests: 1247,
-            requestsLast24h: 45,
-            requestsLast7d: 312,
-            requestsLast30d: 1180,
-            averageRequestsPerDay: 39.3,
-            topEndpoints: [
-                { endpoint: '/api/logs', requests: 856, percentage: 68.7 },
-                { endpoint: '/log', requests: 234, percentage: 18.8 },
-                { endpoint: '/api/search', requests: 89, percentage: 7.1 },
-                { endpoint: '/api/dashboard', requests: 68, percentage: 5.4 }
-            ],
-            statusCodes: {
-                '200': 1156,
-                '400': 45,
-                '401': 23,
-                '500': 23
-            },
-            lastUsed: '2024-11-02T06:15:00Z',
-            firstUsed: '2024-01-16T08:20:00Z',
-            uniqueIPs: 3,
-            errorRate: 7.3
-        };
-
-        res.json({ success: true, stats });
-    } catch (error) {
-        console.error('Error getting API key stats:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Toggle API key status (activate/deactivate)
+// Toggle API key status (activate/deactivate) - convenience
 router.post('/api-keys/:id/toggle', async (req, res) => {
     try {
         const { id } = req.params;
-        const { status } = req.body;
-        
-        const newStatus = status === 'active' ? 'inactive' : 'active';
-        
-        console.log(`API key ${id} ${newStatus === 'active' ? 'activated' : 'deactivated'} by ${req.user ? req.user.username : 'system'}`);
-
-        res.json({ 
-            success: true, 
-            apiKey: {
-                id,
-                status: newStatus,
-                statusChanged: new Date().toISOString(),
-                changedBy: req.user ? req.user.username : 'system'
-            }
-        });
+        const row = await req.dal.get(`SELECT enabled FROM api_keys WHERE id = ?`, [id]);
+        if (!row) return res.status(404).json({ success: false, error: 'API key not found' });
+        const next = row.enabled ? 0 : 1;
+        await req.dal.run(`UPDATE api_keys SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [next, id]);
+        res.json({ success: true, id, is_active: !!next });
     } catch (error) {
-        console.error('Error toggling API key status:', error);
+        req.app.locals?.loggers?.api?.error('Error toggling API key status:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Test API key validity
+// Test API key validity (basic hash existence + enabled)
 router.post('/api-keys/:id/test', async (req, res) => {
     try {
         const { id } = req.params;
-        
-        const testResult = {
-            keyId: id,
-            valid: true,
-            status: 'active',
-            permissions: ['log:read', 'log:write', 'dashboard:read'],
-            expiresAt: '2025-01-15T10:30:00Z',
-            daysUntilExpiry: 72,
-            lastTestAt: new Date().toISOString(),
-            testedBy: req.user ? req.user.username : 'system'
-        };
-
-        res.json({ success: true, test: testResult });
+        const row = await req.dal.get(`SELECT id, enabled, expires_at FROM api_keys WHERE id = ?`, [id]);
+        if (!row) return res.json({ success: true, test: { keyId: id, valid: false, status: 'not_found' } });
+        const now = Date.now();
+        const expiresOk = !row.expires_at || new Date(row.expires_at).getTime() > now;
+        res.json({ success: true, test: { keyId: id, valid: !!row.enabled && expiresOk, status: row.enabled ? 'active' : 'inactive', expiresAt: row.expires_at || null, lastTestAt: new Date().toISOString() } });
     } catch (error) {
-        console.error('Error testing API key:', error);
+        req.app.locals?.loggers?.api?.error('Error testing API key:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Get API key permissions templates
+// Get API key permissions templates (static definitions)
 router.get('/api-keys/permissions/templates', async (req, res) => {
     try {
         const templates = [
-            {
-                id: 'read_only',
-                name: 'Read Only',
-                description: 'Read access to logs and dashboards',
-                permissions: ['log:read', 'dashboard:read', 'search:read']
-            },
-            {
-                id: 'log_writer',
-                name: 'Log Writer',
-                description: 'Write logs and read basic data',
-                permissions: ['log:write', 'log:read']
-            },
-            {
-                id: 'full_access',
-                name: 'Full Access',
-                description: 'Complete access to all API functions',
-                permissions: ['log:*', 'dashboard:*', 'search:*', 'admin:*']
-            },
-            {
-                id: 'analytics',
-                name: 'Analytics Service',
-                description: 'Analytics and reporting access',
-                permissions: ['log:read', 'search:*', 'analytics:*', 'dashboard:read']
-            },
-            {
-                id: 'device_iot',
-                name: 'IoT Device',
-                description: 'Basic log writing for IoT devices',
-                permissions: ['log:write']
-            }
+            { id: 'read_only', name: 'Read Only', description: 'Read access to logs and dashboards', permissions: ['log:read', 'dashboard:read', 'search:read'] },
+            { id: 'log_writer', name: 'Log Writer', description: 'Write logs and read basic data', permissions: ['log:write', 'log:read'] },
+            { id: 'full_access', name: 'Full Access', description: 'Complete access to all API functions', permissions: ['log:*', 'dashboard:*', 'search:*', 'admin:*'] },
+            { id: 'analytics', name: 'Analytics Service', description: 'Analytics and reporting access', permissions: ['log:read', 'search:*', 'analytics:*', 'dashboard:read'] },
+            { id: 'device_iot', name: 'IoT Device', description: 'Basic log writing for IoT devices', permissions: ['log:write'] }
         ];
-
         res.json({ success: true, templates });
     } catch (error) {
-        console.error('Error getting permission templates:', error);
+        req.app.locals?.loggers?.api?.error('Error getting permission templates:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

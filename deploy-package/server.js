@@ -18139,8 +18139,9 @@ const server = app.listen(PORT, async () => {
         loggers.system.info('🎉 All systems operational!');
         
         // Initialize maintenance tasks (backups, cleanup)
-        maintenanceManager.scheduleMaintenance();
-        loggers.system.info('⏰ Scheduled daily backups at 2:00 AM (keeping last 10)');
+        // TODO: Re-enable when maintenanceManager is implemented
+        // maintenanceManager.scheduleMaintenance();
+        // loggers.system.info('⏰ Scheduled daily backups at 2:00 AM (keeping last 10)');
         
         // Log server startup to database
         logToDatabase(`Server started on port ${PORT}`, 'info', 'server', 'logging-server');

@@ -234,7 +234,7 @@ class AdvancedEncryptionSystem {
         
         try {
             const testData = 'This is highly sensitive test data that must be protected!';
-            const testPassword = 'TestPassword123!@#';
+            const testPassword = process.env.TEST_ENCRYPTION_PASSWORD || require('crypto').randomBytes(32).toString('hex');
             
             // Test basic encryption/decryption
             const encrypted = this.encrypt(testData, testPassword);

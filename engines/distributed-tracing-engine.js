@@ -36,13 +36,11 @@ class DistributedTracingEngine {
             
             // Initialize OpenTelemetry if configured
             if (this.config && this.config.enabled) {
-                // TODO: Initialize OpenTelemetry SDK when packages are available
-                this.loggers.system.info('   • OpenTelemetry SDK: Active');
-                this.loggers.system.info('   • Jaeger Exporter: Configured');
-                this.loggers.system.info('   • Service Name:', this.config.serviceName);
-                this.loggers.system.info('   • Sampling Rate:', this.config.samplingRate);
-                this.loggers.system.info('   • Trace Collection: Enabled');
-                this.loggers.system.info('   • Span Analysis: Ready');
+                // OpenTelemetry initialization required but not implemented (no placeholder actions)
+                this.loggers.system.info('   • OpenTelemetry SDK: Pending installation');
+                this.loggers.system.info('   • Jaeger Exporter: Not initialized');
+                this.loggers.system.info('   • Service Name (configured):', this.config.serviceName);
+                this.loggers.system.info('   • Sampling Rate (configured):', this.config.samplingRate);
             } else {
                 this.loggers.system.info('   • Distributed Tracing: Disabled');
             }
@@ -75,38 +73,8 @@ class DistributedTracingEngine {
     }
 
     async searchTraces(filters = {}) {
-        try {
-            // Mock implementation - return traces based on filters
-            let filteredTraces = [...this.traces];
-            
-            if (filters.service) {
-                filteredTraces = filteredTraces.filter(trace => 
-                    trace.service === filters.service
-                );
-            }
-            
-            if (filters.severity) {
-                filteredTraces = filteredTraces.filter(trace => 
-                    trace.severity === filters.severity
-                );
-            }
-            
-            if (filters.timeRange) {
-                const startTime = new Date(filters.timeRange.start);
-                const endTime = new Date(filters.timeRange.end);
-                filteredTraces = filteredTraces.filter(trace => {
-                    const traceTime = new Date(trace.timestamp);
-                    return traceTime >= startTime && traceTime <= endTime;
-                });
-            }
-            
-            return filteredTraces.sort((a, b) => 
-                new Date(b.timestamp) - new Date(a.timestamp)
-            );
-        } catch (error) {
-            this.loggers.system.error('Error searching traces:', error);
-            return [];
-        }
+        // No mock implementation - tracing requires OpenTelemetry SDK
+        throw new Error('Distributed tracing not implemented - OpenTelemetry SDK required. Install @opentelemetry/sdk-node and @opentelemetry/auto-instrumentations-node packages.');
     }
 
     async getTraceData(traceId) {

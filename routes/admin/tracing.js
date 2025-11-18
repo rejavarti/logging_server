@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPageTemplate } = require('../../templates/base');
+const { getPageTemplate } = require('../../configs/templates/base');
 const router = express.Router();
 
 // Distributed Tracing Management Page
@@ -193,20 +193,48 @@ router.get('/', (req, res) => {
                     const response = await fetch('/api/tracing/status');
                     const data = await response.json();
                     
-                    if (data.success) {
+                    if (data.success && data.stats) {
                         tracingStats = data.stats;
+                        updateTracingStats();
+                    } else {
+                        // Initialize with empty stats if none returned
+                        tracingStats = {
+                            avgDuration: 0,
+                            totalTraces: 0,
+                            totalSpans: 0,
+                            errorsCount: 0,
+                            activeSpans: 0,
+                            activeTraces: 0
+                        };
                         updateTracingStats();
                     }
                 } catch (error) {
-                    console.error('Failed to load tracing status:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load tracing status:', error);
+                    // Initialize with empty stats on error
+                    tracingStats = {
+                        avgDuration: 0,
+                        totalTraces: 0,
+                        totalSpans: 0,
+                        errorsCount: 0,
+                        activeSpans: 0,
+                        activeTraces: 0
+                    };
+                    updateTracingStats();
                     showError('tracingStatsDetail', 'Failed to load tracing statistics');
                 }
             }
             
             function updateTracingStats() {
+                // Ensure tracingStats is defined before accessing properties
+                if (!tracingStats || typeof tracingStats !== 'object') {
+                    tracingStats = {};
+                }
+                
                 // Update main cards
-                document.getElementById('avgDuration').textContent = 
-                    Math.round(tracingStats.avgDuration || 0) + 'ms';
+                const avgDurationEl = document.getElementById('avgDuration');
+                if (avgDurationEl) {
+                    avgDurationEl.textContent = Math.round(tracingStats.avgDuration || 0) + 'ms';
+                }
                 
                 // Update detailed statistics
                 const statsDetail = document.getElementById('tracingStatsDetail');
@@ -242,22 +270,30 @@ router.get('/', (req, res) => {
                     const data = await response.json();
                     
                     if (data.success) {
-                        dependencies = data.dependencies;
-                        document.getElementById('serviceCount').textContent = data.services.length;
+                        // Ensure dependencies is always an array
+                        dependencies = Array.isArray(data.dependencies) ? data.dependencies : [];
+                        
+                        const services = Array.isArray(data.services) ? data.services : [];
+                        document.getElementById('serviceCount').textContent = services.length;
                         updateDependencyMap();
                         
                         // Update service filter
                         const serviceSelect = document.getElementById('filterService');
                         serviceSelect.innerHTML = '<option value="">All Services</option>';
-                        data.services.forEach(service => {
+                        services.forEach(service => {
                             const option = document.createElement('option');
                             option.value = service;
                             option.textContent = service;
                             serviceSelect.appendChild(option);
                         });
+                    } else {
+                        // API returned success: false
+                        dependencies = [];
+                        updateDependencyMap();
                     }
                 } catch (error) {
-                    console.error('Failed to load service dependencies:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load service dependencies:', error);
+                    dependencies = []; // Set to empty array on error
                     showError('dependencyMap', 'Failed to load service dependencies');
                 }
             }
@@ -265,7 +301,8 @@ router.get('/', (req, res) => {
             function updateDependencyMap() {
                 const mapDiv = document.getElementById('dependencyMap');
                 
-                if (dependencies.length === 0) {
+                // Ensure dependencies is always an array
+                if (!dependencies || !Array.isArray(dependencies) || dependencies.length === 0) {
                     mapDiv.innerHTML = '<div class="text-center text-muted"><p>No service dependencies found</p></div>';
                     return;
                 }
@@ -330,7 +367,7 @@ router.get('/', (req, res) => {
                         displayTraceResults(data.traces);
                     }
                 } catch (error) {
-                    console.error('Failed to search traces:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to search traces:', error);
                     showError('tracingResults', 'Failed to search traces');
                 }
             }
@@ -348,17 +385,26 @@ router.get('/', (req, res) => {
                 html += '</tr></thead><tbody>';
                 
                 traces.forEach(trace => {
-                    const duration = Math.round(trace.duration);
+                    const duration = Math.round(trace.duration || 0);
                     const errorClass = trace.error_count > 0 ? 'text-danger' : '';
                     
+                    // Safe trace ID handling - check if exists and has substring method
+                    const traceId = trace.trace_id || 'unknown';
+                    const shortTraceId = typeof traceId === 'string' && traceId.length > 16 
+                        ? traceId.substring(0, 16) + '...' 
+                        : traceId;
+                    
+                    // Safe services handling
+                    const services = Array.isArray(trace.services) ? trace.services.join(', ') : 'N/A';
+                    
                     html += \`
-                        <tr style="cursor: pointer;" onclick="viewTraceDetail('\${trace.trace_id}')">
-                            <td><code>\${trace.trace_id.substring(0, 16)}...</code></td>
+                        <tr style="cursor: pointer;" onclick="viewTraceDetail('\${traceId}')">
+                            <td><code>\${shortTraceId}</code></td>
                             <td>\${duration}ms</td>
-                            <td>\${trace.spans_count}</td>
-                            <td>\${trace.services.join(', ')}</td>
-                            <td class="\${errorClass}">\${trace.error_count}</td>
-                            <td>\${formatTimestamp(trace.start_time)}</td>
+                            <td>\${trace.spans_count || 0}</td>
+                            <td>\${services}</td>
+                            <td class="\${errorClass}">\${trace.error_count || 0}</td>
+                            <td>\${formatTimestamp(trace.start_time || new Date().toISOString())}</td>
                         </tr>
                     \`;
                 });
@@ -377,7 +423,7 @@ router.get('/', (req, res) => {
                         alert('Trace Details:\\n' + JSON.stringify(data.trace, null, 2));
                     }
                 } catch (error) {
-                    console.error('Failed to load trace detail:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load trace detail:', error);
                 }
             }
             

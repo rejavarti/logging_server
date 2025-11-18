@@ -1,0 +1,123 @@
+services:
+  logging-server:
+    # Build with better-sqlite3 optimizations (Node.js 20 + Alpine)
+    build:
+      context: ..
+      dockerfile: docker-files/Dockerfile
+    image: enhanced-logging-platform:better-sqlite3
+    # Note: better-sqlite3 requires building from source for optimal performance
+    
+    container_name: rejavarti-logging-server
+    restart: unless-stopped
+    
+    # Port mapping (container uses port 3000, mapped to host 10180)
+    ports:
+      - "10180:3000"
+      # WebSocket and streaming (internal services)
+      - "8081:8081"
+      - "8082:8082"
+      # Ingestion protocols
+      - "514:514/udp"       # Syslog UDP
+      - "601:601"           # Syslog TCP
+      - "12201:12201/udp"   # GELF UDP
+      - "12202:12202"       # GELF TCP
+      - "5044:5044"         # Beats TCP
+      - "9880:9880"         # Fluent HTTP
+    
+    # Volume mounts for persistent data
+    # Windows paths - change these to your preferred location
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./backups:/app/backups
+      # SSL certificates (optional - only if using HTTPS)
+      # Place cert.pem and key.pem in this directory
+      - ./ssl:/app/ssl:ro
+      # DEVELOPMENT MODE: Bind mount source code for live editing
+      # Comment out these lines in production to use baked image code
+      - ..:/app:delegated
+      - /app/node_modules
+      - /app/data
+      - /app/logs
+      - /app/backups
+      # For Linux/Unraid, use these paths instead:
+      # - /mnt/user/appdata/logging-server/data:/app/data
+      # - /mnt/user/appdata/logging-server/logs:/app/logs
+      # - /mnt/user/appdata/logging-server/ssl:/app/ssl:ro
+      # - /etc/localtime:/etc/localtime:ro
+    
+    # Environment variables
+    env_file:
+      - ../.env
+    environment:
+      # Node.js environment (production/development)
+      - NODE_ENV=production
+      
+      # Application port (container internal port)
+      - PORT=3000
+      
+      # Timezone for log timestamps (change to your timezone)
+      # Examples: America/New_York, Europe/London, Asia/Tokyo
+      - TZ=America/Denver
+      
+      # Authentication credentials - REQUIRED environment variables
+      # Set these in your environment or .env file before deployment
+      - AUTH_USERNAME=${AUTH_USERNAME:-admin}
+      - AUTH_PASSWORD=${AUTH_PASSWORD:?AUTH_PASSWORD must be set in environment}
+      
+      # Security secrets - REQUIRED for production security (matches current implementation)
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set in environment}
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      
+      # Better-SQLite3 Configuration (NEW)
+      - USE_BETTER_SQLITE3=true
+      - DB_WAL_MODE=true
+      - DB_CACHE_SIZE=64000
+      - AUTO_MIGRATE=true
+      
+      # Performance Optimization (NEW)
+      - DOCKER_DEPLOYMENT=true
+      - ENABLE_PERFORMANCE_MONITORING=true
+      - SKIP_SETUP_WIZARD=true
+      
+      # HTTPS/SSL Configuration (optional)
+      # Set to 'true' to enable HTTPS (requires SSL certificates in /ssl directory)
+      - USE_HTTPS=false
+      # SSL certificate and key paths (only needed if USE_HTTPS=true)
+      # - SSL_CERT_PATH=/app/ssl/cert.pem
+      # - SSL_KEY_PATH=/app/ssl/key.pem
+    
+    # Resource limits (adjust based on your server)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    # Health check for monitoring (using container internal port)
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    
+    # Container logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Labels for organization (optional)
+    labels:
+      - "com.rejavarti.logging-server.version=2.2.0-security-hardened"
+      - "com.rejavarti.logging-server.description=Enterprise Logging Platform - Security Hardened"
+
+# Network configuration
+networks:
+  default:
+    name: logging-network

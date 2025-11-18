@@ -11,7 +11,7 @@ class WebhookManager {
         try {
             // Get all active webhooks for this event type
             const webhooks = await this.dal.all(
-                'SELECT * FROM webhooks WHERE enabled = 1 AND (events = ? OR events LIKE ? OR events LIKE ? OR events LIKE ?)',
+                'SELECT * FROM webhooks WHERE active = 1 AND (events = ? OR events LIKE ? OR events LIKE ? OR events LIKE ?)',
                 [eventType, `%${eventType}%`, `${eventType},%`, `%,${eventType}`]
             );
 
@@ -135,7 +135,7 @@ class WebhookManager {
         const stats = await this.dal.get(`
             SELECT 
                 COUNT(*) as total_webhooks,
-                SUM(CASE WHEN enabled = 1 THEN 1 ELSE 0 END) as active_webhooks,
+                SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END) as active_webhooks,
                 SUM(success_count) as total_successes,
                 SUM(failure_count) as total_failures
             FROM webhooks

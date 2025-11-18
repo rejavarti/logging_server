@@ -10,7 +10,8 @@
  */
 
 const express = require('express');
-const { getPageTemplate } = require('../templates/base');
+const { getPageTemplate } = require('../configs/templates/base');
+const { escapeHtml } = require('../utils/html-helpers');
 const router = express.Router();
 
 /**
@@ -20,11 +21,23 @@ const router = express.Router();
 router.get('/', async (req, res) => {
     try {
         // Use actual DAL methods to get real webhook data
-        const webhooks = await req.dal.getAllWebhooks() || [];
-        const recentDeliveries = await req.dal.getRecentWebhookDeliveries() || [];
+        const webhooks = await req.dal.getWebhooks() || [];
+        
+        // Get recent webhook deliveries from activity log
+        let recentDeliveries = [];
+        try {
+            recentDeliveries = await req.dal.all(
+                `SELECT * FROM activity_log 
+                 WHERE action = 'webhook_delivery' 
+                 ORDER BY timestamp DESC 
+                 LIMIT 100`
+            ) || [];
+        } catch (err) {
+            req.app.locals?.loggers?.system?.warn('Failed to fetch webhook deliveries:', err.message);
+        }
         
         // Calculate webhook statistics
-        const activeWebhooks = webhooks.filter(w => w.enabled);
+        const activeWebhooks = webhooks.filter(w => w.active);
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
         
@@ -69,7 +82,7 @@ router.get('/', async (req, res) => {
                         <i class="fas fa-paper-plane"></i>
                     </div>
                 </div>
-                <div class="stat-value">${webhookStats.deliveriesToday.toLocaleString()}</div>
+                <div class="stat-value">${(webhookStats.deliveriesToday || 0).toLocaleString()}</div>
                 <div class="stat-label">webhook calls</div>
             </div>
             
@@ -146,21 +159,22 @@ router.get('/', async (req, res) => {
                             </div>
                             
                             <div class="webhook-actions">
-                                <button onclick="testWebhook(${webhook.id})" class="btn-small" title="Test Webhook">
+                                <button onclick="testWebhook(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="Test Webhook">
                                     <i class="fas fa-play"></i> Test
                                 </button>
-                                <button onclick="editWebhook(${webhook.id})" class="btn-small" title="Edit Webhook">
+                                <button onclick="editWebhook(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="Edit Webhook">
                                     <i class="fas fa-edit"></i> Edit
                                 </button>
-                                <button onclick="viewWebhookLogs(${webhook.id})" class="btn-small" title="View Logs">
+                                <button onclick="viewWebhookLogs(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="View Logs">
                                     <i class="fas fa-history"></i> Logs
                                 </button>
                                 <button onclick="toggleWebhook(${webhook.id}, ${webhook.active})" 
-                                        class="btn-small ${webhook.active ? 'btn-warning' : 'btn-success'}" 
+                                        class="btn-small" 
+                                        style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, ${webhook.active ? '#f59e0b' : '#10b981'} 0%, ${webhook.active ? '#d97706' : '#059669'} 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" 
                                         title="${webhook.active ? 'Disable' : 'Enable'} Webhook">
                                     <i class="fas fa-${webhook.active ? 'pause' : 'play'}"></i>
                                 </button>
-                                <button onclick="deleteWebhook(${webhook.id})" class="btn-small btn-danger" title="Delete Webhook">
+                                <button onclick="deleteWebhook(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="Delete Webhook">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -193,36 +207,50 @@ router.get('/', async (req, res) => {
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Webhook</th>
-                                <th>Event</th>
-                                <th>Status</th>
-                                <th>Response Time</th>
-                                <th>Timestamp</th>
-                                <th>Actions</th>
+                                <th style="width: 180px;">Webhook</th>
+                                <th style="width: 150px;">Event</th>
+                                <th style="width: 140px; text-align: center;">Status</th>
+                                <th style="width: 120px; text-align: right;">Response Time</th>
+                                <th style="width: 180px;">Timestamp</th>
+                                <th style="width: 150px; text-align: center;">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             ${recentDeliveries.map(delivery => `
                                 <tr>
-                                    <td>${escapeHtml(delivery.webhookName)}</td>
-                                    <td><span class="event-badge">${delivery.event}</span></td>
                                     <td>
-                                        <span class="status-badge ${delivery.success ? 'online' : 'offline'}">
-                                            ${delivery.success ? 'Success' : 'Failed'}
-                                        </span>
-                                        ${delivery.statusCode ? `<small>(${delivery.statusCode})</small>` : ''}
+                                        <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(delivery.webhookName)}</div>
                                     </td>
-                                    <td>${delivery.responseTime}ms</td>
-                                    <td><span class="timestamp">${formatTimestamp(delivery.timestamp)}</span></td>
                                     <td>
-                                        <button onclick="viewDeliveryDetails(${delivery.id})" class="btn-small" title="View Details">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
-                                        ${!delivery.success ? `
-                                        <button onclick="retryDelivery(${delivery.id})" class="btn-small btn-warning" title="Retry">
-                                            <i class="fas fa-redo"></i>
-                                        </button>
-                                        ` : ''}
+                                        <span class="event-badge" style="background: var(--bg-tertiary); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500;">
+                                            ${delivery.event}
+                                        </span>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <span class="status-badge" style="background: ${delivery.success ? '#10b981' : '#ef4444'}; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; color: white;">
+                                            <i class="fas fa-${delivery.success ? 'check-circle' : 'times-circle'}"></i> ${delivery.success ? 'Success' : 'Failed'}
+                                        </span>
+                                        ${delivery.statusCode ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">HTTP ${delivery.statusCode}</div>` : ''}
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span style="font-weight: 600; color: var(--text-secondary);">${delivery.responseTime}ms</span>
+                                    </td>
+                                    <td>
+                                        <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                            <i class="fas fa-clock"></i> ${formatTimestamp(delivery.timestamp)}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+                                            <button onclick="viewDeliveryDetails(${delivery.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; transition: all 0.2s;" title="View Details">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            ${!delivery.success ? `
+                                            <button onclick="retryDelivery(${delivery.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; transition: all 0.2s;" title="Retry">
+                                                <i class="fas fa-redo"></i>
+                                            </button>
+                                            ` : ''}
+                                        </div>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -371,15 +399,7 @@ X-Custom-Header: value"></textarea>
         </div>
         `;
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text.toString()
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        // escapeHtml() imported from utils/html-helpers
 
         function formatTimestamp(timestamp) {
             if (!timestamp) return 'N/A';
@@ -652,6 +672,82 @@ X-Custom-Header: value"></textarea>
                 gap: 1rem;
             }
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-large);
+        }
+
+        .modal-content.large {
+            max-width: 800px;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 2rem;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
         `;
 
         const additionalJS = `
@@ -665,6 +761,30 @@ X-Custom-Header: value"></textarea>
             document.getElementById('webhook-verify-ssl').checked = true;
             openModal('webhook-modal');
         }
+
+        // Modal management functions
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'flex';
+                document.body.classList.add('modal-open');
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+            }
+        }
+
+        // Close modal on background click
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                closeModal(e.target.id);
+            }
+        });
 
         // Edit existing webhook
         async function editWebhook(webhookId) {
@@ -703,7 +823,7 @@ X-Custom-Header: value"></textarea>
                     throw new Error('Failed to load webhook');
                 }
             } catch (error) {
-                console.error('Edit webhook error:', error);
+                req.app.locals?.loggers?.system?.error('Edit webhook error:', error);
                 showToast('Failed to load webhook details', 'error');
             }
         }
@@ -756,7 +876,7 @@ X-Custom-Header: value"></textarea>
                     throw new Error(error.error || 'Failed to save webhook');
                 }
             } catch (error) {
-                console.error('Save webhook error:', error);
+                req.app.locals?.loggers?.system?.error('Save webhook error:', error);
                 showToast(error.message, 'error');
             }
         });
@@ -776,7 +896,7 @@ X-Custom-Header: value"></textarea>
                     showToast(\`Webhook test failed: \${result.error || 'Unknown error'}\`, 'error');
                 }
             } catch (error) {
-                console.error('Test webhook error:', error);
+                req.app.locals?.loggers?.system?.error('Test webhook error:', error);
                 showToast('Failed to test webhook', 'error');
             }
         }
@@ -838,7 +958,7 @@ X-Custom-Header: value"></textarea>
                     showToast(\`Webhook test failed: \${result.error || 'Unknown error'}\`, 'error');
                 }
             } catch (error) {
-                console.error('Test webhook error:', error);
+                req.app.locals?.loggers?.system?.error('Test webhook error:', error);
                 showToast('Failed to test webhook', 'error');
             } finally {
                 document.getElementById('test-btn').disabled = false;
@@ -866,7 +986,7 @@ X-Custom-Header: value"></textarea>
                     throw new Error(\`Failed to \${action} webhook\`);
                 }
             } catch (error) {
-                console.error('Toggle webhook error:', error);
+                req.app.locals?.loggers?.system?.error('Toggle webhook error:', error);
                 showToast(error.message, 'error');
             }
         }
@@ -889,7 +1009,7 @@ X-Custom-Header: value"></textarea>
                     throw new Error('Failed to delete webhook');
                 }
             } catch (error) {
-                console.error('Delete webhook error:', error);
+                req.app.locals?.loggers?.system?.error('Delete webhook error:', error);
                 showToast('Failed to delete webhook', 'error');
             }
         }
@@ -913,7 +1033,7 @@ X-Custom-Header: value"></textarea>
                     throw new Error('Failed to load delivery details');
                 }
             } catch (error) {
-                console.error('View delivery error:', error);
+                req.app.locals?.loggers?.system?.error('View delivery error:', error);
                 showError('delivery-details', 'Failed to load delivery details');
             }
         }
@@ -1012,7 +1132,7 @@ X-Custom-Header: value"></textarea>
                     throw new Error('Failed to retry delivery');
                 }
             } catch (error) {
-                console.error('Retry delivery error:', error);
+                req.app.locals?.loggers?.system?.error('Retry delivery error:', error);
                 showToast('Failed to retry delivery', 'error');
             }
         }
@@ -1038,7 +1158,7 @@ X-Custom-Header: value"></textarea>
         res.send(html);
 
     } catch (error) {
-        console.error('Webhooks route error:', error);
+        req.app.locals?.loggers?.system?.error('Webhooks route error:', error);
         res.status(500).send('Internal Server Error');
     }
 });
@@ -1050,10 +1170,10 @@ X-Custom-Header: value"></textarea>
 // Get all webhooks
 router.get('/api', async (req, res) => {
     try {
-        const webhooks = await req.dal.getAllWebhooks();
+        const webhooks = await req.dal.getWebhooks();
         res.json(webhooks);
     } catch (error) {
-        console.error('Get webhooks API error:', error);
+        req.app.locals?.loggers?.system?.error('Get webhooks API error:', error);
         res.status(500).json({ error: 'Failed to get webhooks' });
     }
 });
@@ -1067,7 +1187,7 @@ router.get('/api/:id', async (req, res) => {
         }
         res.json(webhook);
     } catch (error) {
-        console.error('Get webhook API error:', error);
+        req.app.locals?.loggers?.system?.error('Get webhook API error:', error);
         res.status(500).json({ error: 'Failed to get webhook' });
     }
 });
@@ -1078,7 +1198,7 @@ router.post('/api', async (req, res) => {
         const webhook = await req.dal.createWebhook(req.body);
         res.json(webhook);
     } catch (error) {
-        console.error('Create webhook API error:', error);
+        req.app.locals?.loggers?.system?.error('Create webhook API error:', error);
         res.status(500).json({ error: 'Failed to create webhook' });
     }
 });
@@ -1089,7 +1209,7 @@ router.put('/api/:id', async (req, res) => {
         const webhook = await req.dal.updateWebhook(req.params.id, req.body);
         res.json(webhook);
     } catch (error) {
-        console.error('Update webhook API error:', error);
+        req.app.locals?.loggers?.system?.error('Update webhook API error:', error);
         res.status(500).json({ error: 'Failed to update webhook' });
     }
 });
@@ -1100,7 +1220,7 @@ router.delete('/api/:id', async (req, res) => {
         await req.dal.deleteWebhook(req.params.id);
         res.json({ success: true });
     } catch (error) {
-        console.error('Delete webhook API error:', error);
+        req.app.locals?.loggers?.system?.error('Delete webhook API error:', error);
         res.status(500).json({ error: 'Failed to delete webhook' });
     }
 });
@@ -1111,7 +1231,7 @@ router.post('/api/:id/toggle', async (req, res) => {
         await req.dal.toggleWebhook(req.params.id);
         res.json({ success: true });
     } catch (error) {
-        console.error('Toggle webhook API error:', error);
+        req.app.locals?.loggers?.system?.error('Toggle webhook API error:', error);
         res.status(500).json({ error: 'Failed to toggle webhook' });
     }
 });
@@ -1122,7 +1242,7 @@ router.post('/api/:id/test', async (req, res) => {
         const result = await req.dal.testWebhook(req.params.id);
         res.json(result);
     } catch (error) {
-        console.error('Test webhook API error:', error);
+        req.app.locals?.loggers?.system?.error('Test webhook API error:', error);
         res.status(500).json({ error: 'Failed to test webhook' });
     }
 });
@@ -1132,10 +1252,54 @@ router.post('/api/test', async (req, res) => {
     try {
         const result = await req.dal.testWebhookData(req.body);
         res.json(result);
-    } catch (error) {
-        console.error('Test webhook data API error:', error);
+        } catch (error) {
+        req.app.locals?.loggers?.system?.error('Test webhook data API error:', error);
         res.status(500).json({ error: 'Failed to test webhook' });
     }
+});
+
+// --- Backward compatibility UI routes (added to restore monolithic paths) ---
+// /webhooks/add
+router.get('/add', async (req, res) => {
+        try {
+                const content = `
+                <div class="card">
+                    <div class="card-header"><h3><i class="fas fa-plus"></i> Add Webhook</h3></div>
+                    <div class="card-body">
+                        <p>Creation now handled directly on the main /webhooks page. This legacy route is preserved for bookmarks.</p>
+                        <a href="/webhooks" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+                    </div>
+                </div>`;
+                res.send(getPageTemplate('webhooks-add', content, req));
+        } catch (e) {
+                res.status(500).send(getPageTemplate('webhooks-add', `<div class='error'>Failed: ${e.message}</div>`, req));
+        }
+});
+
+// /webhooks/edit/:id
+router.get('/edit/:id', async (req, res) => {
+        try {
+                const webhook = await req.dal.getWebhookById(req.params.id);
+                if (!webhook) {
+                        return res.status(404).send(getPageTemplate('webhooks-edit', `<div class='error'>Webhook not found</div>`, req));
+                }
+                const content = `
+                <div class="card">
+                    <div class="card-header"><h3><i class="fas fa-edit"></i> Edit Webhook</h3></div>
+                    <div class="card-body">
+                        <form id="edit-webhook-form" data-id="${webhook.id}">
+                            <div class="form-group"><label>Name</label><input class="form-control" value="${webhook.name}"/></div>
+                            <div class="form-group"><label>URL</label><input class="form-control" value="${webhook.url}"/></div>
+                            <div class="form-group"><label>Method</label><input class="form-control" value="${webhook.method || 'POST'}"/></div>
+                            <p>Editing submits via existing /webhooks API endpoints.</p>
+                            <a href="/webhooks" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back</a>
+                        </form>
+                    </div>
+                </div>`;
+                res.send(getPageTemplate('webhooks-edit', content, req));
+        } catch (e) {
+                res.status(500).send(getPageTemplate('webhooks-edit', `<div class='error'>Failed: ${e.message}</div>`, req));
+        }
 });
 
 module.exports = router;

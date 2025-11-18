@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPageTemplate } = require('../../templates/base');
+const { getPageTemplate } = require('../../configs/templates/base');
 const router = express.Router();
 
 // Advanced Search Management Page
@@ -206,7 +206,7 @@ router.get('/', (req, res) => {
                         templates = data.templates;
                     }
                 } catch (error) {
-                    console.error('Failed to load templates:', error);
+                    req.app.locals?.loggers?.admin?.error('Failed to load templates:', error);
                 }
             }
 
@@ -283,7 +283,7 @@ router.get('/', (req, res) => {
                         showToast(\`Search failed: \${searchData.error}\`, 'error');
                     }
                 } catch (error) {
-                    console.error('Search error:', error);
+                    req.app.locals?.loggers?.admin?.error('Search error:', error);
                     showToast('Search execution failed', 'error');
                 }
             }
@@ -365,7 +365,7 @@ router.get('/', (req, res) => {
                         displayAnalytics(data.analytics);
                     }
                 } catch (error) {
-                    console.error('Analytics error:', error);
+                    req.app.locals?.loggers?.admin?.error('Analytics error:', error);
                     showToast('Failed to load analytics', 'error');
                 }
             }
@@ -400,31 +400,7 @@ router.get('/', (req, res) => {
                 return new Date(timestamp).toLocaleString();
             }
 
-            function showToast(message, type) {
-                // Simple toast implementation
-                console.log(\`[\${type.toUpperCase()}] \${message}\`);
-                
-                const alertClass = type === 'error' ? 'alert-danger' : 
-                                 type === 'warning' ? 'alert-warning' : 
-                                 type === 'success' ? 'alert-success' : 'alert-info';
-                
-                const toastHtml = \`
-                    <div class="alert \${alertClass} alert-dismissible fade show" role="alert">
-                        \${message}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                    </div>
-                \`;
-                
-                // Add to top of content
-                const container = document.querySelector('.container-fluid');
-                container.insertAdjacentHTML('afterbegin', toastHtml);
-                
-                // Auto-remove after 5 seconds
-                setTimeout(() => {
-                    const alert = container.querySelector('.alert');
-                    if (alert) alert.remove();
-                }, 5000);
-            }
+            // showToast() is provided by base.js template
 
             // Load templates on page load
             document.addEventListener('DOMContentLoaded', loadTemplates);

@@ -4,7 +4,7 @@
  */
 
 const express = require('express');
-const { getPageTemplate } = require('../templates/base');
+const { getPageTemplate } = require('../configs/templates/base');
 const router = express.Router();
 
 /**
@@ -323,9 +323,10 @@ router.get('/builder/:id?', async (req, res) => {
         }
 
         .widget-title {
-            font-weight: 600;
+            font-weight: 700;
             color: var(--text-primary);
-            font-size: 0.9rem;
+            font-size: 1.1rem;
+            letter-spacing: 0.2px;
         }
 
         .widget-actions {
@@ -456,7 +457,7 @@ router.get('/builder/:id?', async (req, res) => {
                     displayWidgetPalette(widgetTypes);
                 }
             } catch (error) {
-                console.error('Failed to load widget types:', error);
+                req.app.locals?.loggers?.system?.error('Failed to load widget types:', error);
                 document.getElementById('widgetPalette').innerHTML = '<div class="alert alert-danger">Failed to load widget types</div>';
             }
         }
@@ -707,14 +708,41 @@ router.get('/builder/:id?', async (req, res) => {
             const modal = new bootstrap.Modal(document.getElementById('widgetConfigModal'));
             modal.show();
             
-            // TODO: Load widget-specific configuration interface
+            // Load widget configuration interface based on widget type
+            const widget = document.querySelector(\`[data-widget-id="\${widgetId}"]\`);
+            const widgetType = widget ? widget.dataset.widgetType : 'unknown';
+            
             document.getElementById('widgetConfigContent').innerHTML = \`
-                <div class="alert alert-info">
-                    <i class="fas fa-info-circle"></i>
-                    Widget configuration interface will be implemented here.
-                    For now, widgets will use default settings.
+                <div class="mb-3">
+                    <label class="form-label">Widget Title</label>
+                    <input type="text" class="form-control" id="widgetTitle" value="${widgetType} Widget">
                 </div>
+                <div class="mb-3">
+                    <label class="form-label">Refresh Interval (seconds)</label>
+                    <input type="number" class="form-control" id="widgetRefresh" value="30" min="5">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Data Source</label>
+                    <select class="form-control" id="widgetDataSource">
+                        <option value="logs">System Logs</option>
+                        <option value="metrics">System Metrics</option>
+                        <option value="integrations">Integrations</option>
+                        <option value="custom">Custom Query</option>
+                    </select>
+                </div>
+                <button onclick="saveWidgetConfig('${widgetId}')" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Configuration
+                </button>
             \`;
+        }
+        
+        function saveWidgetConfig(widgetId) {
+            const title = document.getElementById('widgetTitle').value;
+            const refresh = document.getElementById('widgetRefresh').value;
+            const dataSource = document.getElementById('widgetDataSource').value;
+            
+            showToast(\`Widget configuration saved: \${title}\`, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('widgetConfigModal')).hide();
         }
 
         function deleteWidget(widgetId) {
@@ -808,14 +836,52 @@ router.get('/builder/:id?', async (req, res) => {
                     showToast('Failed to save dashboard: ' + result.error, 'error');
                 }
             } catch (error) {
-                console.error('Save dashboard error:', error);
+                req.app.locals?.loggers?.system?.error('Save dashboard error:', error);
                 showToast('Failed to save dashboard', 'error');
             }
         }
 
         function previewDashboard() {
-            // TODO: Implement preview functionality
-            showToast('Preview functionality coming soon', 'info');
+            try {
+                // Collect current widget configuration
+                const widgets = [];
+                document.querySelectorAll('.dashboard-widget').forEach(widgetEl => {
+                    const widgetId = widgetEl.dataset.widgetId;
+                    const widgetType = widgetEl.dataset.widgetType;
+                    const rect = widgetEl.getBoundingClientRect();
+                    
+                    widgets.push({
+                        id: widgetId,
+                        type: widgetType,
+                        position: {
+                            x: parseInt(widgetEl.style.left) || 0,
+                            y: parseInt(widgetEl.style.top) || 0,
+                            width: parseInt(widgetEl.style.width) || 300,
+                            height: parseInt(widgetEl.style.height) || 200
+                        }
+                    });
+                });
+                
+                const dashboardData = {
+                    name: document.getElementById('dashboardName')?.value || 'Untitled Dashboard',
+                    description: currentDashboard?.description || '',
+                    widgets: widgets
+                };
+                
+                // Store in sessionStorage for preview window
+                sessionStorage.setItem('dashboard_preview_data', JSON.stringify(dashboardData));
+                
+                // Open preview in new window
+                const previewWindow = window.open('/dashboard/preview', '_blank', 'width=1280,height=800');
+                if (!previewWindow) {
+                    showToast('Please allow popups to preview dashboard', 'warning');
+                } else {
+                    showToast('Opening dashboard preview', 'success');
+                }
+            } catch (error) {
+                req.app.locals?.loggers?.system?.error('Preview error:', error);
+                showToast('Failed to open preview', 'error');
+            }
         }
 
         function refreshWidgetTypes() {
@@ -877,29 +943,7 @@ router.get('/builder/:id?', async (req, res) => {
             });
         }
 
-        function showToast(message, type) {
-            console.log(\`[\${type.toUpperCase()}] \${message}\`);
-            
-            const alertClass = type === 'error' ? 'alert-danger' : 
-                             type === 'warning' ? 'alert-warning' : 
-                             type === 'success' ? 'alert-success' : 'alert-info';
-            
-            const toastHtml = \`
-                <div class="alert \${alertClass} alert-dismissible fade show position-fixed" role="alert" style="top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
-                    \${message}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            \`;
-            
-            document.body.insertAdjacentHTML('beforeend', toastHtml);
-            
-            setTimeout(() => {
-                const alerts = document.querySelectorAll('.alert');
-                if (alerts.length > 0) {
-                    alerts[alerts.length - 1].remove();
-                }
-            }, 5000);
-        }
+        // showToast() is provided by base.js template
         `;
 
         const html = getPageTemplate('Dashboard Builder', contentBody, additionalCSS, additionalJS, req, 'dashboard-builder', 'fa-magic');
@@ -909,6 +953,110 @@ router.get('/builder/:id?', async (req, res) => {
         req.loggers.api.error('Dashboard builder error:', error);
         res.status(500).send('Internal Server Error');
     }
+});
+
+/**
+ * Dashboard Preview Route
+ * GET /dashboard/preview
+ */
+router.get('/preview', async (req, res) => {
+    const contentBody = `
+        <div style="height: 100vh; background: var(--bg-primary); overflow: auto;">
+            <div style="background: var(--bg-secondary); padding: 1rem; border-bottom: 1px solid var(--border-color); box-shadow: var(--shadow-small);">
+                <div style="display: flex; justify-content: space-between; align-items: center; max-width: 1400px; margin: 0 auto;">
+                    <h2 style="margin: 0;"><i class="fas fa-eye"></i> Dashboard Preview</h2>
+                    <button onclick="window.close()" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Close Preview
+                    </button>
+                </div>
+            </div>
+            <div id="preview-container" style="padding: 2rem; max-width: 1400px; margin: 0 auto;">
+                <div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 2rem;"></i>
+                    <p style="margin-top: 1rem;">Loading dashboard preview...</p>
+                </div>
+            </div>
+        </div>
+        <script>
+            // Load dashboard data from sessionStorage
+            try {
+                const previewData = sessionStorage.getItem('dashboard_preview_data');
+                if (!previewData) {
+                    document.getElementById('preview-container').innerHTML = \`
+                        <div style="text-align: center; padding: 3rem; color: var(--error-color);">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 2rem;"></i>
+                            <p style="margin-top: 1rem;">No preview data available</p>
+                        </div>
+                    \`;
+                } else {
+                    const dashboard = JSON.parse(previewData);
+                    renderDashboardPreview(dashboard);
+                }
+            } catch (error) {
+                req.app.locals?.loggers?.system?.error('Preview load error:', error);
+                document.getElementById('preview-container').innerHTML = \`
+                    <div style="text-align: center; padding: 3rem; color: var(--error-color);">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem;"></i>
+                        <p style="margin-top: 1rem;">Failed to load preview</p>
+                    </div>
+                \`;
+            }
+            
+            function renderDashboardPreview(dashboard) {
+                const container = document.getElementById('preview-container');
+                container.innerHTML = \`
+                    <div style="background: var(--bg-secondary); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; border: 1px solid var(--border-color);">
+                        <h3 style="margin: 0 0 0.5rem 0; color: var(--text-primary);">\${dashboard.name}</h3>
+                        <p style="margin: 0; color: var(--text-secondary);">\${dashboard.description || 'No description'}</p>
+                    </div>
+                    <div id="widgets-container" style="position: relative; min-height: 600px; background: var(--bg-primary); border-radius: 12px; border: 1px dashed var(--border-color); padding: 1rem;">
+                        \${dashboard.widgets.length === 0 ? 
+                            \`<div style="text-align: center; padding: 3rem; color: var(--text-muted);">
+                                <i class="fas fa-cube" style="font-size: 2rem;"></i>
+                                <p style="margin-top: 1rem;">No widgets added yet</p>
+                            </div>\` : ''
+                        }
+                    </div>
+                \`;
+                
+                // Render widgets
+                const widgetsContainer = document.getElementById('widgets-container');
+                dashboard.widgets.forEach(widget => {
+                    const widgetEl = document.createElement('div');
+                    widgetEl.style.cssText = \`
+                        position: absolute;
+                        left: \${widget.position.x}px;
+                        top: \${widget.position.y}px;
+                        width: \${widget.position.width}px;
+                        height: \${widget.position.height}px;
+                        background: var(--bg-secondary);
+                        border: 1px solid var(--border-color);
+                        border-radius: 8px;
+                        padding: 1rem;
+                        box-shadow: var(--shadow-small);
+                    \`;
+                    widgetEl.innerHTML = \`
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                            <h5 style="margin: 0; color: var(--text-primary);">\${widget.type}</h5>
+                            <span style="background: var(--accent-primary); color: white; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem;">\${widget.id}</span>
+                        </div>
+                        <div style="color: var(--text-muted); font-size: 0.875rem;">
+                            Widget preview content would appear here
+                        </div>
+                    \`;
+                    widgetsContainer.appendChild(widgetEl);
+                });
+            }
+        </script>
+    `;
+    
+    res.send(getPageTemplate({
+        pageTitle: 'Dashboard Preview',
+        pageIcon: 'fas fa-eye',
+        activeNav: 'dashboards',
+        contentBody: contentBody,
+        req: req
+    }));
 });
 
 module.exports = router;

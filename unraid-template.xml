@@ -1,55 +1,190 @@
 <?xml version="1.0"?>
 <Container version="2">
-  <Name>RejavartiLoggingServer</Name>
-  <Repository>rejavarti/rejavartis_logging_server:latest</Repository>
-  <Registry>https://hub.docker.com/r/rejavarti/rejavartis_logging_server</Registry>
+  <Name>EnterpriseLoggingServer</Name>
+  <Repository>node:18-alpine</Repository>
+  <Registry>https://hub.docker.com/_/node</Registry>
   <Network>bridge</Network>
   <MyIP/>
   <Shell>sh</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/rejavarti/logging_server</Support>
-  <Project>https://github.com/rejavarti/logging_server</Project>
-  <Overview>Enhanced Universal Logging Platform - Enterprise-grade logging server with web dashboard, real-time monitoring, MQTT integration, and API endpoints. Perfect for ESP32, IoT devices, home automation, and system logging.&#xD;
-&#xD;
-Features:&#xD;
-• Modern Ocean Blue web dashboard with real-time updates&#xD;
-• REST API endpoints for easy integration&#xD;
-• MQTT protocol support for IoT devices&#xD;
-• WebSocket for real-time log streaming&#xD;
-• SQLite database with automatic backups&#xD;
-• Multi-source logging (ESP32, servers, applications)&#xD;
-• Built-in authentication and session management&#xD;
-• Optional HTTPS/SSL support&#xD;
-• Health monitoring and system alerts&#xD;
-&#xD;
-Default Login: admin / ChangeMe123! (Please change immediately!)&#xD;
-&#xD;
-Access the dashboard at: http://[IP]:[PORT:10180]/dashboard</Overview>
-  <Category>Tools: Status:Stable HomeAutomation: Network:Other</Category>
-  <WebUI>http://[IP]:[PORT:10180]/dashboard</WebUI>
-  <TemplateURL>https://raw.githubusercontent.com/rejavarti/logging_server/main/unraid-template.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/rejavarti/logging_server/main/public/favicon.svg</Icon>
-  <ExtraParams/>
-  <PostArgs/>
+  <Support>https://github.com/rejavarti/Node-Red-Logging</Support>
+  <Project>https://github.com/rejavarti/Node-Red-Logging</Project>
+  <Overview>
+    Enterprise-grade logging platform for centralized infrastructure monitoring. 
+    Supports multiple ingestion protocols including Syslog, GELF, Beats, and Fluentd. 
+    Features real-time dashboards, advanced search, automated backups, and WebSocket streaming.
+    
+    &#xD;
+    &#xD;
+    Features:&#xD;
+    • Multi-protocol log ingestion (Syslog, GELF, Beats, Fluentd)&#xD;
+    • Real-time WebSocket streaming&#xD;
+    • Advanced search and filtering&#xD;
+    • Custom dashboards with drag-and-drop widgets&#xD;
+    • Automated database backups&#xD;
+    • SQLite-based storage (no external dependencies)&#xD;
+    • Role-based authentication&#xD;
+    • PM2 process management for high reliability&#xD;
+    &#xD;
+    &#xD;
+    After installation:&#xD;
+    1. Access Web UI at http://[IP]:[PORT:10180]&#xD;
+    2. Login with admin username and your configured password&#xD;
+    3. Configure ingestion sources in Settings&#xD;
+    4. Create dashboards for monitoring&#xD;
+    &#xD;
+    &#xD;
+    IMPORTANT: Change the default AUTH_PASSWORD before first use!
+  </Overview>
+  <Category>Tools: Status:Stable</Category>
+  <WebUI>http://[IP]:[PORT:10180]</WebUI>
+  <TemplateURL>https://raw.githubusercontent.com/rejavarti/Node-Red-Logging/master/unraid-template.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/rejavarti/Node-Red-Logging/master/public/img/logo.png</Icon>
+  <ExtraParams>--restart=unless-stopped</ExtraParams>
+  <PostArgs>sh -c "apk add --no-cache sqlite tini &amp;&amp; npm install -g pm2 &amp;&amp; cd /app &amp;&amp; npm install --production &amp;&amp; exec pm2-runtime start server.js --name logging-server"</PostArgs>
   <CPUset/>
-  <DateInstalled></DateInstalled>
-  <DonateText>Support Development</DonateText>
+  <DateInstalled/>
+  <DonateText/>
   <DonateLink/>
-  <Requires>&#xD;
-Before starting the container, create the required directories:&#xD;
-mkdir -p /mnt/user/appdata/logging-server/{data,logs}&#xD;
-chmod -R 755 /mnt/user/appdata/logging-server&#xD;
-chown -R 1001:1001 /mnt/user/appdata/logging-server</Requires>
-  <Config Name="Web UI Port" Target="10180" Default="10180" Mode="tcp" Description="Web dashboard and API port (HTTP). Access dashboard at http://[IP]:[PORT]/dashboard" Type="Port" Display="always" Required="true" Mask="false">10180</Config>
-  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/logging-server/data" Mode="rw" Description="Database files, backups, and sessions storage" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/logging-server/data</Config>
-  <Config Name="Logs Directory" Target="/app/logs" Default="/mnt/user/appdata/logging-server/logs" Mode="rw" Description="Application log files directory" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/logging-server/logs</Config>
-  <Config Name="SSL Certificates (Optional)" Target="/app/ssl" Default="" Mode="ro" Description="SSL certificate directory for HTTPS (cert.pem and key.pem). Only needed if enabling HTTPS mode." Type="Path" Display="advanced" Required="false" Mask="false"></Config>
-  <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment mode (production recommended)" Type="Variable" Display="advanced" Required="true" Mask="false">production</Config>
-  <Config Name="Application Port" Target="PORT" Default="10180" Mode="" Description="Internal application port (must match container port above)" Type="Variable" Display="advanced" Required="true" Mask="false">10180</Config>
-  <Config Name="Timezone" Target="TZ" Default="America/Denver" Mode="" Description="Timezone for log timestamps. Examples: America/New_York, Europe/London, Asia/Tokyo, America/Los_Angeles" Type="Variable" Display="always" Required="true" Mask="false">America/Denver</Config>
-  <Config Name="Admin Username" Target="AUTH_USERNAME" Default="admin" Mode="" Description="⚠️ SECURITY: Username for web interface authentication. Change from default for better security!" Type="Variable" Display="always" Required="true" Mask="false">admin</Config>
-  <Config Name="Admin Password" Target="AUTH_PASSWORD" Default="ChangeMe123!" Mode="" Description="🔒 CRITICAL SECURITY WARNING: CHANGE THIS PASSWORD IMMEDIATELY! Default password is publicly known and NOT secure. Use a strong, unique password." Type="Variable" Display="always" Required="true" Mask="true">ChangeMe123!</Config>
-  <Config Name="Enable HTTPS" Target="USE_HTTPS" Default="false" Mode="" Description="Enable HTTPS/SSL mode (requires SSL certificates mounted in /app/ssl)" Type="Variable" Display="advanced" Required="false" Mask="false">false</Config>
-  <Config Name="SSL Certificate Path" Target="SSL_CERT_PATH" Default="/app/ssl/cert.pem" Mode="" Description="Path to SSL certificate file (only needed if USE_HTTPS=true)" Type="Variable" Display="advanced" Required="false" Mask="false">/app/ssl/cert.pem</Config>
-  <Config Name="SSL Key Path" Target="SSL_KEY_PATH" Default="/app/ssl/key.pem" Mode="" Description="Path to SSL private key file (only needed if USE_HTTPS=true)" Type="Variable" Display="advanced" Required="false" Mask="false">/app/ssl/key.pem</Config>
+  <Description>
+    Enterprise Logging Platform - Multi-source infrastructure monitoring with advanced analytics, 
+    real-time streaming, and enterprise authentication. Perfect for monitoring home labs, 
+    production servers, containers, and IoT devices.
+  </Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>10180</HostPort>
+        <ContainerPort>10180</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>8081</HostPort>
+        <ContainerPort>8081</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>8082</HostPort>
+        <ContainerPort>8082</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>514</HostPort>
+        <ContainerPort>514</ContainerPort>
+        <Protocol>udp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>601</HostPort>
+        <ContainerPort>601</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>12201</HostPort>
+        <ContainerPort>12201</ContainerPort>
+        <Protocol>udp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>12202</HostPort>
+        <ContainerPort>12202</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>5044</HostPort>
+        <ContainerPort>5044</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+      <Port>
+        <HostPort>9880</HostPort>
+        <ContainerPort>9880</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+  <Data>
+    <Volume>
+      <HostDir>/mnt/user/appdata/logging-server/app</HostDir>
+      <ContainerDir>/app</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/logging-server/data</HostDir>
+      <ContainerDir>/app/data</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+    <Volume>
+      <HostDir>/mnt/user/appdata/logging-server/logs</HostDir>
+      <ContainerDir>/app/logs</ContainerDir>
+      <Mode>rw</Mode>
+    </Volume>
+  </Data>
+  <Environment>
+    <Variable>
+      <Value>10180</Value>
+      <Name>PORT</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>8081</Value>
+      <Name>WS_PORT</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>8082</Value>
+      <Name>STREAM_PORT</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>production</Value>
+      <Name>NODE_ENV</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>America/Denver</Value>
+      <Name>TZ</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>ChangeThisSecurePassword123!</Value>
+      <Name>AUTH_PASSWORD</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value/>
+      <Name>JWT_SECRET</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>99</Value>
+      <Name>PUID</Name>
+      <Mode/>
+    </Variable>
+    <Variable>
+      <Value>100</Value>
+      <Name>PGID</Name>
+      <Mode/>
+    </Variable>
+  </Environment>
+  <Labels/>
+  <Config Name="Web UI Port" Target="10180" Default="10180" Mode="tcp" Description="Web interface port" Type="Port" Display="always" Required="true" Mask="false">10180</Config>
+  <Config Name="WebSocket Port" Target="8081" Default="8081" Mode="tcp" Description="WebSocket real-time updates" Type="Port" Display="always" Required="true" Mask="false">8081</Config>
+  <Config Name="Stream Port" Target="8082" Default="8082" Mode="tcp" Description="Real-time log streaming" Type="Port" Display="always" Required="true" Mask="false">8082</Config>
+  <Config Name="Syslog UDP" Target="514" Default="514" Mode="udp" Description="Syslog UDP ingestion" Type="Port" Display="advanced" Required="false" Mask="false">514</Config>
+  <Config Name="Syslog TCP" Target="601" Default="601" Mode="tcp" Description="Syslog TCP ingestion" Type="Port" Display="advanced" Required="false" Mask="false">601</Config>
+  <Config Name="GELF UDP" Target="12201" Default="12201" Mode="udp" Description="GELF UDP ingestion (Graylog)" Type="Port" Display="advanced" Required="false" Mask="false">12201</Config>
+  <Config Name="GELF TCP" Target="12202" Default="12202" Mode="tcp" Description="GELF TCP ingestion (Graylog)" Type="Port" Display="advanced" Required="false" Mask="false">12202</Config>
+  <Config Name="Beats/Logstash" Target="5044" Default="5044" Mode="tcp" Description="Beats/Logstash ingestion" Type="Port" Display="advanced" Required="false" Mask="false">5044</Config>
+  <Config Name="Fluentd" Target="9880" Default="9880" Mode="tcp" Description="Fluentd ingestion" Type="Port" Display="advanced" Required="false" Mask="false">9880</Config>
+  <Config Name="AppData" Target="/app" Default="/mnt/user/appdata/logging-server/app" Mode="rw" Description="Application files" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/logging-server/app</Config>
+  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/logging-server/data" Mode="rw" Description="Database and persistent data" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/logging-server/data</Config>
+  <Config Name="Logs Directory" Target="/app/logs" Default="/mnt/user/appdata/logging-server/logs" Mode="rw" Description="Application logs" Type="Path" Display="advanced" Required="true" Mask="false">/mnt/user/appdata/logging-server/logs</Config>
+  <Config Name="Web Port" Target="PORT" Default="10180" Mode="" Description="Internal web server port" Type="Variable" Display="advanced" Required="true" Mask="false">10180</Config>
+  <Config Name="WebSocket Port (Internal)" Target="WS_PORT" Default="8081" Mode="" Description="Internal WebSocket port" Type="Variable" Display="advanced" Required="true" Mask="false">8081</Config>
+  <Config Name="Stream Port (Internal)" Target="STREAM_PORT" Default="8082" Mode="" Description="Internal streaming port" Type="Variable" Display="advanced" Required="true" Mask="false">8082</Config>
+  <Config Name="Node Environment" Target="NODE_ENV" Default="production" Mode="" Description="Node.js environment (production/development)" Type="Variable" Display="advanced" Required="true" Mask="false">production</Config>
+  <Config Name="Timezone" Target="TZ" Default="America/Denver" Mode="" Description="Container timezone (e.g., America/New_York, Europe/London)" Type="Variable" Display="always" Required="true" Mask="false">America/Denver</Config>
+  <Config Name="Admin Password" Target="AUTH_PASSWORD" Default="ChangeThisSecurePassword123!" Mode="" Description="Admin authentication password (CHANGE THIS!)" Type="Variable" Display="always" Required="true" Mask="true">ChangeThisSecurePassword123!</Config>
+  <Config Name="JWT Secret" Target="JWT_SECRET" Default="" Mode="" Description="JWT signing secret (leave empty to auto-generate)" Type="Variable" Display="advanced" Required="false" Mask="true"></Config>
+  <Config Name="User ID" Target="PUID" Default="99" Mode="" Description="User ID for file permissions" Type="Variable" Display="advanced" Required="true" Mask="false">99</Config>
+  <Config Name="Group ID" Target="PGID" Default="100" Mode="" Description="Group ID for file permissions" Type="Variable" Display="advanced" Required="true" Mask="false">100</Config>
 </Container>

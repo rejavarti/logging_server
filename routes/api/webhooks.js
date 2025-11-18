@@ -4,33 +4,57 @@ const router = express.Router();
 // GET /api/webhooks - Get all webhooks
 router.get('/', async (req, res) => {
     try {
-        const webhooks = await req.dal.getAllWebhooks();
-        res.json({ webhooks });
+        const webhooks = req.dal && req.dal.getWebhooks ? await req.dal.getWebhooks() : [];
+        res.json({ success: true, webhooks });
     } catch (error) {
-        console.error('API webhooks error:', error);
-        res.status(500).json({ error: 'Failed to fetch webhooks' });
+        req.app.locals?.loggers?.api?.error('API webhooks error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch webhooks' });
     }
 });
 
 // POST /api/webhooks - Create new webhook
 router.post('/', async (req, res) => {
     try {
-        const webhook = await req.dal.createWebhook(req.body);
+        const { name, url } = req.body || {};
+        if (!name || !url) {
+            return res.status(400).json({ success: false, error: 'name and url are required' });
+        }
+        // Basic URL validation
+        try { new URL(url); } catch (_) {
+            return res.status(400).json({ success: false, error: 'invalid webhook url' });
+        }
+
+        const result = await req.dal.createWebhook(req.body);
+        const createdId = result.lastID;
+
+        let webhook = null;
+        try {
+            webhook = await req.dal.getWebhookById(createdId);
+        } catch (fetchErr) {
+            // Fallback to minimal object if direct fetch isn't available
+            webhook = { id: createdId, name: req.body.name, url: req.body.url, method: req.body.method || 'POST', active: req.body.active ?? 1 };
+        }
         
         // Log the activity
-        await req.dal.logUserActivity(
-            req.user.id,
-            'webhook_create',
-            `webhook_${webhook.id}`,
-            { name: req.body.name, url: req.body.url },
-            req.ip,
-            req.get('User-Agent')
-        );
+        if (req.dal && req.dal.logUserActivity) {
+            try {
+                await req.dal.logUserActivity(
+                    req.user?.id || null,
+                    'webhook_create',
+                    `webhook_${createdId}`,
+                    { name: req.body.name, url: req.body.url },
+                    req.ip,
+                    req.get('User-Agent')
+                );
+            } catch (logErr) {
+                req.app.locals?.loggers?.api?.warn('Failed to log webhook create activity:', logErr.message);
+            }
+        }
         
-        res.json({ webhook });
+        res.status(201).json({ success: true, webhook });
     } catch (error) {
-        console.error('API create webhook error:', error);
-        res.status(500).json({ error: 'Failed to create webhook' });
+        req.app.locals?.loggers?.api?.error('API create webhook error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create webhook' });
     }
 });
 
@@ -51,7 +75,7 @@ router.put('/:id', async (req, res) => {
         
         res.json({ webhook });
     } catch (error) {
-        console.error('API update webhook error:', error);
+        req.app.locals?.loggers?.api?.error('API update webhook error:', error);
         res.status(500).json({ error: 'Failed to update webhook' });
     }
 });
@@ -73,7 +97,7 @@ router.delete('/:id', async (req, res) => {
         
         res.json({ success: true });
     } catch (error) {
-        console.error('API delete webhook error:', error);
+        req.app.locals?.loggers?.api?.error('API delete webhook error:', error);
         res.status(500).json({ error: 'Failed to delete webhook' });
     }
 });
@@ -95,7 +119,7 @@ router.post('/:id/toggle', async (req, res) => {
         
         res.json(result);
     } catch (error) {
-        console.error('API toggle webhook error:', error);
+        req.app.locals?.loggers?.api?.error('API toggle webhook error:', error);
         res.status(500).json({ error: 'Failed to toggle webhook' });
     }
 });
@@ -103,22 +127,38 @@ router.post('/:id/toggle', async (req, res) => {
 // POST /api/webhooks/:id/test - Test webhook
 router.post('/:id/test', async (req, res) => {
     try {
-        const result = await req.dal.testWebhook(req.params.id);
+        let result;
+        
+        if (req.dal && req.dal.testWebhook) {
+            result = await req.dal.testWebhook(req.params.id);
+        } else {
+            // No mock data - require real implementation
+            return res.status(501).json({ 
+                success: false, 
+                error: 'Webhook testing not implemented - database access layer unavailable' 
+            });
+        }
         
         // Log the activity
-        await req.dal.logUserActivity(
-            req.user.id,
-            'webhook_test',
-            `webhook_${req.params.id}`,
-            null,
-            req.ip,
-            req.get('User-Agent')
-        );
+        if (req.dal && req.dal.logUserActivity) {
+            try {
+                await req.dal.logUserActivity(
+                    req.user?.id || 1,
+                    'webhook_test',
+                    `webhook_${req.params.id}`,
+                    null,
+                    req.ip,
+                    req.get('User-Agent')
+                );
+            } catch (logError) {
+                req.app.locals?.loggers?.api?.warn('Failed to log webhook test activity:', logError.message);
+            }
+        }
         
         res.json(result);
     } catch (error) {
-        console.error('API test webhook error:', error);
-        res.status(500).json({ error: 'Failed to test webhook' });
+        req.app.locals?.loggers?.api?.error('API test webhook error:', error);
+        res.status(500).json({ success: false, error: 'Failed to test webhook: ' + error.message });
     }
 });
 
@@ -128,7 +168,7 @@ router.post('/test', async (req, res) => {
         const result = await req.dal.testWebhookData(req.body);
         res.json(result);
     } catch (error) {
-        console.error('API test webhook data error:', error);
+        req.app.locals?.loggers?.api?.error('API test webhook data error:', error);
         res.status(500).json({ error: 'Failed to test webhook data' });
     }
 });
@@ -136,44 +176,20 @@ router.post('/test', async (req, res) => {
 // GET /api/webhooks/:id/deliveries - Get webhook delivery history
 router.get('/:id/deliveries', async (req, res) => {
     try {
-        const deliveries = [
-            {
-                id: '1',
-                webhookId: req.params.id,
-                status: 'success',
-                statusCode: 200,
-                timestamp: '2024-11-02T06:15:00Z',
-                payload: { message: 'Log alert triggered', level: 'error' },
-                responseTime: '150ms',
-                response: 'OK'
-            },
-            {
-                id: '2',
-                webhookId: req.params.id,
-                status: 'failed',
-                statusCode: 500,
-                timestamp: '2024-11-02T06:10:00Z',
-                payload: { message: 'System alert', level: 'warning' },
-                responseTime: '5000ms',
-                response: 'Internal Server Error',
-                error: 'Connection timeout'
-            },
-            {
-                id: '3',
-                webhookId: req.params.id,
-                status: 'success',
-                statusCode: 200,
-                timestamp: '2024-11-02T06:05:00Z',
-                payload: { message: 'Authentication success', level: 'info' },
-                responseTime: '85ms',
-                response: 'Received'
-            }
-        ];
+        const rows = await req.dal.all(`
+            SELECT id, webhook_id as webhookId, response_code as statusCode,
+                   delivery_status as status, attempted_at as timestamp,
+                   delivered_at, retry_count as retries
+            FROM webhook_deliveries
+            WHERE webhook_id = ?
+            ORDER BY attempted_at DESC
+            LIMIT 50
+        `, [req.params.id]);
 
-        res.json({ success: true, deliveries });
+        res.json({ success: true, deliveries: rows || [] });
     } catch (error) {
-        console.error('API webhook deliveries error:', error);
-        res.status(500).json({ error: 'Failed to get webhook deliveries' });
+        req.app.locals?.loggers?.api?.error('API webhook deliveries error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get webhook deliveries' });
     }
 });
 
@@ -182,36 +198,33 @@ router.post('/deliveries/:id/retry', async (req, res) => {
     try {
         const { id } = req.params;
         
-        console.log(`Retrying webhook delivery ${id} by user ${req.user ? req.user.username : 'system'}`);
+        req.app.locals?.loggers?.api?.info(`Retrying webhook delivery ${id} by user ${req.user ? req.user.username : 'system'}`);
         
-        // Simulate retry operation
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Require actual implementation - no simulation
+        if (!req.dal || !req.dal.retryWebhookDelivery) {
+            return res.status(501).json({ 
+                success: false, 
+                error: 'Webhook retry not implemented - database access layer unavailable' 
+            });
+        }
         
-        const retryResult = {
-            deliveryId: id,
-            status: 'success',
-            statusCode: 200,
-            timestamp: new Date().toISOString(),
-            responseTime: '120ms',
-            response: 'Retry successful',
-            retriedBy: req.user ? req.user.username : 'system'
-        };
-
+        const result = await req.dal.retryWebhookDelivery(id);
+        
         // Log the activity
         if (req.dal && req.dal.logUserActivity) {
             await req.dal.logUserActivity(
                 req.user ? req.user.id : 0,
                 'webhook_retry',
                 `delivery_${id}`,
-                { status: 'success' },
+                { status: result.status },
                 req.ip,
                 req.get('User-Agent')
             );
         }
 
-        res.json({ success: true, retry: retryResult });
+        res.json({ success: true, retry: result });
     } catch (error) {
-        console.error('API webhook retry error:', error);
+        req.app.locals?.loggers?.api?.error('API webhook retry error:', error);
         res.status(500).json({ error: 'Failed to retry webhook delivery' });
     }
 });

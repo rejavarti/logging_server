@@ -15,6 +15,8 @@ class MetricsManager {
             uptime: 0
         };
         this.integrationMetrics = {};
+    // Per-source ingestion metrics: counts and bytes grouped by source label
+    this.sourceMetrics = {}; // { [source]: { logs: number, bytes: number } }
         this.performanceMetrics = {
             cpuUsage: 0,
             memoryUsage: 0,
@@ -70,6 +72,17 @@ class MetricsManager {
 
     incrementBytes(bytes) {
         this.serverMetrics.totalBytes += bytes;
+    }
+
+    // Record ingestion event grouped by source (e.g., 'file', 'syslog', 'gelf', custom sources)
+    recordIngestion(source = 'unknown', bytes = 0) {
+        const key = String(source || 'unknown');
+        if (!this.sourceMetrics[key]) this.sourceMetrics[key] = { logs: 0, bytes: 0 };
+        this.sourceMetrics[key].logs += 1;
+        this.sourceMetrics[key].bytes += (Number(bytes) || 0);
+        // Maintain global counters too
+        this.incrementLogs();
+        this.incrementBytes(Number(bytes) || 0);
     }
 
     incrementErrors() {
@@ -129,7 +142,8 @@ class MetricsManager {
         return {
             server: this.serverMetrics,
             integrations: this.integrationMetrics,
-            performance: this.performanceMetrics
+            performance: this.performanceMetrics,
+            sources: this.sourceMetrics
         };
     }
 

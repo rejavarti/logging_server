@@ -10,7 +10,8 @@
  */
 
 const express = require('express');
-const { getPageTemplate } = require('../templates/base');
+const { getPageTemplate } = require('../configs/templates/base');
+const { escapeHtml } = require('../utils/html-helpers');
 const router = express.Router();
 
 /**
@@ -37,14 +38,11 @@ router.get('/', async (req, res) => {
         const offset = (page - 1) * limit;
 
         // Use actual DAL methods to get real activity data
-        const activitiesResult = await req.dal.getAllActivity({
-            userId: filters.user,
-            action: filters.type,
-            startDate: filters.startDate,
-            endDate: filters.endDate,
-            limit,
+        const activitiesResult = await req.dal.getActivityLog(
+            filters.user, 
+            limit + 10, // Get a few extra to check for pagination
             offset
-        });
+        );
         
         const activities = activitiesResult || [];
         const total = activities.length;
@@ -83,7 +81,7 @@ router.get('/', async (req, res) => {
                         <i class="fas fa-history"></i>
                     </div>
                 </div>
-                <div class="stat-value">${activityStats.totalActivities.toLocaleString()}</div>
+                <div class="stat-value">${(activityStats.totalActivities || 0).toLocaleString()}</div>
                 <div class="stat-label">all time</div>
             </div>
             
@@ -94,7 +92,7 @@ router.get('/', async (req, res) => {
                         <i class="fas fa-calendar-day"></i>
                     </div>
                 </div>
-                <div class="stat-value">${activityStats.activitiesToday.toLocaleString()}</div>
+                <div class="stat-value">${(activityStats.activitiesToday || 0).toLocaleString()}</div>
                 <div class="stat-label">activities today</div>
             </div>
             
@@ -193,50 +191,47 @@ router.get('/', async (req, res) => {
             <div class="card-header">
                 <h3><i class="fas fa-timeline"></i> Activity Timeline</h3>
                 <div class="results-summary">
-                    Showing ${activities.length} of ${total.toLocaleString()} activities
+                    Showing ${activities.length} of ${(total || 0).toLocaleString()} activities
                     ${total > limit ? `(Page ${page} of ${totalPages})` : ''}
                 </div>
             </div>
-            <div class="card-body">
+            <div class="card-body" style="padding: 0;">
                 ${activities.length > 0 ? `
-                <div class="activity-timeline" id="activity-timeline">
-                    ${activities.map(activity => `
-                        <div class="timeline-item" data-activity-id="${activity.id}">
-                            <div class="timeline-marker ${getActivityTypeClass(activity.type || activity.action)}">
-                                <i class="${getActivityIcon(activity.type || activity.action)}"></i>
-                            </div>
-                            <div class="timeline-content">
-                                <div class="timeline-header">
-                                    <div class="activity-info">
-                                        <span class="activity-type">${(activity.type || activity.action || 'Unknown').toUpperCase()}</span>
-                                        <span class="activity-user">by ${activity.username || 'System'}</span>
-                                        <span class="activity-time">${formatTimestamp(activity.timestamp)}</span>
-                                    </div>
-                                    <div class="activity-actions">
-                                        <button onclick="viewActivityDetails(${activity.id})" class="btn-small" title="View Details">
-                                            <i class="fas fa-eye"></i>
-                                        </button>
+                <div class="table-responsive">
+                    <table class="log-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Type</th>
+                                <th>User</th>
+                                <th>Action</th>
+                                <th>Target</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${activities.map(activity => `
+                                <tr>
+                                    <td>${formatTimestamp(activity.timestamp)}</td>
+                                    <td>
+                                        <span class="severity-badge severity-${getActivityTypeClass(activity.type || activity.action)}">
+                                            ${(activity.type || activity.action || 'Unknown').toUpperCase()}
+                                        </span>
+                                    </td>
+                                    <td>${activity.username || 'System'}</td>
+                                    <td>${escapeHtml(activity.action)}</td>
+                                    <td>${activity.target ? escapeHtml(activity.target) : '-'}</td>
+                                    <td>
                                         ${activity.metadata ? `
-                                        <button onclick="copyActivityData(${activity.id})" class="btn-small" title="Copy Data">
-                                            <i class="fas fa-copy"></i>
+                                        <button onclick="viewActivityDetails(${activity.id})" class="btn-small" title="View Details">
+                                            <i class="fas fa-eye"></i> View
                                         </button>
-                                        ` : ''}
-                                    </div>
-                                </div>
-                                <div class="timeline-description">
-                                    <strong>${escapeHtml(activity.action)}</strong>
-                                    ${activity.description ? `<p>${escapeHtml(activity.description)}</p>` : ''}
-                                    ${activity.target ? `<span class="activity-target">Target: ${escapeHtml(activity.target)}</span>` : ''}
-                                </div>
-                                ${activity.metadata ? `
-                                <div class="activity-metadata">
-                                    <i class="fas fa-database"></i>
-                                    ${Object.keys(JSON.parse(activity.metadata)).length} metadata fields
-                                </div>
-                                ` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
+                                        ` : '-'}
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
                 ` : `
                 <div class="empty-state">
@@ -251,7 +246,7 @@ router.get('/', async (req, res) => {
                 <div class="card-footer">
                     <nav class="pagination-nav">
                         <div class="pagination-info">
-                            Page ${page} of ${totalPages} (${total.toLocaleString()} total activities)
+                            Page ${page} of ${totalPages} (${(total || 0).toLocaleString()} total activities)
                         </div>
                         <div class="pagination-controls">
                             ${page > 1 ? `<a href="?${new URLSearchParams({...req.query, page: page - 1}).toString()}" class="btn btn-secondary"><i class="fas fa-chevron-left"></i> Previous</a>` : ''}
@@ -267,8 +262,9 @@ router.get('/', async (req, res) => {
             <div class="modal-content">
                 <div class="modal-header">
                     <h3><i class="fas fa-info-circle"></i> Activity Details</h3>
-                    <button onclick="closeModal('activity-detail-modal')" class="btn-close">
-                        <i class="fas fa-times"></i>
+                    <button onclick="closeModal('activity-detail-modal')" class="btn-close" aria-label="Close Activity Details">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                        <span class="btn-close-text">Close</span>
                     </button>
                 </div>
                 <div class="modal-body" id="activity-detail-content">
@@ -278,15 +274,7 @@ router.get('/', async (req, res) => {
         </div>
         `;
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text.toString()
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        // escapeHtml() imported from utils/html-helpers
 
         function formatTimestamp(timestamp) {
             if (!timestamp) return 'N/A';
@@ -343,6 +331,15 @@ router.get('/', async (req, res) => {
         .activity-timeline {
             position: relative;
             padding-left: 2rem;
+        }
+        /* Accessible close button text (hidden visually in compact layouts) */
+        .btn-close-text {
+            margin-left: 0.35rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        @media (max-width: 640px) {
+            .btn-close-text { display: none; }
         }
 
         .activity-timeline::before {
@@ -585,8 +582,49 @@ router.get('/', async (req, res) => {
         `;
 
         const additionalJS = `
-        let realtimeActivityActive = false;
-        let realtimeActivityInterval;
+    let realtimeActivityActive = false; // state flag only; actual polling now via Realtime registry
+    let realtimeActivityInterval; // retained for backward compatibility (no longer used once registry active)
+        // --- Pagination State Preservation ---
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentPageParam = urlParams.get('page');
+                if (currentPageParam) {
+                    // Store current page for later restoration
+                    sessionStorage.setItem('activity-current-page', currentPageParam);
+                } else {
+                    // If no page param but we have a stored page, restore it seamlessly
+                    const storedPage = sessionStorage.getItem('activity-current-page');
+                    if (storedPage && storedPage !== '1') {
+                        urlParams.set('page', storedPage);
+                        // Preserve any existing non-page params (e.g., filters)
+                        window.location.replace('/activity?' + urlParams.toString());
+                    }
+                }
+            } catch (err) {
+                req.app.locals?.loggers?.system?.warn('Pagination state restore failed:', err);
+            }
+        });
+
+        // Enhance modal accessibility (ESC to close + overlay click)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const modal = document.getElementById('activity-detail-modal');
+                if (modal && modal.classList.contains('open')) {
+                    closeModal('activity-detail-modal');
+                }
+            }
+        });
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('activity-detail-modal');
+            if (modal) {
+                modal.addEventListener('click', (evt) => {
+                    if (evt.target === modal) {
+                        closeModal('activity-detail-modal');
+                    }
+                });
+            }
+        });
 
         // Handle activity filter form submission
         document.getElementById('activity-filter-form').addEventListener('submit', function(e) {
@@ -600,6 +638,11 @@ router.get('/', async (req, res) => {
                     params.append(key, value);
                 }
             }
+            // Preserve current page if already on a later page (task requirement)
+            const existingPage = new URLSearchParams(window.location.search).get('page');
+            if (existingPage) {
+                params.set('page', existingPage);
+            }
             
             window.location.href = '/activity?' + params.toString();
         });
@@ -607,43 +650,43 @@ router.get('/', async (req, res) => {
         // Clear activity filters
         function clearActivityFilters() {
             document.getElementById('activity-filter-form').reset();
-            window.location.href = '/activity';
+            const existingPage = new URLSearchParams(window.location.search).get('page') || sessionStorage.getItem('activity-current-page');
+            if (existingPage && existingPage !== '1') {
+                window.location.href = '/activity?page=' + existingPage;
+            } else {
+                window.location.href = '/activity';
+            }
         }
 
         // Toggle real-time activity updates
         function toggleRealTimeActivity() {
             const btn = document.getElementById('realtime-activity-btn');
-            
+            if (!btn) return;
             if (!realtimeActivityActive) {
                 realtimeActivityActive = true;
                 btn.innerHTML = '<i class="fas fa-pause"></i> Stop Real-time';
                 btn.classList.add('realtime-active');
-                
-                // Start polling for new activities
-                realtimeActivityInterval = setInterval(async () => {
-                    try {
-                        const response = await fetch('/api/activity/latest');
-                        if (response.ok) {
-                            const newActivities = await response.json();
-                            if (newActivities.length > 0) {
-                                prependNewActivities(newActivities);
+                // Register realtime task (idempotent)
+                if (window.registerRealtimeTask) {
+                    window.registerRealtimeTask('activity-timeline-sync', async () => {
+                        try {
+                            const response = await fetch('/api/activity/latest');
+                            if (response.ok) {
+                                const newActivities = await response.json();
+                                if (Array.isArray(newActivities) && newActivities.length) {
+                                    prependNewActivities(newActivities);
+                                }
                             }
-                        }
-                    } catch (error) {
-                        console.error('Real-time activity update failed:', error);
-                    }
-                }, 3000);
-                
+                        } catch (e) { /* silent */ }
+                    }, 3000, { runImmediately: true });
+                }
                 showToast('Real-time activity updates started', 'success');
             } else {
                 realtimeActivityActive = false;
                 btn.innerHTML = '<i class="fas fa-play"></i> Start Real-time';
                 btn.classList.remove('realtime-active');
-                
-                if (realtimeActivityInterval) {
-                    clearInterval(realtimeActivityInterval);
-                }
-                
+                if (window.unregisterRealtimeTask) window.unregisterRealtimeTask('activity-timeline-sync');
+                if (realtimeActivityInterval) { clearInterval(realtimeActivityInterval); }
                 showToast('Real-time activity updates stopped', 'info');
             }
         }
@@ -666,7 +709,7 @@ router.get('/', async (req, res) => {
                     <div class="timeline-content">
                         <div class="timeline-header">
                             <div class="activity-info">
-                                <span class="activity-type">\${activity.type.toUpperCase()}</span>
+                                <span class="activity-type">\${(activity.type || 'UNKNOWN').toUpperCase()}</span>
                                 <span class="activity-user">by \${activity.username || 'System'}</span>
                                 <span class="activity-time">\${formatTimestamp(activity.timestamp)}</span>
                             </div>
@@ -745,16 +788,24 @@ router.get('/', async (req, res) => {
                 showLoading('activity-detail-content');
                 openModal('activity-detail-modal');
                 
-                const response = await fetch(\`/api/activity/\${activityId}\`);
-                if (response.ok) {
-                    const activity = await response.json();
-                    displayActivityDetails(activity);
-                } else {
+                const response = await fetch('/api/activity/' + activityId, {
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (!response.ok) {
                     throw new Error('Failed to load activity details');
                 }
+                
+                const activity = await response.json();
+                if (activity) { 
+                    displayActivityDetails(activity); 
+                } else { 
+                    showError('activity-detail-content', 'No data'); 
+                }
             } catch (error) {
-                console.error('Error loading activity details:', error);
-                showError('activity-detail-content', 'Failed to load activity details');
+                req.app.locals?.loggers?.system?.error('Error loading activity details:', error);
+                showError('activity-detail-content', error.message || 'Failed to load activity details');
             }
         }
 
@@ -774,7 +825,7 @@ router.get('/', async (req, res) => {
                             </div>
                             <div class="detail-item">
                                 <label>Type:</label>
-                                <span class="activity-type">\${activity.type.toUpperCase()}</span>
+                                <span class="activity-type">\${(activity.type || 'UNKNOWN').toUpperCase()}</span>
                             </div>
                             <div class="detail-item">
                                 <label>Action:</label>
@@ -826,27 +877,32 @@ router.get('/', async (req, res) => {
         // Copy activity data
         async function copyActivityData(activityId) {
             try {
-                const response = await fetch(\`/api/activity/\${activityId}\`);
-                if (response.ok) {
-                    const activity = await response.json();
-                    const data = {
-                        id: activity.id,
-                        type: activity.type,
-                        action: activity.action,
-                        user: activity.username || 'System',
-                        timestamp: activity.timestamp,
-                        target: activity.target,
-                        description: activity.description,
-                        metadata: activity.metadata ? JSON.parse(activity.metadata) : null
-                    };
-                    
-                    await copyToClipboard(JSON.stringify(data, null, 2));
-                } else {
+                const response = await fetch('/api/activity/' + activityId, {
+                    credentials: 'include',
+                    headers: { 'Accept': 'application/json' }
+                });
+                
+                if (!response.ok) {
                     throw new Error('Failed to load activity data');
                 }
+                
+                const activity = await response.json();
+                if (!activity) throw new Error('No activity data');
+                
+                const data = {
+                    id: activity.id,
+                    type: activity.type,
+                    action: activity.action,
+                    user: activity.username || 'System',
+                    timestamp: activity.timestamp,
+                    target: activity.target,
+                    description: activity.description,
+                    metadata: activity.metadata ? JSON.parse(activity.metadata) : null
+                };
+                await copyToClipboard(JSON.stringify(data, null, 2));
             } catch (error) {
-                console.error('Error copying activity data:', error);
-                showToast('Failed to copy activity data', 'error');
+                req.app.locals?.loggers?.system?.error('Error copying activity data:', error);
+                showToast(error.message || 'Failed to copy activity data', 'error');
             }
         }
 
@@ -855,40 +911,33 @@ router.get('/', async (req, res) => {
             try {
                 const params = new URLSearchParams(window.location.search);
                 params.set('export', 'true');
-                
-                const response = await fetch('/api/activity/export?' + params.toString());
-                if (response.ok) {
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = \`activity-export-\${new Date().toISOString().split('T')[0]}.csv\`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    
-                    showToast('Activity exported successfully', 'success');
-                } else {
-                    throw new Error('Export failed');
-                }
+                const blob = await apiFetch('/api/activity/export?' + params.toString(), {}, { responseType: 'blob' });
+                if (!blob) throw new Error('No export data');
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'activity-export-' + new Date().toISOString().split('T')[0] + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                showToast('Activity exported successfully', 'success');
             } catch (error) {
-                console.error('Export error:', error);
-                showToast('Failed to export activity', 'error');
+                req.app.locals?.loggers?.system?.error('Export error:', error);
+                showToast(error.message || 'Failed to export activity', 'error');
             }
         }
 
         // Cleanup on page unload
         window.addEventListener('beforeunload', function() {
-            if (realtimeActivityInterval) {
-                clearInterval(realtimeActivityInterval);
-            }
+            if (window.unregisterRealtimeTask) window.unregisterRealtimeTask('activity-timeline-sync');
+            if (realtimeActivityInterval) { clearInterval(realtimeActivityInterval); }
         });
         `;
 
         const html = getPageTemplate({
             pageTitle: 'Activity Monitor',
-            pageIcon: 'fa-history',
+            pageIcon: 'fas fa-history',
             activeNav: 'activity',
             contentBody,
             additionalCSS,
@@ -901,7 +950,7 @@ router.get('/', async (req, res) => {
         res.send(html);
 
     } catch (error) {
-        console.error('Activity route error:', error);
+        req.app.locals?.loggers?.system?.error('Activity route error:', error);
         res.status(500).send('Internal Server Error');
     }
 });
@@ -916,7 +965,7 @@ router.get('/api/latest', async (req, res) => {
         const activities = await req.dal.getActivitiesSince(since);
         res.json(activities);
     } catch (error) {
-        console.error('Latest activities API error:', error);
+        req.app.locals?.loggers?.system?.error('Latest activities API error:', error);
         res.status(500).json({ error: 'Failed to get latest activities' });
     }
 });
@@ -933,7 +982,7 @@ router.get('/api/:id', async (req, res) => {
         }
         res.json(activity);
     } catch (error) {
-        console.error('Activity details API error:', error);
+        req.app.locals?.loggers?.system?.error('Activity details API error:', error);
         res.status(500).json({ error: 'Failed to get activity details' });
     }
 });
@@ -976,7 +1025,7 @@ router.get('/api/export', async (req, res) => {
         res.send(csv);
 
     } catch (error) {
-        console.error('Export activities API error:', error);
+        req.app.locals?.loggers?.system?.error('Export activities API error:', error);
         res.status(500).json({ error: 'Failed to export activities' });
     }
 });

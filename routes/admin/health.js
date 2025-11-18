@@ -6,19 +6,9 @@ const router = express.Router();
 
 module.exports = (getPageTemplate, requireAuth) => {
     // System Health Checks Page
-    router.get('/health', requireAuth, (req, res) => {
-        if (req.user.role !== 'admin') {
-            return res.status(403).send(getPageTemplate({
-                pageTitle: 'Access Denied',
-                pageIcon: 'fas fa-ban',
-                activeNav: '',
-                contentBody: '<div class="card"><div class="card-body"><h2 style="color: var(--error-color);"><i class="fas fa-exclamation-triangle"></i> Access Denied</h2><p>Admin privileges required to access this page.</p><a href="/dashboard" class="btn"><i class="fas fa-arrow-left"></i> Return to Dashboard</a></div></div>',
-                additionalCSS: '',
-                additionalJS: '',
-                req: req
-            }));
-        }
-
+    // Note: requireAuth and requireAdmin already applied at server.js level
+    // Mounted at "/admin/health" in server.js, so use root path here
+    router.get('/', (req, res) => {
         const contentBody = `
             <div class="card">
                 <div class="card-header">
@@ -163,7 +153,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                     const data = await response.json();
                     renderHealthChecks(data);
                 } catch (error) {
-                    console.error('Error fetching health checks:', error);
+                    req.app.locals?.loggers?.admin?.error('Error fetching health checks:', error);
                     showToast('Failed to load health checks', 'error');
                     
                     // Show error state
@@ -259,10 +249,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                 document.getElementById('last-updated').textContent = data.timestamp || new Date().toLocaleString();
             }
 
-            function showToast(message, type = 'info') {
-                console.log(\`[\${type.toUpperCase()}] \${message}\`);
-                // Could be enhanced with actual toast notifications
-            }
+            // showToast() is provided by base.js template
 
             // Load health checks on page load
             refreshHealthChecks();

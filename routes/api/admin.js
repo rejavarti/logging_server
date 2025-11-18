@@ -6,45 +6,109 @@
 const express = require('express');
 const router = express.Router();
 
-// Get active user sessions
-router.get('/admin/sessions', async (req, res) => {
+// Get all users (admin view)
+router.get('/users', async (req, res) => {
     try {
-        const sessions = [
-            {
-                id: 'sess_1',
-                userId: 1,
-                username: 'admin',
-                ip: '192.168.1.100',
-                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                loginTime: '2024-11-02T06:15:00Z',
-                lastActivity: new Date().toISOString(),
-                active: true
-            },
-            {
-                id: 'sess_2',
-                userId: 2,
-                username: 'viewer',
-                ip: '192.168.1.102',
-                userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                loginTime: '2024-11-02T08:30:00Z',
-                lastActivity: '2024-11-02T09:45:00Z',
-                active: true
-            }
-        ];
+        if (!req.dal || !req.dal.all) {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
 
-        res.json({ success: true, sessions });
+        const users = await req.dal.all(
+            `SELECT 
+                id, username, email, role, 
+                active as status,
+                created_at as created, 
+                last_login as lastLogin
+             FROM users
+             ORDER BY created_at DESC`
+        );
+
+        // Add permissions based on role
+        users.forEach(user => {
+            if (user.role === 'admin') {
+                user.permissions = ['admin:*', 'logs:*', 'dashboards:*', 'users:*'];
+            } else if (user.role === 'analyst') {
+                user.permissions = ['logs:*', 'dashboards:*', 'search:*'];
+            } else {
+                user.permissions = ['logs:read', 'dashboards:read'];
+            }
+        });
+
+        res.json({ success: true, users });
     } catch (error) {
-        console.error('Error getting sessions:', error);
+        req.app.locals?.loggers?.api?.error('Error getting admin users:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Get active user sessions
+router.get('/sessions', async (req, res) => {
+    try {
+        if (!req.dal || !req.dal.all) {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+
+        let sessions = [];
+        
+        try {
+            sessions = await req.dal.all(
+                `SELECT 
+                    s.id, s.user_id as userId, u.username,
+                    s.ip_address, s.user_agent,
+                    s.created_at, s.last_activity,
+                    s.expires_at,
+                    s.is_active as active
+                 FROM user_sessions s
+                 LEFT JOIN users u ON s.user_id = u.id
+                 WHERE s.is_active = 1 AND s.expires_at > datetime('now')
+                 ORDER BY s.last_activity DESC`
+            );
+        } catch (dbErr) {
+            // Table might not exist or query failed
+            req.app.locals?.loggers?.api?.warn('Sessions table query failed:', dbErr.message);
+            
+            // Return empty array if database unavailable - no mock data
+            sessions = [];
+        }
+
+        res.json({ success: true, sessions: sessions || [] });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error getting sessions:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 // Terminate specific session
-router.delete('/admin/sessions/:id', async (req, res) => {
+router.delete('/sessions/:id', async (req, res) => {
     try {
         const { id } = req.params;
         
-        console.log(`Session ${id} terminated by admin ${req.user ? req.user.username : 'system'}`);
+        // Delete session from database if DAL available
+        if (req.dal && req.dal.deleteSessionById) {
+            await req.dal.deleteSessionById(id);
+            
+            // Log session termination activity
+            if (req.dal.logActivity && req.user) {
+                try {
+                    await req.dal.logActivity({
+                        user_id: req.user.id,
+                        action: 'terminate_session',
+                        resource_type: 'session',
+                        resource_id: id,
+                        details: JSON.stringify({ 
+                            session_id: id,
+                            terminated_by: req.user.username
+                        }),
+                        ip_address: req.ip || req.connection.remoteAddress || 'unknown',
+                        user_agent: req.headers['user-agent'] || 'unknown'
+                    });
+                } catch (auditErr) {
+                    req.app.locals?.loggers?.api?.warn('Failed to log session termination activity:', auditErr.message);
+                }
+            }
+        }
+        
+        req.app.locals?.loggers?.api?.info(`Session ${id} terminated by admin ${req.user ? req.user.username : 'system'}`);
         
         res.json({
             success: true,
@@ -53,17 +117,17 @@ router.delete('/admin/sessions/:id', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('Error terminating session:', error);
+        req.app.locals?.loggers?.api?.error('Error terminating session:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 // Terminate all sessions (except current)
-router.post('/admin/sessions/terminate-all', async (req, res) => {
+router.post('/sessions/terminate-all', async (req, res) => {
     try {
         const currentSessionId = req.sessionID || 'current';
         
-        console.log(`All sessions terminated by admin ${req.user ? req.user.username : 'system'}`);
+        req.app.locals?.loggers?.api?.info(`All sessions terminated by admin ${req.user ? req.user.username : 'system'}`);
         
         res.json({
             success: true,
@@ -74,17 +138,17 @@ router.post('/admin/sessions/terminate-all', async (req, res) => {
             timestamp: new Date().toISOString()
         });
     } catch (error) {
-        console.error('Error terminating all sessions:', error);
+        req.app.locals?.loggers?.api?.error('Error terminating all sessions:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 // Admin restart (different from system restart)
-router.post('/admin/restart', async (req, res) => {
+router.post('/restart', async (req, res) => {
     try {
         const { reason = 'Manual restart' } = req.body;
         
-        console.log(`Admin restart initiated by ${req.user ? req.user.username : 'system'}: ${reason}`);
+        req.app.locals?.loggers?.api?.info(`Admin restart initiated by ${req.user ? req.user.username : 'system'}: ${reason}`);
         
         res.json({
             success: true,
@@ -95,7 +159,7 @@ router.post('/admin/restart', async (req, res) => {
             estimatedDowntime: '10-15 seconds'
         });
     } catch (error) {
-        console.error('Error initiating admin restart:', error);
+        req.app.locals?.loggers?.api?.error('Error initiating admin restart:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

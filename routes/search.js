@@ -10,7 +10,8 @@
  */
 
 const express = require('express');
-const { getPageTemplate } = require('../templates/base');
+const { getPageTemplate } = require('../configs/templates/base');
+const { escapeHtml, formatDate } = require('../utils/html-helpers');
 const router = express.Router();
 
 /**
@@ -31,7 +32,8 @@ router.get('/', async (req, res) => {
         let total = 0;
         let searchPerformed = false;
         
-        if (query) {
+        // Search if query OR any filter is provided
+        if (query || level || source || startDate || endDate) {
             searchPerformed = true;
             const searchParams = {
                 query,
@@ -48,9 +50,22 @@ router.get('/', async (req, res) => {
             total = searchResult.total;
         }
         
-        const sources = await req.dal.getLogSources();
+        const sources = await req.dal.getLogSources().catch(() => []);
         const levels = ['debug', 'info', 'warning', 'error'];
-        const savedSearches = await req.dal.getSavedSearchesByUser(req.user.id);
+        
+        // Get saved searches from settings or database
+        let savedSearches = [];
+        try {
+            // Query settings table for saved_searches JSON
+            const savedSearchConfig = await req.dal.get(
+                `SELECT value FROM settings WHERE key = 'saved_searches'`
+            );
+            if (savedSearchConfig && savedSearchConfig.value) {
+                savedSearches = JSON.parse(savedSearchConfig.value);
+            }
+        } catch (err) {
+            req.app.locals?.loggers?.system?.warn('Failed to load saved searches:', err.message);
+        }
 
         const contentBody = `
         <!-- Saved Searches Section -->
@@ -171,7 +186,7 @@ router.get('/', async (req, res) => {
             <div class="card-header">
                 <h3><i class="fas fa-list-alt"></i> Search Results</h3>
                 <div class="results-summary">
-                    ${total > 0 ? `Found ${total.toLocaleString()} matching entries` : 'No results found'}
+                    ${total > 0 ? `Found ${(total || 0).toLocaleString()} matching entries` : 'No results found'}
                 </div>
             </div>
             <div class="card-body">
@@ -181,7 +196,7 @@ router.get('/', async (req, res) => {
                         <div class="result-item" data-index="${index}">
                             <div class="result-header">
                                 <div class="result-meta">
-                                    <span class="timestamp">${formatTimestamp(log.timestamp)}</span>
+                                    <span class="timestamp">${formatDate(log.timestamp)}</span>
                                     <span class="level-badge ${log.level}">${log.level.toUpperCase()}</span>
                                     <span class="source">${log.source || 'System'}</span>
                                 </div>
@@ -213,7 +228,7 @@ router.get('/', async (req, res) => {
                 ${total > 100 ? `
                 <div class="search-pagination">
                     <p class="text-muted">
-                        Showing first 100 results of ${total.toLocaleString()} matches. 
+                        Showing first 100 results of ${(total || 0).toLocaleString()} matches. 
                         Refine your search for more specific results.
                     </p>
                 </div>
@@ -370,15 +385,7 @@ router.get('/', async (req, res) => {
         </div>
         `;
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text.toString()
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        // escapeHtml() imported from utils/html-helpers
 
         function formatTimestamp(timestamp) {
             if (!timestamp) return 'N/A';
@@ -420,7 +427,7 @@ router.get('/', async (req, res) => {
                 }
             } catch (error) {
                 // If regex is invalid, fall back to plain text
-                console.error('Highlight error:', error);
+                req.app.locals?.loggers?.system?.error('Highlight error:', error);
             }
             
             return escaped;
@@ -747,6 +754,71 @@ router.get('/', async (req, res) => {
                 gap: 1rem;
             }
         }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-large);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-close:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        body.modal-open {
+            overflow: hidden;
+        }
         `;
 
         const additionalJS = `
@@ -771,17 +843,24 @@ router.get('/', async (req, res) => {
                 params.append('case_sensitive', 'true');
             }
             
-            if (!params.get('q')) {
-                showToast('Please enter a search query', 'warning');
+            // Allow search with filters only (no query required)
+            const hasQuery = params.get('q');
+            const hasFilters = params.get('level') || params.get('source') || params.get('start_date') || params.get('end_date');
+            
+            if (!hasQuery && !hasFilters) {
+                showToast('Please enter a search query or select at least one filter', 'warning');
                 return;
             }
             
+            // Persist filters before navigating
+            persistSearchFilters();
             window.location.href = '/search?' + params.toString();
         });
 
         // Clear search
         function clearSearch() {
             document.getElementById('search-form').reset();
+            ['query','level','source','start_date','end_date','regex','case_sensitive'].forEach(k => sessionStorage.removeItem('search-'+k));
             window.location.href = '/search';
         }
 
@@ -801,6 +880,30 @@ router.get('/', async (req, res) => {
             document.getElementById('search-preview-query').textContent = query;
             openModal('save-search-modal');
         }
+
+        // Modal management functions
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'flex';
+                document.body.classList.add('modal-open');
+            }
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+            }
+        }
+
+        // Close modal on background click
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('modal')) {
+                closeModal(e.target.id);
+            }
+        });
 
         // Handle save search form
         document.getElementById('save-search-form').addEventListener('submit', async function(e) {
@@ -838,7 +941,7 @@ router.get('/', async (req, res) => {
                     throw new Error('Failed to save search');
                 }
             } catch (error) {
-                console.error('Save search error:', error);
+                req.app.locals?.loggers?.system?.error('Save search error:', error);
                 showToast('Failed to save search', 'error');
             }
         });
@@ -864,7 +967,7 @@ router.get('/', async (req, res) => {
                     throw new Error('Failed to load saved search');
                 }
             } catch (error) {
-                console.error('Load saved search error:', error);
+                req.app.locals?.loggers?.system?.error('Load saved search error:', error);
                 showToast('Failed to load saved search', 'error');
             }
         }
@@ -887,7 +990,7 @@ router.get('/', async (req, res) => {
                     throw new Error('Failed to delete search');
                 }
             } catch (error) {
-                console.error('Delete saved search error:', error);
+                req.app.locals?.loggers?.system?.error('Delete saved search error:', error);
                 showToast('Failed to delete search', 'error');
             }
         }
@@ -906,7 +1009,7 @@ router.get('/', async (req, res) => {
                     throw new Error('Failed to load log details');
                 }
             } catch (error) {
-                console.error('Error loading log details:', error);
+                req.app.locals?.loggers?.system?.error('Error loading log details:', error);
                 showError('log-detail-content', 'Failed to load log details');
             }
         }
@@ -931,7 +1034,7 @@ router.get('/', async (req, res) => {
                             </div>
                             <div class="detail-item">
                                 <label>Level:</label>
-                                <span class="level-badge \${log.level}">\${log.level.toUpperCase()}</span>
+                                <span class="level-badge \${log.level || 'info'}">\${(log.level || 'UNKNOWN').toUpperCase()}</span>
                             </div>
                             <div class="detail-item">
                                 <label>Source:</label>
@@ -1003,6 +1106,56 @@ router.get('/', async (req, res) => {
                 });
             }
         });
+        // --- Added sessionStorage persistence (non-breaking alongside existing localStorage) ---
+        function persistSearchFilters() {
+            const map = {
+                query: document.getElementById('query'),
+                level: document.getElementById('level'),
+                source: document.getElementById('source'),
+                start_date: document.getElementById('start_date'),
+                end_date: document.getElementById('end_date'),
+                regex: document.getElementById('regex'),
+                case_sensitive: document.getElementById('case_sensitive')
+            };
+            Object.entries(map).forEach(([k, el]) => {
+                if (!el) return;
+                if (el.type === 'checkbox') {
+                    sessionStorage.setItem('search-'+k, el.checked ? '1' : '');
+                } else {
+                    sessionStorage.setItem('search-'+k, el.value.trim());
+                }
+            });
+        }
+
+        function restoreSearchFilters() {
+            ['query','level','source','start_date','end_date','regex','case_sensitive'].forEach(k => {
+                const el = document.getElementById(k);
+                const val = sessionStorage.getItem('search-'+k);
+                if (!el || !val) return;
+                if (el.type === 'checkbox') {
+                    el.checked = val === '1' || el.checked;
+                } else if (!el.value) {
+                    el.value = val;
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const hasParams = [...urlParams.keys()].some(k => ['q','level','source','start_date','end_date','regex','case_sensitive'].includes(k));
+            if (!hasParams) {
+                restoreSearchFilters();
+            } else {
+                persistSearchFilters();
+            }
+            // Live persistence
+            ['query','level','source','start_date','end_date','regex','case_sensitive'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const evt = el.type === 'checkbox' ? 'change' : 'input';
+                el.addEventListener(evt, debounce(persistSearchFilters, 300));
+            });
+        });
         `;
 
         const html = getPageTemplate({
@@ -1020,7 +1173,7 @@ router.get('/', async (req, res) => {
         res.send(html);
 
     } catch (error) {
-        console.error('Search route error:', error);
+        req.app.locals?.loggers?.system?.error('Search route error:', error);
         res.status(500).send('Internal Server Error');
     }
 });
@@ -1040,7 +1193,7 @@ router.post('/api/save', async (req, res) => {
         res.json(savedSearch);
         
     } catch (error) {
-        console.error('Save search API error:', error);
+        req.app.locals?.loggers?.system?.error('Save search API error:', error);
         res.status(500).json({ error: 'Failed to save search' });
     }
 });
@@ -1058,7 +1211,7 @@ router.get('/api/saved/:id', async (req, res) => {
         res.json(search);
         
     } catch (error) {
-        console.error('Get saved search API error:', error);
+        req.app.locals?.loggers?.system?.error('Get saved search API error:', error);
         res.status(500).json({ error: 'Failed to get saved search' });
     }
 });
@@ -1073,7 +1226,7 @@ router.delete('/api/saved/:id', async (req, res) => {
         res.json({ success: true });
         
     } catch (error) {
-        console.error('Delete saved search API error:', error);
+        req.app.locals?.loggers?.system?.error('Delete saved search API error:', error);
         res.status(500).json({ error: 'Failed to delete saved search' });
     }
 });

@@ -10,7 +10,8 @@
  */
 
 const express = require('express');
-const { getPageTemplate } = require('../templates/base');
+const { getPageTemplate } = require('../configs/templates/base');
+const { escapeHtml, formatDate } = require('../utils/html-helpers');
 const router = express.Router();
 
 /**
@@ -37,7 +38,7 @@ router.get('/', async (req, res) => {
 
         // Use actual DAL methods to get real data
         const offset = (page - 1) * limit;
-        const logs = await req.dal.getLogs({
+        const logs = await req.dal.getLogEntries({
             level: filters.level,
             source: filters.source,
             search: filters.search,
@@ -47,7 +48,7 @@ router.get('/', async (req, res) => {
             offset
         });
         
-        const totalResult = await req.dal.getLogsCount(filters);
+        const totalResult = await req.dal.getLogCount(filters);
         const total = totalResult.count || 0;
         const totalPages = Math.ceil(total / limit);
         const sources = await req.dal.getLogSources();
@@ -78,7 +79,7 @@ router.get('/', async (req, res) => {
                 border: 1px solid var(--border-color);
             }
             .log-table th, .log-table td { 
-                padding: 1rem; 
+                padding: 0.5rem 0.75rem; 
                 text-align: left; 
                 border-bottom: 1px solid var(--border-color); 
             }
@@ -90,6 +91,13 @@ router.get('/', async (req, res) => {
             .log-table td { 
                 color: var(--text-secondary); 
                 transition: background-color 0.3s ease;
+            }
+            .log-table th:first-child, .log-table td:first-child {
+                min-width: 180px;
+                max-width: 180px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
             .log-table tr:hover td {
                 background: var(--bg-secondary);
@@ -130,37 +138,47 @@ router.get('/', async (req, res) => {
                 <div class="card">
                     <div class="card-header">
                         <h3><i class="fas fa-file-alt"></i> System Logs</h3>
-                        <button onclick="loadLogs()" class="btn">
-                            <i class="fas fa-sync-alt"></i> Refresh
-                        </button>
+                        <div class="card-actions" style="display:flex;gap:0.5rem;align-items:center;">
+                            <button onclick="loadLogs()" class="btn">
+                                <i class="fas fa-sync-alt"></i> Refresh
+                            </button>
+                            <button onclick="exportLogsCSV()" class="btn btn-secondary" title="Export visible logs as CSV">
+                                <i class="fas fa-file-csv"></i> CSV
+                            </button>
+                            <button onclick="exportLogsJSON()" class="btn btn-secondary" title="Export visible logs as JSON">
+                                <i class="fas fa-file-code"></i> JSON
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body" style="padding: 0;">
-                        <table class="log-table">
-                            <thead>
-                                <tr>
-                                    <th>Timestamp</th>
-                                    <th>Category</th>
-                                    <th>Source</th>
-                                    <th>Event Type</th>
-                                    <th>Message</th>
-                                    <th>Severity</th>
-                                </tr>
-                            </thead>
-                            <tbody id="logs-tbody">
-                                ${logs.length > 0 ? logs.map(log => `
+                        <div class="table-responsive">
+                            <table class="log-table">
+                                <thead>
                                     <tr>
-                                        <td>${formatTimestamp(log.timestamp)}</td>
-                                        <td>${log.category || 'System'}</td>
-                                        <td>${log.source || 'System'}</td>
-                                        <td>${log.event_type || log.level}</td>
-                                        <td>${escapeHtml(log.message)}</td>
-                                        <td>
-                                            <span class="severity-badge severity-${log.level}">${log.level.toUpperCase()}</span>
-                                        </td>
+                                        <th>Timestamp</th>
+                                        <th>Category</th>
+                                        <th>Source</th>
+                                        <th>Event Type</th>
+                                        <th>Message</th>
+                                        <th>Severity</th>
                                     </tr>
-                                `).join('') : '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading logs...</td></tr>'}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody id="logs-tbody">
+                                    ${logs.length > 0 ? logs.map(log => `
+                                        <tr>
+                                            <td>${formatDate(log.timestamp)}</td>
+                                            <td>${log.category || 'System'}</td>
+                                            <td>${log.source || 'System'}</td>
+                                            <td>${log.event_type || log.level}</td>
+                                            <td>${escapeHtml(log.message)}</td>
+                                            <td>
+                                                <span class="severity-badge severity-${log.level}">${log.level.toUpperCase()}</span>
+                                            </td>
+                                        </tr>
+                                    `).join('') : '<tr><td colspan="6" style="text-align: center; padding: 2rem;">Loading logs...</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -168,19 +186,31 @@ router.get('/', async (req, res) => {
             <!-- Analytics Tab Content -->
             <div id="content-analytics" class="tab-content" style="display: none;">
                 <!-- Date Range Filter -->
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 1.5rem; gap: 0.5rem;">
-                    <select id="analytics-date-range" onchange="loadAnalytics()" style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
-                        <option value="today">Today</option>
-                        <option value="yesterday">Yesterday</option>
-                        <option value="7days" selected>Last 7 Days</option>
-                        <option value="30days">Last 30 Days</option>
-                    </select>
-                    <button onclick="loadAnalytics()" class="btn">
-                        <i class="fas fa-sync-alt"></i> Refresh
-                    </button>
-                    <button onclick="exportAnalytics()" class="btn">
-                        <i class="fas fa-download"></i> Export
-                    </button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 0.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary);">
+                            <input type="checkbox" id="auto-update-toggle" checked style="margin: 0;">
+                            <i class="fas fa-sync-alt"></i>
+                            Auto-update charts (30s)
+                        </label>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <select id="analytics-date-range" onchange="loadAnalytics()" style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                            <option value="today">Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="7days" selected>Last 7 Days</option>
+                            <option value="30days">Last 30 Days</option>
+                        </select>
+                        <button onclick="loadAnalytics()" class="btn">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                        <button onclick="exportAnalyticsCSV()" class="btn btn-secondary" title="Export analytics as CSV">
+                            <i class="fas fa-file-csv"></i> CSV
+                        </button>
+                        <button onclick="exportAnalyticsJSON()" class="btn btn-secondary" title="Export analytics as JSON">
+                            <i class="fas fa-file-code"></i> JSON
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Stats Grid -->
@@ -283,13 +313,30 @@ router.get('/', async (req, res) => {
                             <button onclick="loadAdvancedLogs()" class="btn">
                                 <i class="fas fa-sync-alt"></i> Refresh
                             </button>
+                            <button onclick="clearAdvancedFilters()" class="btn btn-secondary" title="Clear search and filters">
+                                <i class="fas fa-eraser"></i> Clear
+                            </button>
                         </div>
                     </div>
                     <div class="card-body" style="padding: 0;">
-                        <div id="advanced-logs-container" style="max-height: 800px; overflow-y: auto;">
-                            <div style="text-align: center; padding: 2rem; color: var(--text-muted);">
-                                <i class="fas fa-spinner fa-spin"></i> Loading logs...
-                            </div>
+                        <div class="table-responsive" style="max-height: 800px; overflow-y: auto;">
+                            <table class="log-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Category</th>
+                                        <th>Source</th>
+                                        <th>Event Type</th>
+                                        <th>Message</th>
+                                        <th>Severity</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="advanced-logs-tbody">
+                                    <tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading logs...
+                                    </td></tr>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -297,10 +344,25 @@ router.get('/', async (req, res) => {
         `;
 
         const additionalJS = `
-            <!-- Load Chart.js for analytics charts -->
-            <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
-            <script>
-            // Chart.js loading helper
+            // Chart.js loading helper (Chart.js is already loaded globally in the base template)
+            // --- Pagination State Preservation for Logs Page ---
+            document.addEventListener('DOMContentLoaded', () => {
+                try {
+                    const params = new URLSearchParams(window.location.search);
+                    const pageParam = params.get('page');
+                    if (pageParam) {
+                        sessionStorage.setItem('logs-current-page', pageParam);
+                    } else {
+                        const storedPage = sessionStorage.getItem('logs-current-page');
+                        if (storedPage && storedPage !== '1') {
+                            params.set('page', storedPage);
+                            window.location.replace('/logs?' + params.toString());
+                        }
+                    }
+                } catch (e) {
+                    req.app.locals?.loggers?.system?.warn('Logs pagination restore failed:', e);
+                }
+            });
             function waitForChart(callback) {
                 if (typeof Chart !== 'undefined') {
                     callback();
@@ -331,6 +393,11 @@ router.get('/', async (req, res) => {
                 } else if (tabName === 'advanced') {
                     loadAdvancedLogs();
                 }
+                // Preserve pagination when switching tabs (no page reset on return)
+                const currentPage = new URLSearchParams(window.location.search).get('page');
+                if (currentPage) {
+                    sessionStorage.setItem('logs-current-page', currentPage);
+                }
             }
 
             function refreshAnalytics() {
@@ -340,37 +407,58 @@ router.get('/', async (req, res) => {
             // Analytics variables
             let hourlyChart, categoryChart, severityChart;
             let allLogs = [];
+            let chartUpdateInterval = null; // legacy variable for backward compatibility
+            
+            // Chart auto-update now handled by Realtime registry; these wrappers preserved for UI toggle logic
+            function startChartAutoUpdate() {
+                if (window.registerRealtimeTask) {
+                    window.registerRealtimeTask('logs-analytics-refresh', async () => { try { await loadAnalytics(); } catch(e){} }, 30000, { runImmediately: true });
+                }
+            }
+            function stopChartAutoUpdate() {
+                if (window.unregisterRealtimeTask) window.unregisterRealtimeTask('logs-analytics-refresh');
+            }
+            
+            // Enhanced chart update with animation
+            function updateChartData(chart, newData) {
+                if (!chart || !newData) return;
+                
+                chart.data.labels = newData.labels;
+                chart.data.datasets[0].data = newData.values;
+                chart.update('active'); // Use 'active' animation mode for smooth updates
+            }
+
+            // Hold latest datasets for export
+            let latestLogs = [];
+            let latestAnalytics = null;
 
             // Load logs function
             async function loadLogs() {
                 try {
-                    const response = await fetch('/api/logs?limit=100');
-                    if (response.ok) {
-                        const logs = await response.json();
-                        const tbody = document.getElementById('logs-tbody');
-                        
-                        if (logs.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No logs found</td></tr>';
-                            return;
-                        }
-                        
-                        tbody.innerHTML = logs.map(log => \`
-                            <tr>
-                                <td>\${formatTimestamp(log.timestamp)}</td>
-                                <td>\${log.category || 'System'}</td>
-                                <td>\${log.source || 'System'}</td>
-                                <td>\${log.event_type || log.level}</td>
-                                <td>\${escapeHtml(log.message)}</td>
-                                <td>
-                                    <span class="severity-badge severity-\${log.level}">\${log.level.toUpperCase()}</span>
-                                </td>
-                            </tr>
-                        \`).join('');
+                    const data = await apiFetch('/api/logs?limit=100', { credentials: 'include', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+                    const logs = (data && (data.logs || data)) || [];
+                    latestLogs = Array.isArray(logs) ? logs : [];
+                    const tbody = document.getElementById('logs-tbody');
+                    if (!Array.isArray(logs) || logs.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No logs found</td></tr>';
+                        return;
                     }
+                    tbody.innerHTML = logs.map(function(log){
+                        return '<tr>' +
+                               '<td>' + formatTimestamp(log.timestamp) + '</td>' +
+                               '<td>' + (log.category || 'System') + '</td>' +
+                               '<td>' + (log.source || 'System') + '</td>' +
+                               '<td>' + (log.event_type || log.level) + '</td>' +
+                               '<td>' + escapeHtml(log.message) + '</td>' +
+                               '<td><span class="severity-badge severity-' + log.level + '">' + log.level.toUpperCase() + '</span></td>' +
+                               '</tr>'; 
+                    }).join('');
                 } catch (error) {
-                    console.error('Error loading logs:', error);
-                    document.getElementById('logs-tbody').innerHTML = 
-                        '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--error-color);">Error loading logs</td></tr>';
+                    req.app.locals?.loggers?.system?.error('Error loading logs:', error);
+                    const tbody = document.getElementById('logs-tbody');
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--error-color);">Error loading logs: ' + (error.message || 'Unknown error') + '</td></tr>';
+                    }
                 }
             }
 
@@ -379,22 +467,26 @@ router.get('/', async (req, res) => {
                 const dateRange = document.getElementById('analytics-date-range').value;
                 
                 try {
-                    const response = await fetch(\`/api/logs/analytics?range=\${dateRange}\`);
-                    if (response.ok) {
-                        const data = await response.json();
-                        updateAnalyticsStats(data);
-                        updateAnalyticsCharts(data);
-                    }
+                    const data = await apiFetch('/api/logs/analytics?range=' + dateRange, { credentials: 'include', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+                    latestAnalytics = data;
+                    updateAnalyticsStats(data);
+                    updateAnalyticsCharts(data);
                 } catch (error) {
-                    console.error('Error loading analytics:', error);
+                    req.app.locals?.loggers?.system?.error('Error loading analytics:', error);
+                    // Show error in analytics stats
+                    document.getElementById('analytics-total-logs').textContent = 'Error';
+                    document.getElementById('analytics-error-logs').textContent = 'Error';
+                    document.getElementById('analytics-avg-per-hour').textContent = 'Error';
+                    document.getElementById('analytics-active-sources').textContent = 'Error';
                 }
             }
 
             function updateAnalyticsStats(data) {
-                document.getElementById('analytics-total-logs').textContent = data.totalLogs.toLocaleString();
-                document.getElementById('analytics-error-logs').textContent = data.errorLogs.toLocaleString();
-                document.getElementById('analytics-avg-per-hour').textContent = Math.round(data.avgPerHour);
-                document.getElementById('analytics-active-sources').textContent = data.activeSources;
+                if (!data) return;
+                document.getElementById('analytics-total-logs').textContent = (data.totalLogs || 0).toLocaleString();
+                document.getElementById('analytics-error-logs').textContent = (data.errorLogs || 0).toLocaleString();
+                document.getElementById('analytics-avg-per-hour').textContent = Math.round(data.avgPerHour || 0);
+                document.getElementById('analytics-active-sources').textContent = data.activeSources || 0;
             }
 
             function updateAnalyticsCharts(data) {
@@ -408,17 +500,19 @@ router.get('/', async (req, res) => {
             function updateHourlyChart(data) {
                 const ctx = document.getElementById('hourly-chart').getContext('2d');
                 
+                // If chart exists, update data instead of recreating
                 if (hourlyChart) {
-                    hourlyChart.destroy();
+                    updateChartData(hourlyChart, data);
+                    return;
                 }
                 
                 hourlyChart = new Chart(ctx, {
                     type: 'line',
                     data: {
-                        labels: data.labels,
+                        labels: data.labels || [],
                         datasets: [{
                             label: 'Logs per Hour',
-                            data: data.values,
+                            data: data.values || [],
                             borderColor: 'var(--accent-primary)',
                             backgroundColor: 'var(--accent-primary-light)',
                             tension: 0.4
@@ -426,6 +520,10 @@ router.get('/', async (req, res) => {
                     },
                     options: {
                         responsive: true,
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeInOutQuart'
+                        },
                         plugins: {
                             legend: {
                                 display: false
@@ -443,16 +541,18 @@ router.get('/', async (req, res) => {
             function updateSeverityChart(data) {
                 const ctx = document.getElementById('severity-chart').getContext('2d');
                 
+                // If chart exists, update data instead of recreating
                 if (severityChart) {
-                    severityChart.destroy();
+                    updateChartData(severityChart, data);
+                    return;
                 }
                 
                 severityChart = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
-                        labels: data.labels,
+                        labels: data.labels || [],
                         datasets: [{
-                            data: data.values,
+                            data: data.values || [],
                             backgroundColor: [
                                 '#ef4444', // error
                                 '#f59e0b', // warning  
@@ -463,6 +563,10 @@ router.get('/', async (req, res) => {
                     },
                     options: {
                         responsive: true,
+                        animation: {
+                            animateRotate: true,
+                            duration: 1000
+                        },
                         plugins: {
                             legend: {
                                 position: 'bottom'
@@ -475,22 +579,28 @@ router.get('/', async (req, res) => {
             function updateCategoryChart(data) {
                 const ctx = document.getElementById('category-chart').getContext('2d');
                 
+                // If chart exists, update data instead of recreating
                 if (categoryChart) {
-                    categoryChart.destroy();
+                    updateChartData(categoryChart, data);
+                    return;
                 }
                 
                 categoryChart = new Chart(ctx, {
                     type: 'bar',
                     data: {
-                        labels: data.labels,
+                        labels: data.labels || [],
                         datasets: [{
                             label: 'Log Count',
-                            data: data.values,
+                            data: data.values || [],
                             backgroundColor: 'var(--accent-primary)'
                         }]
                     },
                     options: {
                         responsive: true,
+                        animation: {
+                            duration: 1000,
+                            easing: 'easeInOutQuart'
+                        },
                         plugins: {
                             legend: {
                                 display: false
@@ -507,57 +617,72 @@ router.get('/', async (req, res) => {
 
             // Advanced logs functions
             async function loadAdvancedLogs() {
-                const container = document.getElementById('advanced-logs-container');
-                container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading logs...</div>';
+                const tbody = document.getElementById('advanced-logs-tbody');
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Loading logs...</td></tr>';
                 
                 try {
-                    const response = await fetch('/api/logs?limit=500');
-                    if (response.ok) {
-                        const logs = await response.json();
-                        allLogs = logs;
-                        renderAdvancedLogs(logs);
-                    }
+                    const data = await apiFetch('/api/logs?limit=500', { credentials: 'include', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+                    const logs = data && (data.logs || data) || [];
+                    allLogs = logs;
+                    renderAdvancedLogs(logs);
                 } catch (error) {
-                    console.error('Error loading advanced logs:', error);
-                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--error-color);">Error loading logs</div>';
+                    req.app.locals?.loggers?.system?.error('Error loading advanced logs:', error);
+                    const tbody = document.getElementById('advanced-logs-tbody');
+                    if (tbody) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--error-color);">Error loading logs: ' + (error.message || 'Unknown error') + '</td></tr>';
+                    }
                 }
             }
 
             function renderAdvancedLogs(logs) {
-                const container = document.getElementById('advanced-logs-container');
+                const tbody = document.getElementById('advanced-logs-tbody');
                 
-                if (logs.length === 0) {
-                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No logs found</div>';
+                if (!Array.isArray(logs) || logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">No logs found</td></tr>';
                     return;
                 }
                 
-                container.innerHTML = logs.map(log => \`
-                    <div style="padding: 1rem; border-bottom: 1px solid var(--border-color); hover: background-color: var(--bg-secondary);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                            <span style="font-weight: 600; color: var(--text-primary);">\${formatTimestamp(log.timestamp)}</span>
+                tbody.innerHTML = logs.map(log => \`
+                    <tr>
+                        <td>\${formatTimestamp(log.timestamp)}</td>
+                        <td>\${log.category || 'System'}</td>
+                        <td>\${log.source || 'System'}</td>
+                        <td>\${log.event_type || log.level}</td>
+                        <td>\${escapeHtml(log.message)}</td>
+                        <td>
                             <span class="severity-badge severity-\${log.level}">\${log.level.toUpperCase()}</span>
-                        </div>
-                        <div style="color: var(--text-secondary); margin-bottom: 0.25rem;">
-                            <strong>Source:</strong> \${log.source || 'System'} | 
-                            <strong>Category:</strong> \${log.category || 'System'}
-                        </div>
-                        <div style="color: var(--text-primary);">\${escapeHtml(log.message)}</div>
-                    </div>
+                        </td>
+                    </tr>
                 \`).join('');
             }
 
             function filterAdvancedLogs() {
-                const searchTerm = document.getElementById('advanced-search').value.toLowerCase();
-                const severityFilter = document.getElementById('advanced-severity-filter').value;
-                const categoryFilter = document.getElementById('advanced-category-filter').value;
+                const searchInput = document.getElementById('advanced-search');
+                const searchTerm = (searchInput ? searchInput.value : '').toLowerCase();
+                const severityFilterEl = document.getElementById('advanced-severity-filter');
+                const categoryFilterEl = document.getElementById('advanced-category-filter');
+                const severityFilter = severityFilterEl ? severityFilterEl.value : '';
+                const categoryFilter = categoryFilterEl ? categoryFilterEl.value : '';
+                
+                if (!Array.isArray(allLogs)) {
+                    req.app.locals?.loggers?.system?.error('allLogs is not an array:', allLogs);
+                    return;
+                }
                 
                 let filtered = allLogs.filter(log => {
-                    const matchesSearch = !searchTerm || 
-                        log.message.toLowerCase().includes(searchTerm) ||
-                        (log.source || '').toLowerCase().includes(searchTerm);
+                    if (!log) return false;
                     
-                    const matchesSeverity = !severityFilter || log.level === severityFilter;
-                    const matchesCategory = !categoryFilter || log.category === categoryFilter;
+                    const message = log.message || '';
+                    const source = log.source || '';
+                    const level = log.level || '';
+                    const category = log.category || '';
+                    
+                    const matchesSearch = !searchTerm || 
+                        message.toLowerCase().includes(searchTerm) ||
+                        source.toLowerCase().includes(searchTerm);
+                    
+                    const matchesSeverity = !severityFilter || level === severityFilter;
+                    const matchesCategory = !categoryFilter || category === categoryFilter;
                     
                     return matchesSearch && matchesSeverity && matchesCategory;
                 });
@@ -565,16 +690,136 @@ router.get('/', async (req, res) => {
                 renderAdvancedLogs(filtered);
             }
 
-            function exportAnalytics() {
-                // Implementation for analytics export
-                showToast('Analytics export feature coming soon', 'info');
+            function clearAdvancedFilters() {
+                const searchInput = document.getElementById('advanced-search');
+                const severityFilterEl = document.getElementById('advanced-severity-filter');
+                const categoryFilterEl = document.getElementById('advanced-category-filter');
+                if (searchInput) searchInput.value = '';
+                if (severityFilterEl) severityFilterEl.value = '';
+                if (categoryFilterEl) categoryFilterEl.value = '';
+                // Re-render full list
+                if (Array.isArray(allLogs)) {
+                    renderAdvancedLogs(allLogs);
+                }
+            }
+
+            // ===== Export helpers =====
+            function downloadBlob(text, filename, type = 'text/plain') {
+                const blob = new Blob([text], { type });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+            }
+
+            function toCSV(rows, headers) {
+                // Safe CSV builder without regex newlines to avoid parsing issues in inline scripts
+                if (!Array.isArray(rows) || rows.length === 0) return headers.join(',') + '\\n';
+                const escapeField = (v) => {
+                    if (v === null || v === undefined) return '';
+                    const s = String(v).replace(/"/g, '""');
+                    return (s.includes('"') || s.includes(',') || s.includes('\\n')) ? '"' + s + '"' : s;
+                };
+                const lines = [headers.join(',')];
+                for (const row of rows) {
+                    const line = headers.map(h => escapeField(row[h]));
+                    lines.push(line.join(','));
+                }
+                return lines.join('\\n');
+            }
+
+            // Logs export
+            function exportLogsCSV() {
+                if (!latestLogs || latestLogs.length === 0) {
+                    showToast('No logs to export', 'warning');
+                    return;
+                }
+                const rows = latestLogs.map(l => ({
+                    timestamp: formatTimestamp(l.timestamp),
+                    source: l.source || 'System',
+                    category: l.category || 'System',
+                    level: l.level,
+                    event_type: l.event_type || l.level,
+                    message: l.message || ''
+                }));
+                const csv = toCSV(rows, ['timestamp','source','category','level','event_type','message']);
+                var logFileName = 'logs-export-' + new Date().toISOString().split('T')[0] + '.csv';
+                downloadBlob(csv, logFileName, 'text/csv');
+                showToast('Logs exported (CSV)', 'success');
+            }
+
+            function exportLogsJSON() {
+                if (!latestLogs || latestLogs.length === 0) {
+                    showToast('No logs to export', 'warning');
+                    return;
+                }
+                const json = JSON.stringify(latestLogs, null, 2);
+                var logJsonName = 'logs-export-' + new Date().toISOString().split('T')[0] + '.json';
+                downloadBlob(json, logJsonName, 'application/json');
+                showToast('Logs exported (JSON)', 'success');
+            }
+
+            // Analytics export
+            function exportAnalyticsCSV() {
+                if (!latestAnalytics) {
+                    showToast('No analytics data to export', 'warning');
+                    return;
+                }
+                const sections = [];
+                // Hourly
+                const hourlyRows = (latestAnalytics.hourlyData?.labels || []).map((label, i) => ({
+                    hour: label,
+                    value: latestAnalytics.hourlyData?.values?.[i] ?? 0
+                }));
+                sections.push('"Hourly Logs"');
+                sections.push(toCSV(hourlyRows, ['hour','value']));
+                // Severity
+                const sevRows = (latestAnalytics.severityData?.labels || []).map((label, i) => ({
+                    level: label,
+                    count: latestAnalytics.severityData?.values?.[i] ?? 0
+                }));
+                sections.push('\\n"Severity Distribution"');
+                sections.push(toCSV(sevRows, ['level','count']));
+                // Category
+                const catRows = (latestAnalytics.categoryData?.labels || []).map((label, i) => ({
+                    category: label,
+                    count: latestAnalytics.categoryData?.values?.[i] ?? 0
+                }));
+                sections.push('\\n"Categories"');
+                sections.push(toCSV(catRows, ['category','count']));
+
+                var analyticsCsvName = 'analytics-export-' + new Date().toISOString().split('T')[0] + '.csv';
+                downloadBlob(sections.join('\\n'), analyticsCsvName, 'text/csv');
+                showToast('Analytics exported (CSV)', 'success');
+            }
+
+            function exportAnalyticsJSON() {
+                if (!latestAnalytics) {
+                    showToast('No analytics data to export', 'warning');
+                    return;
+                }
+                const json = JSON.stringify(latestAnalytics, null, 2);
+                var analyticsJsonName = 'analytics-export-' + new Date().toISOString().split('T')[0] + '.json';
+                downloadBlob(json, analyticsJsonName, 'application/json');
+                showToast('Analytics exported (JSON)', 'success');
             }
 
             // Helper functions
             function formatTimestamp(timestamp) {
                 if (!timestamp) return 'N/A';
                 try {
-                    return new Date(timestamp).toLocaleString();
+                    const date = new Date(timestamp);
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const hours = String(date.getHours()).padStart(2, '0');
+                    const minutes = String(date.getMinutes()).padStart(2, '0');
+                    const seconds = String(date.getSeconds()).padStart(2, '0');
+                    return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
                 } catch (error) {
                     return timestamp;
                 }
@@ -587,22 +832,36 @@ router.get('/', async (req, res) => {
                 return div.innerHTML;
             }
 
+            // Expose key functions globally for inline onclick handlers
+            // Ensures buttons like <button onclick="switchTab('analytics')"> work reliably
+            window.switchTab = typeof switchTab === 'function' ? switchTab : undefined;
+            window.loadLogs = typeof loadLogs === 'function' ? loadLogs : undefined;
+            window.exportLogsCSV = typeof exportLogsCSV === 'function' ? exportLogsCSV : undefined;
+            window.exportLogsJSON = typeof exportLogsJSON === 'function' ? exportLogsJSON : undefined;
+            window.loadAnalytics = typeof loadAnalytics === 'function' ? loadAnalytics : undefined;
+            window.exportAnalyticsCSV = typeof exportAnalyticsCSV === 'function' ? exportAnalyticsCSV : undefined;
+            window.exportAnalyticsJSON = typeof exportAnalyticsJSON === 'function' ? exportAnalyticsJSON : undefined;
+            window.loadAdvancedLogs = typeof loadAdvancedLogs === 'function' ? loadAdvancedLogs : undefined;
+            window.filterAdvancedLogs = typeof filterAdvancedLogs === 'function' ? filterAdvancedLogs : undefined;
+
             // Auto-load logs when page loads
             document.addEventListener('DOMContentLoaded', function() {
                 loadLogs();
+                
+                // Add auto-update toggle functionality
+                const autoUpdateToggle = document.getElementById('auto-update-toggle');
+                if (autoUpdateToggle) {
+                    autoUpdateToggle.addEventListener('change', function() {
+                        if (this.checked) { startChartAutoUpdate(); req.app.locals?.loggers?.system?.info('Chart auto-update enabled'); }
+                        else { stopChartAutoUpdate(); req.app.locals?.loggers?.system?.info('Chart auto-update disabled'); }
+                    });
+                }
+                // Start auto-update by default (Realtime registry)
+                startChartAutoUpdate();
             });
-            </script>
         `;
 
-        function escapeHtml(text) {
-            if (!text) return '';
-            return text.toString()
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
-        }
+        // escapeHtml() imported from utils/html-helpers
 
         function formatTimestamp(timestamp) {
             if (!timestamp) return 'N/A';
@@ -625,7 +884,7 @@ router.get('/', async (req, res) => {
 
         const html = getPageTemplate({
             pageTitle: 'System Logs',
-            pageIcon: 'fa-file-alt',
+            pageIcon: 'fas fa-file-text',
             activeNav: 'logs',
             contentBody,
             additionalCSS,
@@ -638,131 +897,14 @@ router.get('/', async (req, res) => {
         res.send(html);
 
     } catch (error) {
-        console.error('Logs route error:', error);
+        req.app.locals?.loggers?.system?.error('Logs route error:', error);
         res.status(500).send('Internal Server Error');
     }
 });
 
-/**
- * API Route - Get logs with filtering
- * GET /api/logs
- */
-router.get('/api', async (req, res) => {
-    try {
-        const limit = parseInt(req.query.limit) || 50;
-        const offset = parseInt(req.query.offset) || 0;
-        const level = req.query.level;
-        const source = req.query.source;
-        const search = req.query.search;
-        
-        const filters = {
-            level: level || null,
-            source: source || null,
-            search: search || null,
-            limit,
-            offset
-        };
-        
-        const logs = await req.dal.getLogs(filters);
-        res.json(logs || []);
-        
-    } catch (error) {
-        console.error('Logs API error:', error);
-        res.status(500).json({ error: 'Failed to get logs' });
-    }
-});
-
-/**
- * API Route - Get analytics data
- * GET /api/logs/analytics
- */
-router.get('/api/analytics', async (req, res) => {
-    try {
-        const range = req.query.range || '7days';
-        
-        // Calculate date range
-        let startDate = new Date();
-        switch (range) {
-            case 'today':
-                startDate.setHours(0, 0, 0, 0);
-                break;
-            case 'yesterday':
-                startDate.setDate(startDate.getDate() - 1);
-                startDate.setHours(0, 0, 0, 0);
-                break;
-            case '7days':
-                startDate.setDate(startDate.getDate() - 7);
-                break;
-            case '30days':
-                startDate.setDate(startDate.getDate() - 30);
-                break;
-        }
-        
-        // Get logs for the period
-        const logs = await req.dal.getLogs({
-            startDate: startDate.toISOString(),
-            limit: 10000
-        }) || [];
-        
-        // Calculate analytics
-        const totalLogs = logs.length;
-        const errorLogs = logs.filter(log => ['error', 'warning', 'critical'].includes(log.level)).length;
-        const avgPerHour = totalLogs / (range === 'today' ? 24 : range === 'yesterday' ? 24 : range === '7days' ? 168 : 720);
-        const activeSources = [...new Set(logs.map(log => log.source).filter(s => s))].length;
-        
-        // Hourly distribution
-        const hourlyData = {
-            labels: [],
-            values: []
-        };
-        
-        for (let i = 0; i < 24; i++) {
-            const hour = i.toString().padStart(2, '0') + ':00';
-            hourlyData.labels.push(hour);
-            hourlyData.values.push(logs.filter(log => 
-                new Date(log.timestamp).getHours() === i
-            ).length);
-        }
-        
-        // Severity distribution
-        const severityCounts = {
-            error: logs.filter(log => log.level === 'error').length,
-            warning: logs.filter(log => log.level === 'warning').length,
-            info: logs.filter(log => log.level === 'info').length,
-            debug: logs.filter(log => log.level === 'debug').length
-        };
-        
-        const severityData = {
-            labels: Object.keys(severityCounts),
-            values: Object.values(severityCounts)
-        };
-        
-        // Category distribution
-        const categories = {};
-        logs.forEach(log => {
-            const category = log.category || log.source || 'System';
-            categories[category] = (categories[category] || 0) + 1;
-        });
-        
-        const categoryData = {
-            labels: Object.keys(categories).slice(0, 10), // Top 10
-            values: Object.values(categories).slice(0, 10)
-        };
-        
-        res.json({
-            totalLogs,
-            errorLogs,
-            avgPerHour: Math.round(avgPerHour),
-            activeSources,
-            hourlyData,
-            severityData,
-            categoryData
-        });
-        
-    } catch (error) {
-        console.error('Analytics API error:', error);
-        res.status(500).json({ error: 'Failed to get analytics' });
-    }
-});
+// API endpoints removed - these are now handled by dedicated routes/api/logs.js
+// This follows the Unix philosophy: make each component do one thing well
+// routes/logs.js = HTML page serving
+// routes/api/logs.js = API data serving
 
 module.exports = router;

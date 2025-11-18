@@ -6,6 +6,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const moment = require('moment');
 
 module.exports = function(dependencies) {
     const { dal, userManager, loggers, config } = dependencies;
@@ -24,20 +25,50 @@ module.exports = function(dependencies) {
             const result = await userManager.authenticateUser(username, password);
             
             if (result.success) {
-                // Generate JWT token
+                // Generate JWT token (24h expiry)
                 const token = jwt.sign(
                     { userId: result.user.id, username: result.user.username, role: result.user.role },
                     config.auth.jwtSecret,
                     { expiresIn: '24h' }
                 );
-                
+
+                // Compute session expiry (match JWT validity)
+                const expiresAt = moment.utc().add(24, 'hours').format('YYYY-MM-DD HH:mm:ss');
+
+                // Create persistent session record (ignore failures but log them)
+                if (dal && dal.createUserSession) {
+                    try {
+                        loggers?.system?.info(`Creating session for user ${result.user.id} (${result.user.username})`);
+                        await dal.createUserSession({
+                            session_token: token,
+                            user_id: result.user.id,
+                            ip_address: req.ip || req.connection?.remoteAddress || null,
+                            user_agent: req.headers['user-agent'] || null,
+                            expires_at: expiresAt
+                        });
+                        loggers?.system?.info(`Session created successfully for user ${result.user.username}`);
+                    } catch (sessionErr) {
+                        loggers?.system?.error('Failed to persist session record:', sessionErr.message, sessionErr.stack);
+                    }
+                } else {
+                    loggers?.system?.warn('DAL or createUserSession method not available');
+                }
+
                 // Log successful login via DAL
-                await dal.logActivity(result.user.id, 'login', '/api/auth/login', `Successful login from ${req.ip}`, req);
-                
+                try {
+                    await dal.logActivity(result.user.id, 'login', '/api/auth/login', `Successful login from ${req.ip}`, req);
+                } catch (activityErr) {
+                    loggers?.system?.warn('Login activity log failed:', activityErr.message);
+                }
+
                 res.json({
                     success: true,
                     token,
-                    user: result.user
+                    user: result.user,
+                    session: {
+                        expiresAt,
+                        createdAt: moment.utc().format('YYYY-MM-DD HH:mm:ss')
+                    }
                 });
             } else {
                 res.status(401).json({ error: result.error });
@@ -51,9 +82,31 @@ module.exports = function(dependencies) {
     // Logout endpoint
     router.post('/logout', async (req, res) => {
         try {
-            if (req.user) {
-                await dal.logActivity(req.user.id, 'logout', '/api/auth/logout', `User logged out from ${req.ip}`, req);
+            // Extract token (same logic pattern as auth middleware)
+            let token = null;
+            if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+                token = req.headers.authorization.substring(7);
+            } else if (req.cookies && req.cookies.token) {
+                token = req.cookies.token;
             }
+
+            // Deactivate session if we can
+            if (token && dal?.deactivateSession) {
+                try {
+                    await dal.deactivateSession(token);
+                } catch (deactErr) {
+                    loggers?.system?.warn('Failed to deactivate session:', deactErr.message);
+                }
+            }
+
+            if (req.user) {
+                try {
+                    await dal.logActivity(req.user.id, 'logout', '/api/auth/logout', `User logged out from ${req.ip}`, req);
+                } catch (activityErr) {
+                    loggers?.system?.warn('Logout activity log failed:', activityErr.message);
+                }
+            }
+
             res.json({ success: true, message: 'Logged out successfully' });
         } catch (error) {
             loggers.system.error('Logout error:', error);

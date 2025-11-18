@@ -6,45 +6,187 @@
 const express = require('express');
 const router = express.Router();
 
+// Utility to parse config fields consistently
+function parseConfigRow(row) {
+    if (!row) return row;
+    const parsed = { ...row };
+    if (parsed.config) {
+        try { parsed.config = JSON.parse(parsed.config); } catch (_) { parsed.config = {}; }
+    }
+    if (parsed.enabled !== undefined) {
+        parsed.enabled = parsed.enabled ? true : false;
+    }
+    return parsed;
+}
+
+// List all integrations
+router.get('/integrations', async (req, res) => {
+    try {
+        if (!req.dal || typeof req.dal.getIntegrations !== 'function') {
+            return res.json({ success: true, integrations: [] });
+        }
+        const rows = await req.dal.getIntegrations();
+        const integrations = (rows || []).map(parseConfigRow);
+        res.json({ success: true, integrations });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('List integrations error:', error);
+        res.status(500).json({ success: false, error: 'Failed to list integrations' });
+    }
+});
+
+// Get a single integration by id
+router.get('/integrations/:id', async (req, res) => {
+    try {
+        if (!req.dal || typeof req.dal.getIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const row = await req.dal.getIntegration(req.params.id);
+        if (!row) return res.status(404).json({ success: false, error: 'Integration not found' });
+        res.json(parseConfigRow(row));
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Get integration error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get integration' });
+    }
+});
+
+// Add/update integration (root POST handler for compatibility)
+router.post('/integrations', async (req, res) => {
+    try {
+        let { name, type, config, enabled, verifySsl } = req.body;
+        if (!name || !type) {
+            return res.status(400).json({ success: false, error: 'Integration name and type are required' });
+        }
+        if (!req.dal || typeof req.dal.createIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        
+        // Convert booleans to integers for SQLite
+        if (typeof enabled === 'boolean') {
+            enabled = enabled ? 1 : 0;
+        } else if (enabled === undefined) {
+            enabled = 1; // Default to enabled
+        }
+        
+        if (typeof verifySsl === 'boolean') {
+            verifySsl = verifySsl ? 1 : 0;
+        }
+        
+        // Stringify config if it's an object
+        if (config && typeof config === 'object') {
+            config = JSON.stringify(config);
+        }
+        
+        const result = await req.dal.createIntegration({ name, type, config, enabled, verifySsl });
+        
+        // Also create entry in integration_health table for monitoring
+        try {
+            const healthExists = await req.dal.get(
+                `SELECT id FROM integration_health WHERE integration_name = ?`,
+                [name.toLowerCase().replace(/\s+/g, '_')]
+            );
+            
+            if (!healthExists) {
+                await req.dal.run(
+                    `INSERT INTO integration_health (integration_name, status, metadata) VALUES (?, ?, ?)`,
+                    [
+                        name.toLowerCase().replace(/\s+/g, '_'),
+                        'unknown',
+                        JSON.stringify({
+                            enabled: enabled ? true : false,
+                            type: type,
+                            description: `Custom ${type} integration`
+                        })
+                    ]
+                );
+            }
+        } catch (healthError) {
+            req.app.locals?.loggers?.api?.error('Failed to create health entry:', healthError);
+            // Non-fatal - integration was created successfully
+        }
+        
+        // Fetch created/updated row
+        const created = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [result.lastID]);
+        res.json({ success: true, integration: parseConfigRow(created), message: 'Integration created successfully' });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Integration creation error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create integration: ' + error.message });
+    }
+});
+
+// Update integration
+router.put('/integrations/:id', async (req, res) => {
+    try {
+        if (!req.dal || typeof req.dal.updateIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const { id } = req.params;
+        const updates = { ...req.body };
+        
+        // Convert booleans to integers for SQLite
+        Object.keys(updates).forEach(key => {
+            if (typeof updates[key] === 'boolean') {
+                updates[key] = updates[key] ? 1 : 0;
+            }
+        });
+        
+        // Stringify config if it's an object
+        if (updates.config && typeof updates.config !== 'string') {
+            updates.config = JSON.stringify(updates.config);
+        }
+        
+        const result = await req.dal.updateIntegration(id, updates);
+        if ((result?.changes || 0) === 0) {
+            return res.status(404).json({ success: false, error: 'Integration not found' });
+        }
+        const updated = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [id]);
+        res.json({ success: true, integration: parseConfigRow(updated) });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Integration update error:', error);
+        res.status(500).json({ success: false, error: 'Failed to update integration: ' + error.message });
+    }
+});
+
+// Delete integration
+router.delete('/integrations/:id', async (req, res) => {
+    try {
+        if (!req.dal || typeof req.dal.deleteIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const result = await req.dal.deleteIntegration(req.params.id);
+        if ((result?.changes || 0) === 0) {
+            return res.status(404).json({ success: false, error: 'Integration not found' });
+        }
+        res.json({ success: true, message: 'Integration deleted successfully' });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Integration delete error:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete integration: ' + error.message });
+    }
+});
+
+// Toggle integration enabled status
+router.post('/integrations/:id/toggle', async (req, res) => {
+    try {
+        if (!req.dal || typeof req.dal.toggleIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const result = await req.dal.toggleIntegration(req.params.id);
+        if (!result.success) {
+            return res.status(404).json({ success: false, error: result.error || 'Integration not found' });
+        }
+        res.json({ success: true, id: result.id, enabled: result.enabled });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Integration toggle error:', error);
+        res.status(500).json({ success: false, error: 'Failed to toggle integration: ' + error.message });
+    }
+});
+
 // Get integration health status
 router.get('/integrations/health', async (req, res) => {
     try {
-        const health = {
-            websocket: {
-                status: 'healthy',
-                connections: 5,
-                uptime: '2h 15m',
-                lastCheck: new Date().toISOString()
-            },
-            mqtt: {
-                status: 'disconnected',
-                broker: 'localhost:1883',
-                lastCheck: new Date().toISOString(),
-                error: 'Connection refused'
-            },
-            elasticsearch: {
-                status: 'healthy',
-                cluster: 'logging-cluster',
-                indices: 12,
-                lastCheck: new Date().toISOString()
-            },
-            syslog: {
-                status: 'healthy',
-                protocols: ['UDP:514', 'TCP:601'],
-                messagesPerMinute: 150,
-                lastCheck: new Date().toISOString()
-            },
-            slack: {
-                status: 'configured',
-                webhook: 'https://hooks.slack.com/...',
-                lastNotification: '2024-11-02T06:15:00Z',
-                lastCheck: new Date().toISOString()
-            }
-        };
-
-        res.json({ success: true, integrations: health });
+        // No fabricated health info
+        return res.json({ success: true, integrations: {} });
     } catch (error) {
-        console.error('Error getting integration health:', error);
+        req.app.locals?.loggers?.api?.error('Error getting integration health:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -52,26 +194,10 @@ router.get('/integrations/health', async (req, res) => {
 // Test specific integration
 router.post('/integrations/:name/test', async (req, res) => {
     try {
-        const { name } = req.params;
-        const { config = {} } = req.body;
-        
-        console.log(`Testing integration: ${name}`);
-        
-        // Simulate test based on integration type
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        
-        const testResults = {
-            integration: name,
-            status: 'success',
-            responseTime: '150ms',
-            timestamp: new Date().toISOString(),
-            details: `${name} integration test completed successfully`,
-            config: config
-        };
-
-        res.json({ success: true, test: testResults });
+        // Not implemented: do not simulate tests
+        return res.status(501).json({ success: false, error: 'Integration test not implemented' });
     } catch (error) {
-        console.error('Error testing integration:', error);
+        req.app.locals?.loggers?.api?.error('Error testing integration:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -79,49 +205,11 @@ router.post('/integrations/:name/test', async (req, res) => {
 // Get integration history/logs
 router.get('/integrations/:name/history', async (req, res) => {
     try {
-        const { name } = req.params;
+        // No history backend yet
         const { limit = 50, offset = 0 } = req.query;
-        
-        const history = [
-            {
-                id: '1',
-                integration: name,
-                event: 'connection_established',
-                timestamp: '2024-11-02T06:15:00Z',
-                status: 'success',
-                details: `Successfully connected to ${name}`
-            },
-            {
-                id: '2',
-                integration: name,
-                event: 'data_sent',
-                timestamp: '2024-11-02T06:20:00Z',
-                status: 'success',
-                details: 'Log data transmitted successfully',
-                recordCount: 25
-            },
-            {
-                id: '3',
-                integration: name,
-                event: 'connection_lost',
-                timestamp: '2024-11-02T07:30:00Z',
-                status: 'error',
-                details: 'Connection timeout after 30 seconds',
-                error: 'TIMEOUT'
-            }
-        ];
-
-        res.json({ 
-            success: true, 
-            history,
-            pagination: {
-                limit: parseInt(limit),
-                offset: parseInt(offset),
-                total: history.length
-            }
-        });
+        res.json({ success: true, history: [], pagination: { limit: parseInt(limit), offset: parseInt(offset), total: 0 } });
     } catch (error) {
-        console.error('Error getting integration history:', error);
+        req.app.locals?.loggers?.api?.error('Error getting integration history:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -129,29 +217,9 @@ router.get('/integrations/:name/history', async (req, res) => {
 // Test all integrations
 router.post('/integrations/test-all', async (req, res) => {
     try {
-        console.log(`Testing all integrations by user ${req.user ? req.user.username : 'system'}`);
-        
-        // Simulate testing multiple integrations
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        const testResults = {
-            totalTests: 5,
-            successful: 3,
-            failed: 2,
-            results: [
-                { integration: 'websocket', status: 'success', responseTime: '50ms' },
-                { integration: 'elasticsearch', status: 'success', responseTime: '120ms' },
-                { integration: 'syslog', status: 'success', responseTime: '25ms' },
-                { integration: 'mqtt', status: 'failed', error: 'Connection refused' },
-                { integration: 'slack', status: 'failed', error: 'Invalid webhook URL' }
-            ],
-            timestamp: new Date().toISOString(),
-            duration: '3.2s'
-        };
-
-        res.json({ success: true, tests: testResults });
+        return res.status(501).json({ success: false, error: 'Integration tests not implemented' });
     } catch (error) {
-        console.error('Error testing all integrations:', error);
+        req.app.locals?.loggers?.api?.error('Error testing all integrations:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -159,33 +227,17 @@ router.post('/integrations/test-all', async (req, res) => {
 // Get custom integrations
 router.get('/integrations/custom', async (req, res) => {
     try {
-        const customIntegrations = [
-            {
-                id: '1',
-                name: 'Custom Webhook Alert',
-                type: 'webhook',
-                endpoint: 'https://api.example.com/alerts',
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ***', 'Content-Type': 'application/json' },
-                enabled: true,
-                created: '2024-10-15T10:30:00Z',
-                lastUsed: '2024-11-02T06:15:00Z'
-            },
-            {
-                id: '2',
-                name: 'Database Export',
-                type: 'database',
-                connection: 'postgresql://localhost:5432/logs',
-                table: 'system_logs',
-                enabled: false,
-                created: '2024-10-20T14:20:00Z',
-                lastUsed: null
-            }
-        ];
-
-        res.json({ success: true, integrations: customIntegrations });
+        if (!req.dal || typeof req.dal.getIntegrations !== 'function') {
+            return res.json({ success: true, integrations: [] });
+        }
+        const rows = await req.dal.getIntegrations();
+        const integrations = (rows || []).filter(r => r.type === 'custom').map(r => ({
+            ...r,
+            config: (() => { try { return r.config ? JSON.parse(r.config) : {}; } catch (_) { return {}; } })()
+        }));
+        res.json({ success: true, integrations });
     } catch (error) {
-        console.error('Error getting custom integrations:', error);
+        req.app.locals?.loggers?.api?.error('Error getting custom integrations:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -193,22 +245,17 @@ router.get('/integrations/custom', async (req, res) => {
 // Create custom integration
 router.post('/integrations/custom', async (req, res) => {
     try {
-        const integrationData = req.body;
-        
-        const newIntegration = {
-            id: Date.now().toString(),
-            ...integrationData,
-            created: new Date().toISOString(),
-            createdBy: req.user ? req.user.username : 'system',
-            enabled: true,
-            lastUsed: null
-        };
-
-        console.log(`Custom integration created: ${integrationData.name} by ${req.user ? req.user.username : 'system'}`);
-
-        res.json({ success: true, integration: newIntegration });
+        if (!req.dal || typeof req.dal.createIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const { name, config } = req.body;
+        if (!name) return res.status(400).json({ success: false, error: 'Name is required' });
+        const result = await req.dal.createIntegration({ name, type: 'custom', config, enabled: true });
+        const created = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [result.lastID]);
+        if (created && created.config) { try { created.config = JSON.parse(created.config); } catch (_) { created.config = {}; } }
+        res.json({ success: true, integration: created });
     } catch (error) {
-        console.error('Error creating custom integration:', error);
+        req.app.locals?.loggers?.api?.error('Error creating custom integration:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -217,16 +264,19 @@ router.post('/integrations/custom', async (req, res) => {
 router.put('/integrations/custom/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
-        
-        console.log(`Custom integration ${id} updated by ${req.user ? req.user.username : 'system'}`);
-
-        res.json({ 
-            success: true, 
-            integration: { id, ...updates, updated: new Date().toISOString() }
-        });
+        if (!req.dal || typeof req.dal.updateIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const updates = { ...req.body };
+        const result = await req.dal.updateIntegration(id, updates);
+        if ((result?.changes || 0) === 0) {
+            return res.status(404).json({ success: false, error: 'Integration not found' });
+        }
+        const updated = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [id]);
+        if (updated && updated.config) { try { updated.config = JSON.parse(updated.config); } catch (_) { updated.config = {}; } }
+        res.json({ success: true, integration: updated });
     } catch (error) {
-        console.error('Error updating custom integration:', error);
+        req.app.locals?.loggers?.api?.error('Error updating custom integration:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -235,15 +285,16 @@ router.put('/integrations/custom/:id', async (req, res) => {
 router.delete('/integrations/custom/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        
-        console.log(`Custom integration ${id} deleted by ${req.user ? req.user.username : 'system'}`);
-
-        res.json({ 
-            success: true, 
-            message: 'Custom integration deleted successfully'
-        });
+        if (!req.dal || typeof req.dal.deleteIntegration !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database not available' });
+        }
+        const result = await req.dal.deleteIntegration(id);
+        if ((result?.changes || 0) === 0) {
+            return res.status(404).json({ success: false, error: 'Integration not found' });
+        }
+        res.json({ success: true, message: 'Custom integration deleted successfully' });
     } catch (error) {
-        console.error('Error deleting custom integration:', error);
+        req.app.locals?.loggers?.api?.error('Error deleting custom integration:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -251,23 +302,9 @@ router.delete('/integrations/custom/:id', async (req, res) => {
 // Test custom integration
 router.post('/integrations/custom/:id/test', async (req, res) => {
     try {
-        const { id } = req.params;
-        
-        // Simulate testing custom integration
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        res.json({
-            success: true,
-            test: {
-                integrationId: id,
-                status: 'success',
-                responseTime: '180ms',
-                timestamp: new Date().toISOString(),
-                message: 'Custom integration test completed successfully'
-            }
-        });
+        return res.status(501).json({ success: false, error: 'Custom integration test not implemented' });
     } catch (error) {
-        console.error('Error testing custom integration:', error);
+        req.app.locals?.loggers?.api?.error('Error testing custom integration:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -275,34 +312,18 @@ router.post('/integrations/custom/:id/test', async (req, res) => {
 // Get integration configurations
 router.get('/integrations/configs', async (req, res) => {
     try {
-        const configs = {
-            websocket: {
-                port: 8081,
-                maxConnections: 100,
-                heartbeatInterval: 30000
-            },
-            mqtt: {
-                broker: 'localhost',
-                port: 1883,
-                username: '',
-                topics: ['logs/+/+', 'alerts/+']
-            },
-            elasticsearch: {
-                host: 'localhost',
-                port: 9200,
-                index: 'logs-{YYYY.MM.DD}',
-                bulkSize: 100
-            },
-            slack: {
-                webhook: 'https://hooks.slack.com/services/...',
-                channel: '#alerts',
-                username: 'LogBot'
-            }
-        };
-
+        if (!req.dal || typeof req.dal.getIntegrations !== 'function') {
+            return res.json({ success: true, configs: {} });
+        }
+        const rows = await req.dal.getIntegrations();
+        const configs = {};
+        (rows || []).forEach(r => {
+            const cfg = (() => { try { return r.config ? JSON.parse(r.config) : {}; } catch (_) { return {}; } })();
+            configs[r.name] = cfg;
+        });
         res.json({ success: true, configs });
     } catch (error) {
-        console.error('Error getting integration configs:', error);
+        req.app.locals?.loggers?.api?.error('Error getting integration configs:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -311,22 +332,16 @@ router.get('/integrations/configs', async (req, res) => {
 router.get('/integrations/configs/:name', async (req, res) => {
     try {
         const { name } = req.params;
-        
-        // Mock configuration for the specific integration
-        const config = {
-            name,
-            enabled: true,
-            lastUpdated: '2024-11-01T15:30:00Z',
-            settings: {
-                timeout: 5000,
-                retries: 3,
-                batchSize: 50
-            }
-        };
-
-        res.json({ success: true, config });
+        if (!req.dal || typeof req.dal.getIntegrations !== 'function') {
+            return res.status(404).json({ success: false, error: 'Integration not found' });
+        }
+        const rows = await req.dal.getIntegrations();
+        const match = (rows || []).find(r => r.name === name);
+        if (!match) return res.status(404).json({ success: false, error: 'Integration not found' });
+        const config = (() => { try { return match.config ? JSON.parse(match.config) : {}; } catch (_) { return {}; } })();
+        res.json({ success: true, config: { name: match.name, enabled: match.enabled ? true : false, settings: config } });
     } catch (error) {
-        console.error('Error getting integration config:', error);
+        req.app.locals?.loggers?.api?.error('Error getting integration config:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -334,20 +349,10 @@ router.get('/integrations/configs/:name', async (req, res) => {
 // Create/Update integration config
 router.post('/integrations/configs', async (req, res) => {
     try {
-        const configData = req.body;
-        
-        console.log(`Integration config updated: ${configData.name || 'unknown'} by ${req.user ? req.user.username : 'system'}`);
-
-        res.json({
-            success: true,
-            config: {
-                ...configData,
-                updated: new Date().toISOString(),
-                updatedBy: req.user ? req.user.username : 'system'
-            }
-        });
+        // Not implemented: needs concrete config schema
+        return res.status(501).json({ success: false, error: 'Integration config update not implemented' });
     } catch (error) {
-        console.error('Error updating integration config:', error);
+        req.app.locals?.loggers?.api?.error('Error updating integration config:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -355,16 +360,9 @@ router.post('/integrations/configs', async (req, res) => {
 // Delete integration config
 router.delete('/integrations/configs/:name', async (req, res) => {
     try {
-        const { name } = req.params;
-        
-        console.log(`Integration config deleted: ${name} by ${req.user ? req.user.username : 'system'}`);
-
-        res.json({
-            success: true,
-            message: `Integration config for ${name} deleted successfully`
-        });
+        return res.status(501).json({ success: false, error: 'Integration config deletion not implemented' });
     } catch (error) {
-        console.error('Error deleting integration config:', error);
+        req.app.locals?.loggers?.api?.error('Error deleting integration config:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -372,24 +370,17 @@ router.delete('/integrations/configs/:name', async (req, res) => {
 // Get integration status (overall)
 router.get('/integrations/status', async (req, res) => {
     try {
-        const status = {
-            totalIntegrations: 5,
-            activeIntegrations: 3,
-            failedIntegrations: 2,
-            lastHealthCheck: new Date().toISOString(),
-            uptime: '2h 15m 30s',
-            overview: {
-                websocket: { status: 'active', connections: 5 },
-                mqtt: { status: 'failed', error: 'Connection refused' },
-                elasticsearch: { status: 'active', indices: 12 },
-                syslog: { status: 'active', messagesPerMinute: 150 },
-                slack: { status: 'failed', error: 'Invalid webhook' }
-            }
-        };
-
+        if (!req.dal || typeof req.dal.getIntegrations !== 'function') {
+            return res.json({ success: true, status: { totalIntegrations: 0, activeIntegrations: 0, failedIntegrations: 0 } });
+        }
+        const rows = await req.dal.getIntegrations();
+        const total = rows?.length || 0;
+        const active = (rows || []).filter(r => r.enabled).length;
+        // failedIntegrations not tracked without a health backend
+        const status = { totalIntegrations: total, activeIntegrations: active, failedIntegrations: 0 };
         res.json({ success: true, status });
     } catch (error) {
-        console.error('Error getting integration status:', error);
+        req.app.locals?.loggers?.api?.error('Error getting integration status:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -397,22 +388,9 @@ router.get('/integrations/status', async (req, res) => {
 // Publish message via MQTT
 router.post('/integrations/mqtt/publish', async (req, res) => {
     try {
-        const { topic, message, qos = 0 } = req.body;
-        
-        console.log(`MQTT publish to topic: ${topic}`);
-
-        res.json({
-            success: true,
-            published: {
-                topic,
-                message,
-                qos,
-                timestamp: new Date().toISOString(),
-                messageId: Date.now().toString()
-            }
-        });
+        return res.status(501).json({ success: false, error: 'MQTT publish not implemented' });
     } catch (error) {
-        console.error('Error publishing MQTT message:', error);
+        req.app.locals?.loggers?.api?.error('Error publishing MQTT message:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -420,21 +398,29 @@ router.post('/integrations/mqtt/publish', async (req, res) => {
 // Broadcast WebSocket message
 router.post('/integrations/websocket/broadcast', async (req, res) => {
     try {
-        const { message, channel = 'general' } = req.body;
-        
-        console.log(`WebSocket broadcast to channel: ${channel}`);
-
-        res.json({
-            success: true,
-            broadcast: {
-                channel,
-                message,
-                timestamp: new Date().toISOString(),
-                recipients: 5
-            }
-        });
+        return res.status(501).json({ success: false, error: 'WebSocket broadcast not implemented' });
     } catch (error) {
-        console.error('Error broadcasting WebSocket message:', error);
+        req.app.locals?.loggers?.api?.error('Error broadcasting WebSocket message:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Form test endpoint (used by UI form test button)
+router.post('/integrations/test', async (req, res) => {
+    try {
+        return res.status(501).json({ success: false, error: 'Integration test not implemented' });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error testing integration from form:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Test integration by id (UI uses id, not name)
+router.post('/integrations/:id/test', async (req, res) => {
+    try {
+        return res.status(501).json({ success: false, error: 'Integration test not implemented' });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error testing integration by id:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

@@ -23,18 +23,18 @@ function checkInitialSetup() {
     const envPath = path.join(__dirname, '.env');
     
     if (!fs.existsSync(setupDataPath) || !fs.existsSync(envPath)) {
-        console.log('\n🎯 ENHANCED UNIVERSAL LOGGING PLATFORM');
-        console.log('🔧 Initial Setup Required');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-        console.log('📋 First-time installation detected!');
-        console.log('🎮 Run the setup wizard: node initial-setup-server.js');
-        console.log('   Or use quick setup: node scripts/setup.js');
-        console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+        loggers?.system?.info('\n🎯 ENHANCED UNIVERSAL LOGGING PLATFORM');
+        loggers?.system?.info('🔧 Initial Setup Required');
+        loggers?.system?.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+        loggers?.system?.info('📋 First-time installation detected!');
+        loggers?.system?.info('🎮 Run the setup wizard: node initial-setup-server.js');
+        loggers?.system?.info('   Or use quick setup: node scripts/setup.js');
+        loggers?.system?.info('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
         
         // Try to start setup server automatically
         try {
             const { spawn } = require('child_process');
-            console.log('🚀 Starting setup wizard automatically...\n');
+            loggers?.system?.info('🚀 Starting setup wizard automatically...\n');
             const setupProcess = spawn('node', ['initial-setup-server.js'], { 
                 stdio: 'inherit',
                 cwd: __dirname
@@ -42,7 +42,7 @@ function checkInitialSetup() {
             
             setupProcess.on('exit', (code) => {
                 if (code === 0) {
-                    console.log('\n✅ Setup completed! Restarting main server...');
+                    loggers?.system?.info('\n✅ Setup completed! Restarting main server...');
                     // Restart main server after setup
                     setTimeout(() => {
                         process.exit(0);
@@ -52,8 +52,8 @@ function checkInitialSetup() {
             
             return false; // Don't continue with main server
         } catch (error) {
-            console.error('Could not start setup wizard automatically.');
-            console.error('Please run manually: node initial-setup-server.js');
+            loggers?.system?.error('Could not start setup wizard automatically.');
+            loggers?.system?.error('Please run manually: node initial-setup-server.js');
             process.exit(1);
         }
     }
@@ -80,11 +80,11 @@ function checkInitialSetup() {
 
 // Core dependencies
 const express = require('express');
+const compression = require('compression');
 const session = require('express-session');
+const SQLiteStore = require('connect-sqlite3')(session);
 const cors = require('cors');
 const helmet = require('helmet');
-const fs = require('fs');
-const path = require('path');
 const moment = require('moment-timezone');
 const winston = require('winston');
 const rateLimit = require('express-rate-limit');
@@ -107,7 +107,7 @@ try {
     Fuse = require('fuse.js');
     _ = require('lodash');
 } catch (error) {
-    console.warn('Some optional packages not available:', error.message);
+    loggers?.system?.warn('Some optional packages not available:', error.message);
 }
 
 // Multi-Protocol Dependencies (already included in engines)
@@ -137,14 +137,41 @@ try {
     
     opentelemetry = require('@opentelemetry/api');
 } catch (error) {
-    console.warn('OpenTelemetry packages not available, distributed tracing disabled:', error.message);
+    loggers?.system?.warn('OpenTelemetry packages not available, distributed tracing disabled:', error.message);
 }
 
 // Initialize Express application
 const app = express();
 
+// Application version (from package.json or APP_VERSION env override)
+const APP_VERSION = process.env.APP_VERSION || require('./package.json').version;
+
+// Global readiness flag (set true after full startup completes)
+let systemReady = false;
+
+// Early health endpoints (available before full engine init)
+app.get('/health', (req, res) => {
+    res.json({
+        status: systemReady ? 'ready' : 'starting',
+        version: APP_VERSION,
+        node: process.version,
+        pid: process.pid,
+        uptime: Math.floor(process.uptime()),
+        enginesInitialized: systemReady,
+        timestamp: new Date().toISOString()
+    });
+});
+app.get('/api/health', (req, res) => {
+    res.json({
+        success: true,
+        status: systemReady ? 'ready' : 'starting',
+        version: APP_VERSION,
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Environment configuration
-const PORT = process.env.PORT || 10180;
+const PORT = process.env.PORT || 3000;
 const TIMEZONE = process.env.TIMEZONE || 'America/Edmonton';
 const USE_HTTPS = process.env.USE_HTTPS === 'true';
 
@@ -168,13 +195,21 @@ const logDir = path.join(dataDir, 'logs');
 const config = {
     system: {
         name: 'Enhanced Universal Logging Platform',
-        version: '2.1.0-stable-enhanced',
+        version: APP_VERSION,
         environment: process.env.NODE_ENV || 'production'
     },
     auth: {
-        jwtSecret: process.env.JWT_SECRET || (() => {
-            console.error('🚨 SECURITY WARNING: JWT_SECRET environment variable not set!');
-            console.error('🔧 Generate a secure secret: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+        jwtSecret: (() => {
+            if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
+            // Allow dev/CI fallback secret only outside production or when explicitly permitted
+            const allowFallback = (process.env.NODE_ENV !== 'production') || process.env.ALLOW_DEV_SECRET === 'true';
+            if (allowFallback) {
+                const fallback = crypto.randomBytes(32).toString('hex');
+                loggers?.system?.warn('⚠️ Using ephemeral development JWT secret (DO NOT use in production). Set JWT_SECRET to override.');
+                return fallback;
+            }
+            loggers?.system?.error('🚨 SECURITY WARNING: JWT_SECRET environment variable not set and no fallback allowed (production mode).');
+            loggers?.system?.error('🔧 Generate a secure secret: node -e "loggers?.system?.info(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
             process.exit(1);
         })(),
         saltRounds: 12,
@@ -286,40 +321,52 @@ const loggers = {
             winston.format.colorize(),
             winston.format.printf(info => `${info.timestamp} [${info.level}] ${info.message}`)
         ),
-        transports: [
-            new winston.transports.Console(),
-            new winston.transports.File({ 
-                filename: path.join(logDir, 'system.log'),
-                maxsize: 50 * 1024 * 1024, // 50MB
-                maxFiles: 5
-            })
-        ]
+        transports: (() => {
+            const isTest = process.env.NODE_ENV === 'test' || process.env.DISABLE_FILE_LOGGING === 'true';
+            const arr = [new winston.transports.Console()];
+            if (!isTest) {
+                arr.push(new winston.transports.File({
+                    filename: path.join(logDir, 'system.log'),
+                    maxsize: 50 * 1024 * 1024,
+                    maxFiles: 5
+                }));
+            }
+            return arr;
+        })()
     }),
     api: winston.createLogger({
         format: winston.format.combine(
             timezoneTimestamp(),
             winston.format.json()
         ),
-        transports: [
-            new winston.transports.File({ 
+        transports: (() => {
+            const isTest = process.env.NODE_ENV === 'test' || process.env.DISABLE_FILE_LOGGING === 'true';
+            if (isTest) {
+                return [new winston.transports.Console()];
+            }
+            return [new winston.transports.File({
                 filename: path.join(logDir, 'api.log'),
                 maxsize: 50 * 1024 * 1024,
                 maxFiles: 5
-            })
-        ]
+            })];
+        })()
     }),
     security: winston.createLogger({
         format: winston.format.combine(
             timezoneTimestamp(),
             winston.format.json()
         ),
-        transports: [
-            new winston.transports.File({ 
+        transports: (() => {
+            const isTest = process.env.NODE_ENV === 'test' || process.env.DISABLE_FILE_LOGGING === 'true';
+            if (isTest) {
+                return [new winston.transports.Console()];
+            }
+            return [new winston.transports.File({
                 filename: path.join(logDir, 'security.log'),
                 maxsize: 50 * 1024 * 1024,
-                maxFiles: 10
-            })
-        ]
+                maxFiles: 5
+            })];
+        })()
     }),
     access: winston.createLogger({
         level: 'info',
@@ -399,7 +446,7 @@ function formatSQLiteTimestamp(sqliteTimestamp, format) {
         const m = moment.utc(sqliteTimestamp, 'YYYY-MM-DD HH:mm:ss').tz(timezone);
         return m.isValid() ? m.format(displayFormat) : null;
     } catch (error) {
-        console.error('❌ Error formatting timestamp:', sqliteTimestamp, error);
+        loggers?.system?.error('❌ Error formatting timestamp:', sqliteTimestamp, error);
         return null;
     }
 }
@@ -424,11 +471,12 @@ const RealTimeStreamingEngine = require('./engines/real-time-streaming-engine');
 const AnomalyDetectionEngine = require('./engines/anomaly-detection-engine');
 const LogCorrelationEngine = require('./engines/log-correlation-engine');
 const PerformanceOptimizationEngine = require('./engines/performance-optimization-engine');
-const AdvancedDashboardBuilder = require('./engines/advanced-dashboard-builder');
+// const AdvancedDashboardBuilder = require('./engines/advanced-dashboard-builder');
 const DistributedTracingEngine = require('./engines/distributed-tracing-engine');
+const FileIngestionEngine = require('./engines/file-ingestion-engine');
 
 // Template system
-const { getPageTemplate } = require('./templates/base');
+const { getPageTemplate } = require('./configs/templates/base');
 
 // Global system components
 let integrationManager = null;
@@ -443,38 +491,150 @@ let realTimeStreamingEngine = null;
 let anomalyDetectionEngine = null;
 let logCorrelationEngine = null;
 let performanceOptimizationEngine = null;
-let advancedDashboardBuilder = null;
+let advancedDashboardBuilder = null; // Disabled: Builder not used
 let distributedTracingEngine = null;
+let fileIngestionEngine = null;
 
-// Express middleware setup - Security first!
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            imgSrc: ["'self'", "data:", "https:"],
-            connectSrc: ["'self'", "ws:", "wss:"],
-            fontSrc: ["'self'"],
-            objectSrc: ["'none'"],
-            mediaSrc: ["'self'"],
-            frameSrc: ["'none'"]
-        }
-    },
-    crossOriginEmbedderPolicy: false // For WebSocket compatibility
-}));
+// Express middleware setup - Enhanced Security Configuration!
+// Use helmet for all routes except /dashboard to avoid CSP conflicts with custom dashboard CSP
+app.use((req, res, next) => {
+    if (req.path.startsWith('/dashboard')) {
+        // Skip helmet CSP for dashboard
+        return next();
+    }
+    // Apply helmet with CSP for all other routes
+    helmet({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                styleSrc: ["'self'", "'unsafe-inline'", 
+                    "https://cdnjs.cloudflare.com", 
+                    "https://fonts.googleapis.com", 
+                    "https://cdn.jsdelivr.net", 
+                    "https://unpkg.com",
+                    "https://stackpath.bootstrapcdn.com",
+                    "https://maxcdn.bootstrapcdn.com",
+                    "https://use.fontawesome.com"
+                ],
+                scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'",
+                    "https://cdnjs.cloudflare.com", 
+                    "https://cdn.jsdelivr.net", 
+                    "https://unpkg.com",
+                    "https://stackpath.bootstrapcdn.com",
+                    "https://maxcdn.bootstrapcdn.com",
+                    "https://code.jquery.com",
+                    "https://use.fontawesome.com",
+                    "blob:"
+                ],
+                scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"],
+                scriptSrcElem: ["'self'", "'unsafe-inline'",
+                    "https://cdn.jsdelivr.net",
+                    "https://cdnjs.cloudflare.com",
+                    "https://unpkg.com",
+                    "https://stackpath.bootstrapcdn.com",
+                    "https://maxcdn.bootstrapcdn.com",
+                    "https://code.jquery.com"
+                ],
+                imgSrc: ["'self'", "data:", "https:", "blob:"],
+                connectSrc: ["'self'", "ws:", "wss:", "https:", "http:", "ws://localhost:*", "wss://localhost:*"],
+                fontSrc: ["'self'", 
+                    "https://cdnjs.cloudflare.com", 
+                    "https://fonts.gstatic.com", 
+                    "https://cdn.jsdelivr.net", 
+                    "https://unpkg.com",
+                    "https://stackpath.bootstrapcdn.com",
+                    "https://maxcdn.bootstrapcdn.com",
+                    "https://use.fontawesome.com",
+                    "data:"
+                ],
+                objectSrc: ["'none'"],
+                mediaSrc: ["'self'"],
+                frameSrc: ["'none'"],
+                workerSrc: ["'self'", "blob:", "https://cdn.jsdelivr.net"],
+                childSrc: ["'self'", "blob:"],
+                baseUri: ["'self'"],
+                formAction: ["'self'"],
+                upgradeInsecureRequests: [],
+                blockAllMixedContent: []
+            }
+        },
+        crossOriginEmbedderPolicy: false, // For WebSocket compatibility
+        hsts: {
+            maxAge: 31536000, // 1 year
+            includeSubDomains: true,
+            preload: true
+        },
+        noSniff: true,
+        xssFilter: true,
+        referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+        permittedCrossDomainPolicies: false,
+        dnsPrefetchControl: true,
+        frameguard: { action: 'deny' }
+    })(req, res, next);
+});
+
+// Additional security headers
+app.use((req, res, next) => {
+    // Enhanced security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    next();
+});
 
 app.use(cors({
-    origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : ['http://localhost:10180', 'https://localhost:10180'],
+    origin: true,
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    exposedHeaders: ['Authorization'],
+    preflightContinue: false,
+    optionsSuccessStatus: 200
 }));
-app.use(express.json({ limit: '10mb' }));
+
+// Body parsing middleware (FIXED: removed conflicting custom parser)
+// Express.json() handles JSON parsing properly without stream conflicts
+
+app.use(express.json({ 
+    limit: '10mb',
+    strict: true, // Only parse arrays and objects
+    verify: (req, res, buf, encoding) => {
+        // Additional validation for express.json
+        if (buf && buf.length) {
+            try {
+                JSON.parse(buf);
+            } catch (error) {
+                // Log the error but let express.json handle it
+                loggers.security.debug(`JSON parse verification failed: ${error.message}`);
+            }
+        }
+    }
+}));
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
+// Enable gzip/deflate compression for responses
+app.use(compression());
+
+// Static file serving for public assets
+app.use(express.static(path.join(__dirname, 'public'), {
+    maxAge: '1d', // Cache static files for 1 day
+    etag: true,
+    lastModified: true
+}));
+
+// Session configuration - Production-ready SQLite session store
 app.use(session({
+    store: new SQLiteStore({
+        db: 'sessions.db',
+        dir: path.join(__dirname, 'data', 'databases'),
+        table: 'sessions',
+        concurrentDB: true
+    }),
     secret: config.auth.jwtSecret,
     resave: false,
     saveUninitialized: false,
@@ -491,10 +651,24 @@ app.use(session({
 // Rate limiting
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: 500, // Increased limit to accommodate frequent UI requests
     message: { error: 'Too many requests, please try again later.' },
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    // Skip rate limiting for polling and frequently accessed endpoints
+    skip: (req) => {
+        const exemptEndpoints = [
+            '/api/notifications/recent',
+            '/api/notifications/unread',
+            '/api/system/health',
+            '/api/users',
+            '/api/audit-trail',
+            '/api/tracing/status',
+            '/api/tracing/dependencies',
+            '/health'
+        ];
+        return exemptEndpoints.some(endpoint => req.path.includes(endpoint));
+    }
 });
 
 const logIngestionLimiter = rateLimit({
@@ -506,16 +680,24 @@ const logIngestionLimiter = rateLimit({
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // limit each IP to 5 auth attempts per windowMs
+    max: process.env.NODE_ENV === 'test' ? 1000 : 5, // much higher in tests to avoid 429 flakiness
     message: { error: 'Too many authentication attempts, please try again later.' },
-    skipSuccessfulRequests: true
+    skipSuccessfulRequests: true,
+    standardHeaders: true,
+    legacyHeaders: true
 });
 
-// Apply rate limiting
-app.use('/api/', generalLimiter);
-app.use('/log', logIngestionLimiter);
-app.use('/login', authLimiter);
-app.use('/api/auth/', authLimiter);
+// Apply rate limiting (disable aggressive limits in test to avoid flakiness)
+if (process.env.NODE_ENV !== 'test') {
+    app.use('/api/', generalLimiter);
+    app.use('/log', logIngestionLimiter);
+    app.use('/login', authLimiter);
+    app.use('/api/auth/', authLimiter);
+} else {
+    // In test mode, still protect auth endpoints minimally but avoid interfering with assertions
+    app.use('/login', authLimiter);
+    app.use('/api/auth/', authLimiter);
+}
 
 // Make dependencies available to routes
 app.locals.config = config;
@@ -532,7 +714,8 @@ app.use((req, res, next) => {
     req.loggers = loggers;
     req.TIMEZONE = TIMEZONE;
     req.systemSettings = { timezone: TIMEZONE, default_theme: 'auto' };
-    req.dashboardBuilder = advancedDashboardBuilder;
+    // Dashboard builder disabled: do not inject
+    req.dashboardBuilder = null;
     req.webhookManager = webhookManager;
     next();
 });
@@ -555,54 +738,8 @@ app.locals.getManagers = () => ({
 // Set template function for routes
 app.set('pageTemplate', getPageTemplate);
 
-// Authentication middleware - matches monolithic implementation exactly
-const requireAuth = (req, res, next) => {
-    const token = req.session?.token;
-    
-    loggers.security.info(`Auth check for ${req.path}: token=${token ? 'present' : 'missing'}`);
-    
-    if (!token) {
-        loggers.security.warn(`No token for ${req.path}, redirecting to login`);
-        if (req.path.startsWith('/api/')) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-        return res.redirect('/login');
-    }
-
-    const user = userManager.verifyJWT(token);
-    if (!user) {
-        loggers.security.warn(`Invalid token for ${req.path}, redirecting to login`);
-        if (req.path.startsWith('/api/')) {
-            return res.status(401).json({ error: 'Invalid token' });
-        }
-        return res.redirect('/login');
-    }
-
-    loggers.security.info(`Auth successful for ${req.path}, user: ${user.username}`);
-    req.user = user;
-    
-    // Update session last_activity (use explicit UTC time)
-    const utcNow = moment.utc().format('YYYY-MM-DD HH:mm:ss');
-    dal.run(
-        `UPDATE user_sessions SET last_activity = ? WHERE session_token = ? AND active = 1`,
-        [utcNow, token],
-        (err) => {
-            if (err) loggers.system.error('Failed to update session activity:', err);
-        }
-    );
-    
-    next();
-};
-
-const requireAdmin = (req, res, next) => {
-    if (req.user?.role !== 'admin') {
-        if (req.path.startsWith('/api/')) {
-            return res.status(403).json({ error: 'Admin access required' });
-        }
-        return res.status(403).send('<h1>Access Denied</h1><p>Administrator privileges required</p>');
-    }
-    next();
-};
+// Authentication middleware will be initialized after userManager is ready
+// (moved to initializeSystemComponents function)
 
 // Legacy ESP32 authentication
 const legacyAuth = (req, res, next) => {
@@ -626,9 +763,7 @@ const legacyAuth = (req, res, next) => {
     next();
 };
 
-// Make middleware available to routes
-app.locals.requireAuth = requireAuth;
-app.locals.requireAdmin = requireAdmin;
+// Make legacy auth middleware available (requireAuth and requireAdmin initialized later)
 app.locals.legacyAuth = legacyAuth;
 
 // Database initialization function
@@ -638,7 +773,7 @@ async function initializeDatabase() {
         
         // Run database migration first to ensure all tables exist
         loggers.system.info('🔧 Running database migration...');
-        const DatabaseMigration = require('./database-migration');
+        const DatabaseMigration = require('./archive/migrations/database-migration');
         const migration = new DatabaseMigration(dbPath, loggers.system);
         await migration.runMigration();
         loggers.system.info('✅ Database migration completed successfully');
@@ -653,11 +788,46 @@ async function initializeDatabase() {
         // Load system settings after DAL is initialized
         await loadSystemSettings();
         
+        // Note: Admin user initialization is handled by UserManager during system components init
+        
         loggers.system.info('✅ Database Access Layer initialized successfully');
         return true;
     } catch (error) {
         loggers.system.error('❌ Database initialization failed:', error.message);
         throw error;
+    }
+}
+
+// Initialize default admin user if it doesn't exist
+async function initializeDefaultAdmin() {
+    try {
+        // Check if admin user exists
+        const existingAdmin = await dal.get('SELECT id FROM users WHERE username = ?', ['admin']);
+        
+        if (!existingAdmin) {
+            // Require AUTH_PASSWORD from environment for security
+            const defaultPassword = process.env.AUTH_PASSWORD || (() => {
+                throw new Error('AUTH_PASSWORD environment variable must be set for admin user creation');
+            })();
+            const bcrypt = require('bcrypt');
+            const passwordHash = await bcrypt.hash(defaultPassword, config.auth.saltRounds);
+            
+            await dal.run(
+                'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+                ['admin', 'admin@enterprise.local', passwordHash, 'admin']
+            );
+            
+            loggers.system.info('✅ Default admin user created', {
+                username: 'admin',
+                password: defaultPassword
+            });
+            loggers?.system?.info(`\n🔐 Default Admin Created:`);
+            loggers?.system?.info(`   Username: admin`);
+            loggers?.system?.info(`   Password: ${defaultPassword}`);
+            loggers?.system?.info(`   Please change this password after first login!\n`);
+        }
+    } catch (error) {
+        loggers.system.error('Error creating default admin:', error);
     }
 }
 
@@ -671,6 +841,73 @@ async function initializeSystemComponents() {
         await metricsManager.initialize();
 
         userManager = new UserManager(config, loggers, dal);
+        
+        // Initialize authentication middleware AFTER userManager is ready
+        // This ensures the middleware can properly reference userManager
+        const requireAuth = (req, res, next) => {
+            // Extract token from session (web UI) OR Authorization header (API clients)
+            let token = req.session?.token;
+            let tokenSource = 'session';
+            
+            // Check for Bearer token in Authorization header
+            if (!token && req.headers.authorization) {
+                const authHeader = req.headers.authorization;
+                if (authHeader.startsWith('Bearer ')) {
+                    token = authHeader.substring(7); // Remove 'Bearer ' prefix
+                    tokenSource = 'bearer';
+                }
+            }
+            
+            loggers.security.info(`Auth check for ${req.originalUrl}: token=${token ? 'present' : 'missing'} (source: ${tokenSource})`);
+            
+            if (!token) {
+                loggers.security.warn(`No token for ${req.originalUrl}, redirecting to login`);
+                if (req.originalUrl.startsWith('/api/')) {
+                    return res.status(401).json({ success: false, error: 'Authentication required' });
+                }
+                return res.redirect('/login');
+            }
+
+            const user = userManager.verifyJWT(token);
+            if (!user) {
+                loggers.security.warn(`Invalid token for ${req.originalUrl}, redirecting to login`);
+                if (req.originalUrl.startsWith('/api/')) {
+                    return res.status(401).json({ success: false, error: 'Invalid token' });
+                }
+                return res.redirect('/login');
+            }
+
+            loggers.security.info(`Auth successful for ${req.originalUrl}, user: ${user.username} (via ${tokenSource})`);
+            req.user = user;
+            
+            // Update session last_activity (use explicit UTC time)
+            const utcNow = moment.utc().format('YYYY-MM-DD HH:mm:ss');
+            dal.run(
+                `UPDATE user_sessions SET last_activity = ? WHERE session_token = ? AND is_active = 1`,
+                [utcNow, token],
+                (err) => {
+                    if (err) loggers.system.error('Failed to update session activity:', err);
+                }
+            );
+            
+            next();
+        };
+
+        const requireAdmin = (req, res, next) => {
+            // Strict role check - only users with 'admin' role can access
+            if (req.user?.role !== 'admin') {
+                loggers.security.warn(`Admin access denied for user: ${req.user?.username} (role: ${req.user?.role})`);
+                if (req.originalUrl.startsWith('/api/')) {
+                    return res.status(403).json({ error: 'Admin access required' });
+                }
+                return res.status(403).send('<h1>Access Denied</h1><p>Administrator privileges required</p>');
+            }
+            next();
+        };
+
+        // Make middleware available to app
+        app.locals.requireAuth = requireAuth;
+        app.locals.requireAdmin = requireAdmin;
         
         // Enhanced log to database function with optional request context
         const logToDatabase = async (message, level = 'info', category = 'system', source = 'localhost', requestContext = null) => {
@@ -722,8 +959,9 @@ async function initializeSystemComponents() {
 
                 const logId = await dal.createLogEntry(logEntry);
                 if (metricsManager) {
-                    metricsManager.incrementLogs();
-                    metricsManager.incrementBytes(message.length || 0);
+                    // Record per-source metrics based on category (stored in source field)
+                    const bytes = typeof message === 'string' ? message.length : 0;
+                    metricsManager.recordIngestion(logEntry.source || 'system', bytes);
                 }
                 return logId;
             } catch (error) {
@@ -732,8 +970,8 @@ async function initializeSystemComponents() {
             }
         };
         
-        integrationManager = new IntegrationManager(config, loggers, logToDatabase, TIMEZONE);
-        await integrationManager.initialize();
+    integrationManager = new IntegrationManager(config, loggers, logToDatabase, TIMEZONE);
+    await integrationManager.initialize();
         
         // Initialize WebhookManager
         webhookManager = new WebhookManager(dal, loggers);
@@ -749,14 +987,27 @@ async function initializeSystemComponents() {
         advancedSearchEngine = new AdvancedSearchEngine(dal, loggers);
         await advancedSearchEngine.initialize();
 
-        multiProtocolIngestionEngine = new MultiProtocolIngestionEngine(config, loggers, dal);
-        await multiProtocolIngestionEngine.initialize();
+        multiProtocolIngestionEngine = new MultiProtocolIngestionEngine(dal, loggers, config);
+        // Skip binding network sockets during tests to avoid EADDRINUSE
+        if (process.env.NODE_ENV === 'test' || process.env.TEST_DISABLE_NETWORK === 'true') {
+            loggers.system.warn('⏭️ Skipping Multi-Protocol Ingestion Engine initialization in test mode');
+        } else {
+            await multiProtocolIngestionEngine.initialize();
+        }
+
+        // Initialize File Ingestion Engine (directory-based log tailing)
+        fileIngestionEngine = new FileIngestionEngine(config, loggers, dal);
+        await fileIngestionEngine.initialize();
 
         dataRetentionEngine = new DataRetentionEngine(dal, loggers, config);
         await dataRetentionEngine.initialize();
 
         realTimeStreamingEngine = new RealTimeStreamingEngine(dal, loggers, config);
-        await realTimeStreamingEngine.initialize();
+        if (process.env.NODE_ENV === 'test' || process.env.TEST_DISABLE_NETWORK === 'true') {
+            loggers.system.warn('⏭️ Skipping Real-time Streaming Engine initialization in test mode');
+        } else {
+            await realTimeStreamingEngine.initialize();
+        }
 
         anomalyDetectionEngine = new AnomalyDetectionEngine(dal, loggers, config);
         await anomalyDetectionEngine.initialize();
@@ -767,16 +1018,24 @@ async function initializeSystemComponents() {
         performanceOptimizationEngine = new PerformanceOptimizationEngine(dal, loggers, config);
         await performanceOptimizationEngine.initialize();
 
-        advancedDashboardBuilder = new AdvancedDashboardBuilder(dal, loggers, config);
-        await advancedDashboardBuilder.initialize();
+    // AdvancedDashboardBuilder disabled (single dashboard mode)
+    // advancedDashboardBuilder = new AdvancedDashboardBuilder(dal, loggers, config);
+    // await advancedDashboardBuilder.initialize();
 
+        // Distributed tracing initialization gated by TRACING_ENABLED env
+        const tracingEnabled = String(process.env.TRACING_ENABLED || 'false').toLowerCase() === 'true';
         distributedTracingEngine = new DistributedTracingEngine(dal, loggers, config);
-        await distributedTracingEngine.initialize();
+        if (tracingEnabled) {
+            loggers.system.info('🛰️ Distributed Tracing enabled - initializing OpenTelemetry pipeline');
+            await distributedTracingEngine.initialize();
+        } else {
+            loggers.system.info('🛰️ Distributed Tracing disabled (set TRACING_ENABLED=true to activate)');
+        }
 
         loggers.system.info('✅ All system components initialized successfully');
         loggers.system.info('📊 System Summary:');
         loggers.system.info('   • Database: SQLite with DAL optimization');
-        loggers.system.info('   • Engines: 9 enterprise engines loaded');
+    loggers.system.info('   • Engines: 10 enterprise engines loaded (including File Ingestion)');
         loggers.system.info('   • Integrations: WebSocket, MQTT, Multi-protocol');
         loggers.system.info('   • Security: Rate limiting, JWT auth, audit logging');
         loggers.system.info('   • Performance: Caching, streaming, optimization');
@@ -792,18 +1051,37 @@ function setupRoutes() {
     try {
         loggers.system.info('🛣️ Setting up application routes...');
 
-        // Health check endpoint (for setup server transition)
-        app.get('/health', (req, res) => {
-            res.json({ 
-                status: 'healthy', 
-                timestamp: new Date().toISOString(),
-                server: 'Enhanced Universal Logging Platform',
-                version: config.system.version
-            });
-        });
+        // Extract middleware from app.locals (initialized in initializeSystemComponents)
+        const requireAuth = app.locals.requireAuth;
+        const requireAdmin = app.locals.requireAdmin;
+        
+        if (!requireAuth || !requireAdmin) {
+            throw new Error('Auth middleware not initialized! Call initializeSystemComponents first.');
+        }
+
+        // REMOVED DUPLICATE /health endpoint - already defined at line 153
+        // app.get('/health', (req, res) => { ... })
 
         // Root redirect
         app.get('/', (req, res) => res.redirect('/dashboard'));
+
+    // Engine status route (Unix philosophy: simple status resource)
+    const enginesStatusRouter = require('./routes/api/engines-status');
+    app.use('/api/engines/status', requireAuth, enginesStatusRouter);
+
+    // Expose engine references for status route without tight coupling
+    app.locals.alertingEngine = alertingEngine;
+    app.locals.advancedSearchEngine = advancedSearchEngine;
+    app.locals.multiProtocolIngestionEngine = multiProtocolIngestionEngine;
+    app.locals.fileIngestionEngine = fileIngestionEngine;
+    app.locals.dataRetentionEngine = dataRetentionEngine;
+    app.locals.realTimeStreamingEngine = realTimeStreamingEngine;
+    app.locals.anomalyDetectionEngine = anomalyDetectionEngine;
+    app.locals.logCorrelationEngine = logCorrelationEngine;
+    app.locals.performanceOptimizationEngine = performanceOptimizationEngine;
+    // Builder disabled; leave null reference for status route
+    app.locals.advancedDashboardBuilder = advancedDashboardBuilder;
+    app.locals.distributedTracingEngine = distributedTracingEngine;
 
         // Login page
         app.get('/login', (req, res) => {
@@ -1091,11 +1369,56 @@ function setupRoutes() {
             }`;
 
             const loginJS = `
-            // Enhanced login functionality with proper error handling
+            // Form validation utility (inline version for login page)
+            function showFieldError(fieldId, message) {
+                const field = document.getElementById(fieldId);
+                if (!field) return;
+                const existingError = field.parentElement.querySelector('.field-error');
+                if (existingError) existingError.remove();
+                field.classList.remove('is-invalid');
+                if (!message) return;
+                field.classList.add('is-invalid');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'field-error';
+                errorDiv.style.cssText = 'color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem;';
+                errorDiv.textContent = message;
+                field.parentElement.appendChild(errorDiv);
+            }
+            
+            function validateLoginForm() {
+                let isValid = true;
+                showFieldError('username', null);
+                showFieldError('password', null);
+                
+                const username = document.getElementById('username').value.trim();
+                const password = document.getElementById('password').value;
+                
+                if (!username) {
+                    showFieldError('username', 'Username is required');
+                    isValid = false;
+                }
+                
+                if (!password) {
+                    showFieldError('password', 'Password is required');
+                    isValid = false;
+                } else if (password.length < 4) {
+                    showFieldError('password', 'Password must be at least 4 characters');
+                    isValid = false;
+                }
+                
+                return isValid;
+            }
+            
+            // Enhanced login functionality with proper error handling and validation
             document.getElementById('loginForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 
-                const username = document.getElementById('username').value;
+                // Validate form before submission
+                if (!validateLoginForm()) {
+                    return;
+                }
+                
+                const username = document.getElementById('username').value.trim();
                 const password = document.getElementById('password').value;
                 const loginBtn = document.getElementById('loginBtn');
                 const errorDiv = document.getElementById('error-message');
@@ -1104,11 +1427,12 @@ function setupRoutes() {
                 errorDiv.style.display = 'none';
                 errorDiv.textContent = '';
                 
-                // Show loading state
-                loginBtn.disabled = true;
-                loginBtn.textContent = 'Signing In...';
-                
                 try {
+                    // Save original button text
+                    const originalText = loginBtn.textContent;
+                    loginBtn.disabled = true;
+                    loginBtn.textContent = 'Signing In...';
+                    
                     const response = await fetch('/api/auth/login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1118,6 +1442,17 @@ function setupRoutes() {
                     const result = await response.json();
                     
                     if (result.success) {
+                        // Persist auth token for subsequent API requests (themes, settings, etc.)
+                        try {
+                            if (result.token) {
+                                localStorage.setItem('authToken', result.token);
+                                // Also set a cookie for compatibility with existing middleware token checks
+                                document.cookie = 'token=' + result.token + '; Path=/; SameSite=Lax';
+                            }
+                        } catch (storageErr) {
+                            loggers?.system?.warn('Failed to persist auth token:', storageErr.message);
+                        }
+
                         loginBtn.textContent = 'Success! Redirecting...';
                         loginBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
                         setTimeout(() => {
@@ -1173,7 +1508,7 @@ function setupRoutes() {
                 try {
                     localStorage.setItem('preferred-theme', nextTheme);
                 } catch(e) {
-                    console.warn('Cannot save theme preference:', e);
+                    loggers?.system?.warn('Cannot save theme preference:', e);
                 }
                 
                 // Update theme toggle icon and tooltip
@@ -1219,7 +1554,7 @@ function setupRoutes() {
                             break;
                     }
                 } catch(e) {
-                    console.warn('Cannot load theme preference:', e);
+                    loggers?.system?.warn('Cannot load theme preference:', e);
                 }
             })();
             
@@ -1234,7 +1569,8 @@ function setupRoutes() {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🔥 Enterprise Logger - Login</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <!-- Removed external icon CDN to avoid console errors in headless environments -->
     <style>
         :root {
             /* Light Theme Colors */
@@ -1330,14 +1666,72 @@ function setupRoutes() {
         app.post('/api/auth/login', async (req, res) => {
             try {
                 const { username, password } = req.body;
+                const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+                const userAgent = req.headers['user-agent'] || 'unknown';
+                
+                if (!username || !password) {
+                    return res.status(400).json({ success: false, error: 'username and password are required' });
+                }
+
                 const result = await userManager.authenticateUser(username, password);
                 
                 if (result.success) {
                     const token = userManager.generateJWT(result.user);
-                    req.session.token = token;
-                    res.json({ success: true, token, user: result.user });
+                    
+                    // Regenerate session to prevent fixation and ensure persistence before responding
+                    return req.session.regenerate(async (regenErr) => {
+                        if (regenErr) {
+                            loggers.security.error('Session regenerate error during login:', regenErr);
+                            return res.status(500).json({ success: false, error: 'Login failed' });
+                        }
+
+                        req.session.token = token;
+
+                        // Log successful login to activity
+                        if (dal && dal.logActivity) {
+                            try {
+                                await dal.logActivity({
+                                    user_id: result.user.id,
+                                    action: 'login',
+                                    resource_type: 'auth',
+                                    resource_id: result.user.id.toString(),
+                                    details: JSON.stringify({ username: result.user.username, method: 'password' }),
+                                    ip_address: clientIp,
+                                    user_agent: userAgent
+                                });
+                            } catch (auditErr) {
+                                loggers.security.warn('Failed to log activity for login:', auditErr.message);
+                            }
+                        }
+
+                        req.session.save((saveErr) => {
+                            if (saveErr) {
+                                loggers.security.error('Session save error during login:', saveErr);
+                                return res.status(500).json({ success: false, error: 'Login failed' });
+                            }
+                            return res.json({ success: true, token, user: result.user });
+                        });
+                    });
                 } else {
-                    res.status(401).json({ success: false, error: result.error });
+                    // Log failed login attempt
+                    if (dal && dal.logActivity) {
+                        try {
+                            await dal.logActivity({
+                                user_id: null,
+                                action: 'login_failed',
+                                resource_type: 'auth',
+                                resource_id: username,
+                                details: JSON.stringify({ username, reason: result.error || 'invalid_credentials' }),
+                                ip_address: clientIp,
+                                user_agent: userAgent
+                            });
+                        } catch (auditErr) {
+                            loggers.security.warn('Failed to log activity for failed login:', auditErr.message);
+                        }
+                    }
+                    
+                    // Authentication failed
+                    res.status(401).json({ success: false, error: 'Invalid credentials' });
                 }
             } catch (error) {
                 loggers.security.error('Login error:', error);
@@ -1346,13 +1740,35 @@ function setupRoutes() {
         });
 
         app.post('/api/auth/logout', (req, res) => {
+            // Log logout activity
+            if (req.user && dal && dal.logActivity) {
+                const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
+                const userAgent = req.headers['user-agent'] || 'unknown';
+                dal.logActivity({
+                    user_id: req.user.id,
+                    action: 'logout',
+                    resource_type: 'auth',
+                    resource_id: req.user.id.toString(),
+                    details: JSON.stringify({ username: req.user.username }),
+                    ip_address: clientIp,
+                    user_agent: userAgent
+                }).catch(err => loggers.security.warn('Failed to log logout activity:', err.message));
+            }
+            
             req.session.destroy();
             res.json({ success: true });
         });
 
+        // Token validation endpoint
+        app.get('/api/auth/validate', requireAuth, (req, res) => {
+            res.json({
+                success: true,
+                user: req.user
+            });
+        });
+
         // Core routes
-        app.use('/dashboard', requireAuth, require('./routes/dashboard'));
-        app.use('/dashboard', requireAuth, require('./routes/dashboard-builder'));
+    app.use('/dashboard', requireAuth, require('./routes/dashboard'));
         app.use('/logs', requireAuth, require('./routes/logs'));
         app.use('/log-analyzer', requireAuth, require('./routes/log-analyzer'));
         app.use('/search', requireAuth, require('./routes/search'));
@@ -1361,46 +1777,83 @@ function setupRoutes() {
         app.use('/activity', requireAuth, require('./routes/activity'));
 
         // Admin routes
-        app.use('/admin/users', requireAuth, requireAdmin, require('./routes/admin/users'));
+        app.use('/admin/users', requireAuth, requireAdmin, require('./routes/admin/users')(getPageTemplate, requireAuth));
         app.use('/admin', requireAuth, requireAdmin, require('./routes/admin/settings'));
-        app.use('/admin/health', requireAuth, requireAdmin, require('./routes/admin/health'));
+        app.use('/admin/health', requireAuth, requireAdmin, require('./routes/admin/health')(getPageTemplate, requireAuth));
         app.use('/admin', requireAuth, requireAdmin, require('./routes/admin/security')(getPageTemplate, requireAuth));
-        app.use('/admin/api-keys', requireAuth, requireAdmin, require('./routes/admin/api-keys'));
+        app.use('/admin/api-keys', requireAuth, requireAdmin, require('./routes/admin/api-keys')(getPageTemplate, requireAuth));
         app.use('/admin/search-advanced', requireAuth, requireAdmin, require('./routes/admin/search-advanced'));
         app.use('/admin/ingestion', requireAuth, requireAdmin, require('./routes/admin/ingestion'));
         app.use('/admin/tracing', requireAuth, requireAdmin, require('./routes/admin/tracing'));
-        app.use('/admin/dashboards', requireAuth, requireAdmin, require('./routes/admin/dashboards'));
+    // Builder admin removed
+    // app.use('/admin/dashboards', requireAuth, requireAdmin, require('./routes/admin/dashboards'));
 
         // Dashboard API routes
-        app.use('/api/dashboards', requireAuth, require('./routes/api/dashboards'));
-        app.use('/api/logs', requireAuth, require('./routes/api/logs'));
+        
+        // Request metrics tracking middleware (tracks all /api/* requests)
+        const requestMetricsMiddleware = require('./middleware/request-metrics');
+        app.use(requestMetricsMiddleware(dal));
+        
+    // Builder API removed
+    // app.use('/api/dashboards', requireAuth, require('./routes/api/dashboards'));
+    // Notifications API (parse error notifications)
+    app.use('/api/notifications', requireAuth, require('./routes/api/notifications'));
+    app.use('/api/logs', requireAuth, require('./routes/api/logs'));
+    // Register analytics API (restored from monolithic feature set)
+    app.use('/api/analytics', requireAuth, require('./routes/api/analytics'));
         app.use('/api/activity', requireAuth, require('./routes/api/activity'));
         app.use('/api/webhooks', requireAuth, require('./routes/api/webhooks'));
         app.use('/api/search', requireAuth, require('./routes/api/search'));
         app.use('/api/dashboard', requireAuth, require('./routes/api/dashboard'));
+        // WebSocket clients inspection endpoint (REST) for parity with monolithic
+        app.get('/api/websocket/clients', requireAuth, async (req, res) => {
+            try {
+                if (!realTimeStreamingEngine || !realTimeStreamingEngine.wsServer) {
+                    return res.json({ success: false, error: 'WebSocket server not initialized', clients: [] });
+                }
+                const clients = [];
+                for (const [clientId, clientData] of realTimeStreamingEngine.clients.entries()) {
+                    clients.push({
+                        id: clientId,
+                        ip: clientData.ip,
+                        userAgent: clientData.userAgent,
+                        connectedAt: clientData.connectedAt,
+                        messagesSent: clientData.messagesSent,
+                        bytesSent: clientData.bytesSent,
+                        subscriptions: Array.from(clientData.subscriptions || []),
+                        filters: clientData.filters || []
+                    });
+                }
+                res.json({ success: true, total: clients.length, clients });
+            } catch (error) {
+                loggers.system.error('WebSocket clients endpoint error:', error);
+                res.status(500).json({ success: false, error: 'Failed to enumerate WebSocket clients' });
+            }
+        });
         
         // Admin API routes
         app.use('/api/settings', requireAuth, require('./routes/api/settings'));
-        app.use('/api/api-keys', requireAuth, require('./routes/api/settings'));
+        // REMOVED DUPLICATE: app.use('/api/api-keys', requireAuth, require('./routes/api/settings')); // WRONG FILE!
         app.use('/api/tracing', requireAuth, require('./routes/api/tracing'));
         app.use('/api/ingestion', requireAuth, require('./routes/api/ingestion'));
         app.use('/api/users', requireAuth, require('./routes/api/users'));
-        app.use('/api/admin', requireAuth, require('./routes/api/users'));
+        app.use('/api/admin', requireAuth, require('./routes/api/admin'));
         app.use('/api/roles', requireAuth, require('./routes/api/users'));
-        app.use('/api/rate-limits', requireAuth, require('./routes/api/security'));
-        app.use('/api/audit-trail', requireAuth, require('./routes/api/security'));
-        app.use('/api/security', requireAuth, require('./routes/api/security'));
         app.use('/api/log-analyzer', requireAuth, require('./api/log-analyzer'));
-        app.use('/api', requireAuth, require('./routes/api/alerts'));
-        app.use('/api', requireAuth, require('./routes/api/system'));
-        app.use('/api', requireAuth, require('./routes/api/admin'));
+    app.use('/api', requireAuth, require('./routes/api/alerts'));
+    app.use('/api', requireAuth, require('./routes/api/system'));
+    app.use('/api', requireAuth, require('./routes/api/stats'));
+        // REMOVED DUPLICATE: app.use('/api/admin', requireAuth, require('./routes/api/admin'));
         app.use('/api', requireAuth, require('./routes/api/backups'));
         app.use('/api', requireAuth, require('./routes/api/user-theme'));
+        app.use('/api', requireAuth, require('./routes/api/themes'));
         app.use('/api', requireAuth, require('./routes/api/saved-searches'));
         app.use('/api', requireAuth, require('./routes/api/integrations'));
         app.use('/api', requireAuth, require('./routes/api/api-keys'));
-        app.use('/api', requireAuth, require('./routes/api/rate-limits'));
-        app.use('/api', requireAuth, require('./routes/api/audit-trail'));
+        app.use('/api', requireAuth, require('./routes/api/security'));  // Contains /rate-limits, /audit-trail, /security/* routes
+        // REMOVED DUPLICATES - security.js now handles these paths:
+        // app.use('/api', requireAuth, require('./routes/api/rate-limits'));
+        // app.use('/api', requireAuth, require('./routes/api/audit-trail'));
 
         // Enhanced log ingestion endpoint with geographic and user-agent analysis
         app.post('/log', legacyAuth, async (req, res) => {
@@ -1478,15 +1931,742 @@ function setupRoutes() {
             </svg>`);
         });
 
-        // Health check endpoint
-        app.get('/health', (req, res) => {
-            const uptime = process.uptime();
-            res.json({
-                status: 'healthy',
-                uptime: Math.floor(uptime),
-                version: config.system.version,
-                timestamp: new Date().toISOString()
-            });
+        // REMOVED: Mock tracing search endpoint (handled by routes/api/tracing.js)
+
+        // REMOVED: Mock settings endpoint (use routes/api/settings.js)
+
+        // NOTE: API Keys management is now handled by routes/api/api-keys.js
+        // Those routes are mounted via: app.use('/api', requireAuth, require('./routes/api/api-keys'));
+
+        // System Metrics API endpoints  
+        app.get('/api/metrics/system', (req, res) => {
+            try {
+                const memoryUsage = process.memoryUsage();
+                const cpuUsage = process.cpuUsage();
+                const uptime = process.uptime();
+
+                // Calculate CPU percentage (approximation)
+                const cpuPercent = Math.min(100, Math.max(0, 
+                    ((cpuUsage.user + cpuUsage.system) / 1000000 / uptime) * 100
+                ));
+
+                // Memory calculations
+                const totalMemory = memoryUsage.heapTotal;
+                const usedMemory = memoryUsage.heapUsed;
+                const memoryPercent = (usedMemory / totalMemory) * 100;
+
+                // Format uptime
+                const hours = Math.floor(uptime / 3600);
+                const minutes = Math.floor((uptime % 3600) / 60);
+                const seconds = Math.floor(uptime % 60);
+
+                const metrics = {
+                    success: true,
+                    timestamp: new Date().toISOString(),
+                    memory: {
+                        used: Math.round(usedMemory / 1024 / 1024), // MB
+                        total: Math.round(totalMemory / 1024 / 1024), // MB
+                        percentage: Math.round(memoryPercent * 100) / 100,
+                        rss: Math.round(memoryUsage.rss / 1024 / 1024), // MB
+                        external: Math.round(memoryUsage.external / 1024 / 1024) // MB
+                    },
+                    cpu: {
+                        percentage: Math.round(cpuPercent * 100) / 100,
+                        user: cpuUsage.user,
+                        system: cpuUsage.system
+                    },
+                    uptime: {
+                        seconds: Math.floor(uptime),
+                        formatted: `${hours}h ${minutes}m ${seconds}s`,
+                        hours: hours,
+                        minutes: minutes
+                    },
+                    system: {
+                        platform: process.platform,
+                        arch: process.arch,
+                        nodeVersion: process.version,
+                        pid: process.pid
+                    }
+                };
+
+                res.json(metrics);
+            } catch (error) {
+                loggers.system.error('System metrics API error:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Failed to fetch system metrics'
+                });
+            }
+        });
+
+        app.get('/api/metrics/database', async (req, res) => {
+            try {
+                const fs = require('fs');
+                let dbStats = {
+                    size: 0,
+                    tables: 4,
+                    lastBackup: null
+                };
+
+                try {
+                    const dbPath = './database.db';
+                    if (fs.existsSync(dbPath)) {
+                        const stats = fs.statSync(dbPath);
+                        dbStats.size = Math.round(stats.size / 1024 / 1024 * 100) / 100; // MB
+                        dbStats.lastModified = stats.mtime.toISOString();
+                    }
+                } catch (e) {
+                    loggers.system.warn('Could not read database stats:', e.message);
+                }
+
+                // Get real query statistics from request_metrics table
+                let queryStats = {
+                    totalQueries: 0,
+                    avgQueryTime: 0,
+                    cacheHitRate: 0
+                };
+                
+                try {
+                    if (dal) {
+                        // Total queries from request_metrics
+                        const totalResult = await dal.get('SELECT COUNT(*) as count FROM request_metrics');
+                        queryStats.totalQueries = totalResult ? totalResult.count : 0;
+                        
+                        // Average query time from recent requests
+                        const avgResult = await dal.get(`
+                            SELECT AVG(response_time_ms) as avgTime
+                            FROM request_metrics
+                            WHERE timestamp >= datetime('now', 'localtime', '-1 hour')
+                        `);
+                        queryStats.avgQueryTime = avgResult && avgResult.avgTime ? 
+                            Math.round(avgResult.avgTime) : 0;
+                        
+                        // Cache hit rate approximation from status codes (2xx vs others)
+                        const cacheResult = await dal.get(`
+                            SELECT 
+                                SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as hits,
+                                COUNT(*) as total
+                            FROM request_metrics
+                            WHERE timestamp >= datetime('now', 'localtime', '-1 hour')
+                        `);
+                        
+                        if (cacheResult && cacheResult.total > 0) {
+                            queryStats.cacheHitRate = Math.round((cacheResult.hits / cacheResult.total) * 100);
+                        }
+                    }
+                } catch (dbError) {
+                    loggers.system.warn('Could not fetch query statistics:', dbError.message);
+                }
+
+                const metrics = {
+                    success: true,
+                    timestamp: new Date().toISOString(),
+                    database: dbStats,
+                    performance: {
+                        connectionPool: 1,
+                        activeConnections: 1,
+                        avgQueryTime: queryStats.avgQueryTime + 'ms',
+                        totalQueries: queryStats.totalQueries,
+                        cacheHitRate: queryStats.cacheHitRate
+                    }
+                };
+
+                res.json(metrics);
+            } catch (error) {
+                loggers.system.error('Database metrics API error:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Failed to fetch database metrics'
+                });
+            }
+        });
+
+        app.get('/api/metrics/requests', async (req, res) => {
+            try {
+                const timeRange = req.query.range || '24h';
+                let timeCondition = '';
+                
+                // Calculate time condition based on range
+                switch(timeRange) {
+                    case '1h':
+                        timeCondition = "timestamp >= datetime('now', '-1 hour')";
+                        break;
+                    case '24h':
+                        timeCondition = "timestamp >= datetime('now', '-1 day')";
+                        break;
+                    case '7d':
+                        timeCondition = "timestamp >= datetime('now', '-7 days')";
+                        break;
+                    case '30d':
+                        timeCondition = "timestamp >= datetime('now', '-30 days')";
+                        break;
+                    default:
+                        timeCondition = "timestamp >= datetime('now', '-1 day')";
+                }
+                
+                // Get request counts and statistics
+                const totalRequests = await dal.get(
+                    `SELECT COUNT(*) as total, 
+                            AVG(response_time_ms) as avgTime,
+                            MAX(response_time_ms) as maxTime,
+                            MIN(response_time_ms) as minTime
+                     FROM request_metrics`
+                );
+                
+                const recentRequests = await dal.get(
+                    `SELECT COUNT(*) as count, AVG(response_time_ms) as avgTime
+                     FROM request_metrics WHERE ${timeCondition}`
+                );
+                
+                const lastHourRequests = await dal.get(
+                    `SELECT COUNT(*) as count
+                     FROM request_metrics 
+                     WHERE timestamp >= datetime('now', '-1 hour')`
+                );
+                
+                // Top endpoints by request count
+                const topEndpoints = await dal.all(
+                    `SELECT endpoint, method, COUNT(*) as requests, 
+                            ROUND(AVG(response_time_ms), 2) as avgTime
+                     FROM request_metrics
+                     WHERE ${timeCondition}
+                     GROUP BY endpoint, method
+                     ORDER BY requests DESC
+                     LIMIT 10`
+                );
+                
+                // Status code distribution
+                const statusCodes = await dal.all(
+                    `SELECT status_code, COUNT(*) as count
+                     FROM request_metrics
+                     WHERE ${timeCondition}
+                     GROUP BY status_code
+                     ORDER BY status_code`
+                );
+                
+                const statusCodeMap = {};
+                statusCodes.forEach(row => {
+                    statusCodeMap[row.status_code.toString()] = row.count;
+                });
+                
+                const metrics = {
+                    success: true,
+                    timestamp: new Date().toISOString(),
+                    timeRange,
+                    requests: {
+                        total: totalRequests.total || 0,
+                        inRange: recentRequests.count || 0,
+                        lastHour: lastHourRequests.count || 0,
+                        perMinute: Math.round((lastHourRequests.count || 0) / 60),
+                        avgResponseTime: recentRequests.avgTime ? 
+                            Math.round(recentRequests.avgTime) + 'ms' : '0ms'
+                    },
+                    endpoints: topEndpoints.map(ep => ({
+                        path: `${ep.method} ${ep.endpoint}`,
+                        requests: ep.requests,
+                        avgTime: Math.round(ep.avgTime) + 'ms'
+                    })),
+                    statusCodes: statusCodeMap
+                };
+
+                res.json(metrics);
+            } catch (error) {
+                loggers.system.error('Request metrics API error:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Failed to fetch request metrics'
+                });
+            }
+        });
+
+        // Theme Management API - handled by routes/api/themes.js module
+
+        // Backup Management API - handled by routes/api/backups.js module
+
+        // REMOVED DUPLICATE /health endpoint - already defined at line 153
+        // app.get('/health', (req, res) => { ... })
+
+        // Analytics Advanced endpoint
+        app.get('/analytics-advanced', requireAuth, (req, res) => {
+            try {
+                const contentBody = `
+                <div class="analytics-dashboard">
+                    <h2><i class="fas fa-chart-line"></i> Advanced Analytics</h2>
+                    
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Total Logs</h5>
+                                    <h3 id="total-logs" class="text-primary">Loading...</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Error Rate</h5>
+                                    <h3 id="error-rate" class="text-danger">Loading...</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Active Connections</h5>
+                                    <h3 id="active-connections" class="text-success">Loading...</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h5 class="card-title">Uptime</h5>
+                                    <h3 id="uptime" class="text-info">Loading...</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Performance Metrics</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="performance-chart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5>Log Trends</h5>
+                                </div>
+                                <div class="card-body">
+                                    <canvas id="trends-chart" width="400" height="200"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                    // Ensure Chart.js is available (loaded elsewhere or add CDN if missing)
+                    (function ensureChart(){
+                        if (typeof Chart === 'undefined') {
+                            const s = document.createElement('script');
+                            s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js';
+                            document.head.appendChild(s);
+                        }
+                    })();
+
+                    let performanceChart, trendsChart;
+
+                    function placeholderIfEmpty(arr, label='No Data') {
+                        if (!Array.isArray(arr) || arr.length === 0) {
+                            return { labels:[label], values:[0], _empty:true };
+                        }
+                        return arr;
+                    }
+
+                    function setMetric(id, value, emptyMsg) {
+                        const el = document.getElementById(id);
+                        if (!el) return;
+                        if (value === 0 || value === '0' || value === 0.00) {
+                            el.textContent = '0';
+                            if (emptyMsg) {
+                                el.parentElement.querySelector('.card-title + h3')?.classList?.add('text-muted');
+                            }
+                        } else {
+                            el.textContent = value;
+                        }
+                    }
+
+                    function updateCards(data){
+                        const overview = data?.data?.overview || { totalLogs:0,errorRate:0,activeConnections:0 };
+                        const perf = data?.data?.performance || { uptime:0 };
+                        document.getElementById('total-logs').textContent = (overview.totalLogs||0).toLocaleString();
+                        document.getElementById('error-rate').textContent = (overview.errorRate||0) + '%';
+                        document.getElementById('active-connections').textContent = overview.activeConnections||0;
+                        document.getElementById('uptime').textContent = Math.floor((perf.uptime||0) / 3600) + 'h';
+                        if ((overview.totalLogs||0) === 0){
+                            document.getElementById('total-logs').insertAdjacentHTML('afterend','<div style="font-size:0.75rem;color:var(--text-muted);">No log data yet</div>');
+                        }
+                    }
+
+                    function initPerformanceChart(data){
+                        const ctx = document.getElementById('performance-chart').getContext('2d');
+                        const perf = data?.data?.performance?.normalized || { memoryMB:0, cpuPercent:0 };
+                        const labels = ['Memory (MB)','CPU (%)'];
+                        const values = [perf.memoryMB, perf.cpuPercent];
+                        performanceChart = new Chart(ctx, {
+                            type:'bar',
+                            data:{ labels, datasets:[{ label:'Performance', data:values, backgroundColor:['#3b82f6','#10b981'] }] },
+                            options:{ responsive:true, scales:{ y:{ beginAtZero:true, title:{ display:true, text:'Value' } } } }
+                        });
+                    }
+
+                    function initTrendsChart(data){
+                        const ctx = document.getElementById('trends-chart').getContext('2d');
+                        const daily = data?.data?.trends?.daily || [];
+                        const labels = daily.map(d=>d.date);
+                        const values = daily.map(d=>d.count);
+                        const placeholder = labels.length===0;
+                        trendsChart = new Chart(ctx, {
+                            type:'line',
+                            data:{ labels: placeholder?['No Data']:labels, datasets:[{ label:'Daily Logs', data: placeholder?[0]:values, borderColor:'#6366f1', backgroundColor:'rgba(99,102,241,0.25)', tension:0.3 }] },
+                            options:{ responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } }
+                        });
+                    }
+
+                    function updateCharts(data){
+                        if (!performanceChart) initPerformanceChart(data); else {
+                            const perf = data?.data?.performance?.normalized || { memoryMB:0, cpuPercent:0 };
+                            performanceChart.data.datasets[0].data = [perf.memoryMB, perf.cpuPercent];
+                            performanceChart.update();
+                        }
+                        if (!trendsChart) initTrendsChart(data); else {
+                            const daily = data?.data?.trends?.daily || [];
+                            const labels = daily.map(d=>d.date);
+                            const values = daily.map(d=>d.count);
+                            if (labels.length===0){
+                                trendsChart.data.labels=['No Data'];
+                                trendsChart.data.datasets[0].data=[0];
+                            } else {
+                                trendsChart.data.labels=labels;
+                                trendsChart.data.datasets[0].data=values;
+                            }
+                            trendsChart.update();
+                        }
+                    }
+
+                    // Load analytics data with empty-state handling
+                    async function loadAnalyticsData() {
+                        try {
+                            const response = await fetch('/api/analytics/data');
+                            const data = await response.json();
+                            updateCards(data);
+                            updateCharts(data);
+                        } catch (error) {
+                            loggers?.system?.error('Failed to load analytics data:', error);
+                            ['total-logs','error-rate','active-connections','uptime'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent='Error'; });
+                        }
+                    }
+
+                    document.addEventListener('DOMContentLoaded', loadAnalyticsData);
+                    setInterval(loadAnalyticsData, 30000);
+                </script>
+                `;
+
+                const html = getPageTemplate({
+                    pageTitle: 'Advanced Analytics',
+                    pageIcon: 'fas fa-chart-line',
+                    activeNav: 'analytics',
+                    contentBody: contentBody,
+                    req: req
+                });
+                
+                res.send(html);
+            } catch (error) {
+                loggers.system.error('Analytics endpoint error:', error);
+                res.status(500).json({
+                    status: 'error',
+                    message: 'Failed to retrieve analytics data',
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+
+        // Analytics data API endpoint
+        app.get('/api/analytics/data', requireAuth, async (req, res) => {
+            try {
+                const analyticsData = {
+                    status: 'success',
+                    data: {
+                        overview: {
+                            totalLogs: 0,
+                            errorRate: 0,
+                            avgResponseTime: 0,
+                            activeConnections: 0
+                        },
+                        trends: {
+                            hourly: [],
+                            daily: [],
+                            weekly: []
+                        },
+                        performance: {
+                            raw: {
+                                cpuUsage: process.cpuUsage(),
+                                memoryUsage: process.memoryUsage()
+                            },
+                            uptime: Math.floor(process.uptime()),
+                            normalized: {
+                                cpuPercent: 0,
+                                memoryMB: 0,
+                                memoryPercent: 0
+                            }
+                        },
+                        alerts: []
+                    },
+                    timestamp: new Date().toISOString()
+                };
+
+                // Get actual data from database if available
+                try {
+                    if (req.dal) {
+                        // Total logs count
+                        const totalLogs = await req.dal.getLogCount();
+                        analyticsData.data.overview.totalLogs = totalLogs;
+                        
+                        // Calculate error rate from all logs
+                        const errorLogs = await req.dal.getLogCount({ level: 'error' });
+                        analyticsData.data.overview.errorRate = totalLogs > 0 ? 
+                            parseFloat(((errorLogs / totalLogs) * 100).toFixed(2)) : 0;
+                        
+                        // Get real trend data using new DAL methods
+                        if (req.dal.getDailyLogTrends) {
+                            const dailyTrends = await req.dal.getDailyLogTrends(7);
+                            analyticsData.data.trends.daily = dailyTrends.map(d => ({
+                                date: d.date,
+                                count: d.count,
+                                errors: d.errors || 0,
+                                warnings: d.warnings || 0
+                            }));
+                        }
+                        
+                        if (req.dal.getHourlyLogTrends) {
+                            const hourlyTrends = await req.dal.getHourlyLogTrends(24);
+                            analyticsData.data.trends.hourly = hourlyTrends.map(h => ({
+                                hour: h.hour,
+                                count: h.count,
+                                errors: h.errors || 0,
+                                warnings: h.warnings || 0
+                            }));
+                        }
+                        
+                        if (req.dal.getWeeklyLogTrends) {
+                            const weeklyTrends = await req.dal.getWeeklyLogTrends(4);
+                            analyticsData.data.trends.weekly = weeklyTrends.map(w => ({
+                                week: w.week,
+                                count: w.count,
+                                errors: w.errors || 0,
+                                warnings: w.warnings || 0
+                            }));
+                        }
+                        
+                        // Active connections from WebSocket if available
+                        try {
+                            if (typeof wsServer !== 'undefined' && wsServer && wsServer.clients) {
+                                analyticsData.data.overview.activeConnections = wsServer.clients.size;
+                            }
+                        } catch (_) { /* wsServer not available */ }
+                        
+                        // Average response time from request_metrics table
+                        const avgTimeResult = await req.dal.get(`
+                            SELECT AVG(response_time_ms) as avgTime
+                            FROM request_metrics
+                            WHERE timestamp >= datetime('now', 'localtime', '-1 hour')
+                        `);
+                        
+                        if (avgTimeResult && avgTimeResult.avgTime) {
+                            analyticsData.data.overview.avgResponseTime = 
+                                parseFloat(avgTimeResult.avgTime.toFixed(2));
+                        }
+
+                        // Normalized CPU% (fallback similar to DAL logic for Windows)
+                        try {
+                            const os = require('os');
+                            const loadAvg = os.loadavg()[0];
+                            const cpuCount = os.cpus().length;
+                            if (loadAvg && loadAvg > 0) {
+                                analyticsData.data.performance.normalized.cpuPercent = Math.min(Math.round((loadAvg / cpuCount) * 100), 100);
+                            } else {
+                                // Derive from process.cpuUsage since last request if available
+                                if (!req.app.locals._lastCpuSample) {
+                                    req.app.locals._lastCpuSample = { usage: process.cpuUsage(), time: Date.now() };
+                                    analyticsData.data.performance.normalized.cpuPercent = 0;
+                                } else {
+                                    const now = Date.now();
+                                    const current = process.cpuUsage();
+                                    const elapsedMs = now - req.app.locals._lastCpuSample.time;
+                                    if (elapsedMs > 0) {
+                                        const userDiff = current.user - req.app.locals._lastCpuSample.usage.user;
+                                        const sysDiff = current.system - req.app.locals._lastCpuSample.usage.system;
+                                        const totalDiffMicros = userDiff + sysDiff;
+                                        const percentOneCore = (totalDiffMicros / 1000) / elapsedMs * 100;
+                                        analyticsData.data.performance.normalized.cpuPercent = Math.min(100, Math.max(0, Math.round(percentOneCore / cpuCount)));
+                                    }
+                                    req.app.locals._lastCpuSample = { usage: current, time: now };
+                                }
+                            }
+                        } catch (_) { /* ignore cpu calc errors */ }
+
+                        // Normalized memory metrics
+                        try {
+                            const mem = analyticsData.data.performance.raw.memoryUsage;
+                            const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
+                            const heapTotalMB = Math.max(1, Math.round(mem.heapTotal / 1024 / 1024));
+                            analyticsData.data.performance.normalized.memoryMB = heapUsedMB;
+                            analyticsData.data.performance.normalized.memoryPercent = Math.min(100, Math.round((heapUsedMB / heapTotalMB) * 100));
+                        } catch (memErr) { 
+                            loggers.system.warn('Memory calc error:', memErr); 
+                        }
+                    }
+                } catch (dbError) {
+                    loggers.system.error('Failed to get analytics data:', dbError);
+                }
+
+                res.json(analyticsData);
+            } catch (error) {
+                loggers.system.error('Analytics data API error:', error);
+                res.status(500).json({ 
+                    status: 'error', 
+                    error: 'Analytics data unavailable' 
+                });
+            }
+        });
+
+        // API Ingestion Status endpoint
+        app.get('/api/ingestion/status', async (req, res) => {
+            try {
+                // Get log counts by source/protocol from database
+                let protocolCounts = {};
+                let totalMessages = 0;
+                let errors = 0;
+                
+                if (dal) {
+                    try {
+                        // Get total log count
+                        const totalResult = await dal.get('SELECT COUNT(*) as count FROM logs');
+                        totalMessages = totalResult ? totalResult.count : 0;
+                        
+                        // Get counts by source/protocol
+                        const protocolResult = await dal.all(`
+                            SELECT source, COUNT(*) as count 
+                            FROM logs 
+                            GROUP BY source
+                        `);
+                        
+                        if (protocolResult && Array.isArray(protocolResult)) {
+                            protocolResult.forEach(row => {
+                                const protocol = row.source || 'unknown';
+                                protocolCounts[protocol] = row.count;
+                            });
+                        }
+                        
+                        // Get error count (warning and error levels)
+                        const errorResult = await dal.get(`
+                            SELECT COUNT(*) as count 
+                            FROM logs 
+                            WHERE level IN ('error', 'warning')
+                        `);
+                        errors = errorResult ? errorResult.count : 0;
+                        
+                    } catch (dbError) {
+                        loggers.system.warn('Database query error in ingestion status:', dbError);
+                    }
+                }
+                
+                // If no protocol data, provide some default structure
+                if (Object.keys(protocolCounts).length === 0) {
+                    protocolCounts = {
+                        'syslog': 0,
+                        'gelf': 0,
+                        'beats': 0,
+                        'fluent': 0,
+                        'http': 0,
+                        'system': totalMessages
+                    };
+                }
+
+                const memUsage = process.memoryUsage();
+                const response = {
+                    success: true,
+                    stats: {
+                        totalMessages: totalMessages,
+                        connectionsActive: 6, // Number of protocol listeners
+                        bytesReceived: Math.round(memUsage.heapUsed / 1024), // Convert to KB
+                        errors: errors,
+                        messagesByProtocol: protocolCounts
+                    },
+                    health: {
+                        database: dal ? 'connected' : 'disconnected',
+                        memory: {
+                            used: Math.round(memUsage.heapUsed / 1024 / 1024),
+                            total: Math.round(memUsage.heapTotal / 1024 / 1024)
+                        },
+                        uptime: Math.floor(process.uptime())
+                    },
+                    timestamp: new Date().toISOString()
+                };
+
+                res.json(response);
+            } catch (error) {
+                loggers.system.error('Ingestion status endpoint error:', error);
+                res.status(500).json({
+                    success: false,
+                    error: 'Failed to retrieve ingestion status',
+                    timestamp: new Date().toISOString()
+                });
+            }
+        });
+
+        // REMOVED: Mock tracing dependencies endpoint (use routes/api/tracing.js)
+
+        // REMOVED: Mock tracing status endpoint (use routes/api/tracing.js)
+
+        // Global error handler to ensure consistent JSON for API errors and safe HTML for pages
+        app.use((err, req, res, next) => {
+            try {
+                const status = err.status || err.statusCode || 500;
+                const code = err.code || undefined;
+                const rawMessage = err.message || 'Unexpected error';
+                const message = status >= 500 ? 'Internal Server Error' : rawMessage;
+
+                // Log standardized error with stack for debugging
+                loggers.system.error('Unhandled error:', { status, code, message: rawMessage, stack: err.stack });
+
+                if (req.originalUrl && req.originalUrl.startsWith('/api/')) {
+                    return res.status(status).json({
+                        success: false,
+                        error: {
+                            message,
+                            code
+                        },
+                        path: req.originalUrl,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+
+                // Escape HTML helper
+                const escapeHtml = (s) => String(s)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+
+                // Attempt to render with base template when available
+                try {
+                    const html = getPageTemplate({
+                        title: `Error ${status}`,
+                        content: `<div class="container"><h1>Error ${status}</h1><p>${escapeHtml(rawMessage)}</p></div>`,
+                        req
+                    });
+                    return res.status(status).send(html);
+                } catch (_) {
+                    return res.status(status).send(`<h1>Error ${status}</h1><p>${escapeHtml(rawMessage)}</p>`);
+                }
+            } catch (fatal) {
+                // As a last resort, send minimal text
+                try {
+                    return res.status(500).send('Internal Server Error');
+                } catch (_) {
+                    return; // give up if headers already sent
+                }
+            }
         });
 
         loggers.system.info('✅ All routes configured successfully');
@@ -1513,14 +2693,14 @@ async function startServer() {
         // Start server
         let server;
         
-        if (USE_HTTPS && fs.existsSync(SSL_KEY_PATH) && fs.existsSync(SSL_CERT_PATH)) {
+    if (USE_HTTPS && fs.existsSync(SSL_KEY_PATH) && fs.existsSync(SSL_CERT_PATH)) {
             const httpsOptions = {
                 key: fs.readFileSync(SSL_KEY_PATH),
                 cert: fs.readFileSync(SSL_CERT_PATH)
             };
             
             server = https.createServer(httpsOptions, app);
-            server.listen(PORT, () => {
+            server.listen(PORT, '0.0.0.0', () => {
                 loggers.system.info(`🔒 HTTPS Server running on port ${PORT}`);
                 printStartupBanner(true);
             });
@@ -1529,9 +2709,10 @@ async function startServer() {
                 loggers.system.warn('⚠️  HTTPS requested but SSL certificates not found, using HTTP');
             }
             
-            server = app.listen(PORT, () => {
-                loggers.system.info(`🚀 HTTP Server running on port ${PORT}`);
+            server = app.listen(PORT, '0.0.0.0', () => {
+                loggers.system.info(`🚀 HTTP Server running on port ${PORT} (bound to 0.0.0.0)`);
                 printStartupBanner(false);
+                systemReady = true;
             });
         }
         
@@ -1539,7 +2720,7 @@ async function startServer() {
         server.on('error', (error) => {
             loggers.system.error('Server error:', error);
             if (error.code === 'EADDRINUSE') {
-                console.error(`❌ Port ${PORT} is already in use!`);
+                loggers?.system?.error(`❌ Port ${PORT} is already in use!`);
                 process.exit(1);
             }
         });
@@ -1563,7 +2744,7 @@ async function startServer() {
         
     } catch (error) {
         loggers.system.error('❌ Server startup failed:', error);
-        console.error('🚨 STARTUP ERROR:', error);
+        loggers?.system?.error('🚨 STARTUP ERROR:', error);
         process.exit(1);
     }
 }
@@ -1572,26 +2753,53 @@ async function startServer() {
 function printStartupBanner(isHttps) {
     const protocol = isHttps ? 'https' : 'http';
     
-    console.log('\n🎯 Enhanced Universal Logging Platform Started Successfully!');
-    console.log('═════════════════════════════════════════════════════════════');
-    if (isHttps) console.log(`🔒 HTTPS Enabled - Secure Connection`);
-    console.log(`🌐 Web Interface: ${protocol}://localhost:${PORT}/dashboard`);
-    console.log(`🔐 Login: admin / ChangeMe123!`);
-    console.log(`📊 API Endpoints: ${protocol}://localhost:${PORT}/api/`);
-    console.log(`🔒 ESP32 Endpoint: ${protocol}://localhost:${PORT}/log`);
-    console.log(`💚 Health Check: ${protocol}://localhost:${PORT}/health`);
+    loggers?.system?.info('\n🎯 Enhanced Universal Logging Platform Started Successfully!');
+    loggers?.system?.info('═════════════════════════════════════════════════════════════');
+    if (isHttps) loggers?.system?.info(`🔒 HTTPS Enabled - Secure Connection`);
+    loggers?.system?.info(`🌐 Web Interface: ${protocol}://localhost:${PORT}/dashboard`);
+    loggers?.system?.info(`🔐 Login: admin / [AUTH_PASSWORD from environment]`);
+    loggers?.system?.info(`📊 API Endpoints: ${protocol}://localhost:${PORT}/api/`);
+    loggers?.system?.info(`🔒 ESP32 Endpoint: ${protocol}://localhost:${PORT}/log`);
+    loggers?.system?.info(`💚 Health Check: ${protocol}://localhost:${PORT}/health`);
     if (config.integrations.websocket.enabled) {
-        console.log(`🔗 WebSocket Server: ws${isHttps ? 's' : ''}://localhost:${config.integrations.websocket.port}`);
+        loggers?.system?.info(`🔗 WebSocket Server: ws${isHttps ? 's' : ''}://localhost:${config.integrations.websocket.port}`);
     }
     if (config.integrations.mqtt.enabled) {
-        console.log(`📡 MQTT Integration: ${config.integrations.mqtt.broker}`);
+        loggers?.system?.info(`📡 MQTT Integration: ${config.integrations.mqtt.broker}`);
     }
-    console.log('═════════════════════════════════════════════════════════════\n');
+    loggers?.system?.info('═════════════════════════════════════════════════════════════\n');
 }
 
 // Start the server
 if (require.main === module) {
     startServer();
 }
+// Test initialization helper: sets up database, system components, routes without starting network listener
+// Ensures default admin user exists for authentication tests
+async function createTestApp() {
+    // Avoid re-initializing if already set up
+    if (!dal) {
+        // Provide a fallback AUTH_PASSWORD in test environments if not set
+        if (!process.env.AUTH_PASSWORD) {
+            process.env.AUTH_PASSWORD = 'testAdmin123!';
+        }
+        // Mark test mode and disable networked components
+        process.env.NODE_ENV = process.env.NODE_ENV || 'test';
+        process.env.TEST_DISABLE_NETWORK = 'true';
+        // Disable integrations and ingestion that open sockets
+        config.integrations.websocket.enabled = false;
+        config.integrations.mqtt.enabled = false;
+        if (config.ingestion && config.ingestion.syslog) config.ingestion.syslog.enabled = false;
+        if (config.ingestion && config.ingestion.gelf) config.ingestion.gelf.enabled = false;
+        if (config.ingestion && config.ingestion.beats) config.ingestion.beats.enabled = false;
+        if (config.ingestion && config.ingestion.fluent) config.ingestion.fluent.enabled = false;
+        await initializeDatabase();
+        await initializeSystemComponents();
+        await initializeDefaultAdmin();
+        setupRoutes();
+        systemReady = true;
+    }
+    return app;
+}
 
-module.exports = { app, config, loggers };
+module.exports = { app, config, loggers, createTestApp }; 

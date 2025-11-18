@@ -9,7 +9,7 @@ const router = express.Router();
 // Get user's theme preference
 router.get('/user/theme', async (req, res) => {
     try {
-        const userTheme = {
+        let userTheme = {
             theme: 'dark',
             customizations: {
                 primaryColor: '#007bff',
@@ -19,9 +19,26 @@ router.get('/user/theme', async (req, res) => {
             lastUpdated: '2024-11-01T10:30:00Z'
         };
 
+        // Get theme from database if available
+        if (req.dal && req.dal.getUserById && req.user) {
+            try {
+                const user = await req.dal.getUserById(req.user.id);
+                if (user && user.preferences) {
+                    const prefs = typeof user.preferences === 'string' 
+                        ? JSON.parse(user.preferences) 
+                        : user.preferences;
+                    if (prefs.theme) {
+                        userTheme = prefs.theme;
+                    }
+                }
+            } catch (dbErr) {
+                req.app.locals?.loggers?.api?.warn('Could not load user theme from database:', dbErr.message);
+            }
+        }
+
         res.json({ success: true, theme: userTheme });
     } catch (error) {
-        console.error('Error getting user theme:', error);
+        req.app.locals?.loggers?.api?.error('Error getting user theme:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -32,7 +49,54 @@ router.post('/user/theme', async (req, res) => {
         const themeData = req.body;
         const userId = req.user ? req.user.id : 'system';
         
-        console.log(`User theme updated by user ${userId}`);
+        // Save theme to database if available
+        if (req.dal && req.dal.updateUser && req.user) {
+            try {
+                // Get current preferences
+                const user = await req.dal.getUserById(req.user.id);
+                let preferences = {};
+                if (user && user.preferences) {
+                    preferences = typeof user.preferences === 'string' 
+                        ? JSON.parse(user.preferences) 
+                        : user.preferences;
+                }
+                
+                // Update theme in preferences
+                preferences.theme = {
+                    ...themeData,
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                // Save to database
+                await req.dal.updateUser(req.user.id, {
+                    preferences: JSON.stringify(preferences)
+                });
+                
+                // Log theme update activity
+                if (req.dal.logActivity) {
+                    try {
+                        await req.dal.logActivity({
+                            user_id: req.user.id,
+                            action: 'update_theme',
+                            resource_type: 'user_preferences',
+                            resource_id: req.user.id.toString(),
+                            details: JSON.stringify({ 
+                                theme: themeData.theme || 'custom',
+                                customizations: Object.keys(themeData.customizations || {})
+                            }),
+                            ip_address: req.ip || req.connection.remoteAddress || 'unknown',
+                            user_agent: req.headers['user-agent'] || 'unknown'
+                        });
+                    } catch (auditErr) {
+                        req.app.locals?.loggers?.api?.warn('Failed to log theme update activity:', auditErr.message);
+                    }
+                }
+            } catch (dbErr) {
+                req.app.locals?.loggers?.api?.warn('Could not save user theme to database:', dbErr.message);
+            }
+        }
+        
+        req.app.locals?.loggers?.api?.info(`User theme updated by user ${userId}`);
         
         res.json({
             success: true,
@@ -43,7 +107,7 @@ router.post('/user/theme', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error updating user theme:', error);
+        req.app.locals?.loggers?.api?.error('Error updating user theme:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -53,7 +117,33 @@ router.delete('/user/theme', async (req, res) => {
     try {
         const userId = req.user ? req.user.id : 'system';
         
-        console.log(`User theme reset by user ${userId}`);
+        // Reset theme in database if available
+        if (req.dal && req.dal.updateUser && req.user) {
+            try {
+                const user = await req.dal.getUserById(req.user.id);
+                let preferences = {};
+                if (user && user.preferences) {
+                    preferences = typeof user.preferences === 'string' 
+                        ? JSON.parse(user.preferences) 
+                        : user.preferences;
+                }
+                
+                // Reset theme to default
+                preferences.theme = {
+                    theme: 'light',
+                    customizations: {},
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                await req.dal.updateUser(req.user.id, {
+                    preferences: JSON.stringify(preferences)
+                });
+            } catch (dbErr) {
+                req.app.locals?.loggers?.api?.warn('Could not reset user theme in database:', dbErr.message);
+            }
+        }
+        
+        req.app.locals?.loggers?.api?.info(`User theme reset by user ${userId}`);
         
         res.json({
             success: true,
@@ -65,7 +155,7 @@ router.delete('/user/theme', async (req, res) => {
             }
         });
     } catch (error) {
-        console.error('Error resetting user theme:', error);
+        req.app.locals?.loggers?.api?.error('Error resetting user theme:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -83,7 +173,7 @@ router.get('/timezone', (req, res) => {
 
         res.json(timezone);
     } catch (error) {
-        console.error('Error getting timezone:', error);
+        req.app.locals?.loggers?.api?.error('Error getting timezone:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

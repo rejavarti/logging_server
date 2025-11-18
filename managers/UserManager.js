@@ -37,6 +37,15 @@ class UserManager {
                 throw error;
             }
             
+            if (adminUser && adminUser.role !== 'admin') {
+                try {
+                    await this.dal.updateUser(adminUser.id, { role: 'admin' });
+                    this.loggers.system.warn('Corrected existing admin user role to admin');
+                } catch (e) {
+                    this.loggers.system.error('Failed to correct admin role:', e.message);
+                }
+            }
+
             if (!adminUser) {
                 // Create default admin user using DAL
                 const defaultPassword = process.env.AUTH_PASSWORD;
