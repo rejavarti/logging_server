@@ -609,19 +609,24 @@ app.use(cors({
 
 app.use(express.json({ 
     limit: '10mb',
-    strict: true, // Only parse arrays and objects
-    verify: (req, res, buf, encoding) => {
-        // Additional validation for express.json
-        if (buf && buf.length) {
-            try {
-                JSON.parse(buf);
-            } catch (error) {
-                // Log the error but let express.json handle it
-                loggers.security.debug(`JSON parse verification failed: ${error.message}`);
-            }
-        }
-    }
+    strict: true // Only parse arrays and objects
 }));
+
+// JSON syntax error handler - must come right after express.json()
+// Catches malformed JSON and returns proper 400 response
+app.use((err, req, res, next) => {
+    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+        loggers.security.warn(`Malformed JSON from ${req.ip}: ${err.message}`);
+        return res.status(400).json({ 
+            success: false, 
+            error: 'Malformed JSON in request body',
+            details: err.message
+        });
+    }
+    // Pass to next error handler if not a JSON syntax error
+    next(err);
+});
+
 app.use(express.urlencoded({ extended: true }));
 
 // Enable gzip/deflate compression for responses
