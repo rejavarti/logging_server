@@ -9,7 +9,7 @@ beforeAll(async () => {
   // Login via API to obtain a Bearer token we can reuse for protected routes
   const loginRes = await request(app)
     .post('/api/auth/login')
-    .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' });
+    .send({ username: 'admin', password: process.env.AUTH_PASSWORD });
   expect(loginRes.status).toBe(200);
   token = loginRes.body.token;
   expect(typeof token).toBe('string');

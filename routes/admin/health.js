@@ -147,7 +147,7 @@ module.exports = (getPageTemplate, requireAuth) => {
         const additionalJS = `
             async function refreshHealthChecks() {
                 try {
-                    const response = await fetch('/api/system/health-checks');
+                    const response = await fetch('/api/system/health-checks', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed to fetch health checks');
                     
                     const data = await response.json();
@@ -251,11 +251,21 @@ module.exports = (getPageTemplate, requireAuth) => {
 
             // showToast() is provided by base.js template
 
+            let healthRefreshInterval = null;
+            
             // Load health checks on page load
             refreshHealthChecks();
 
             // Auto-refresh every 30 seconds
-            setInterval(refreshHealthChecks, 30000);
+            healthRefreshInterval = setInterval(refreshHealthChecks, 30000);
+            
+            // Cleanup interval on page unload to prevent memory leaks
+            window.addEventListener('beforeunload', () => {
+                if (healthRefreshInterval) {
+                    clearInterval(healthRefreshInterval);
+                    healthRefreshInterval = null;
+                }
+            });
         `;
 
         res.send(getPageTemplate({

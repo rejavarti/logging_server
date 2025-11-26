@@ -12,7 +12,12 @@ class MetricsManager {
             activeConnections: 0,
             errors: 0,
             avgResponseTime: 0,
-            uptime: 0
+            uptime: 0,
+            lockedInserts: 0,
+            retriedInserts: 0,
+            failedInserts: 0,
+            batchedInserts: 0,
+            batchFlushes: 0
         };
         this.integrationMetrics = {};
     // Per-source ingestion metrics: counts and bytes grouped by source label
@@ -41,14 +46,19 @@ class MetricsManager {
 
     initializeMetricsCollection() {
         // Update server uptime every minute
-        setInterval(() => {
+        this.uptimeInterval = setInterval(() => {
             this.serverMetrics.uptime = Date.now() - this.serverMetrics.startTime.getTime();
         }, 60000);
 
         // Collect performance metrics every 30 seconds
-        setInterval(() => {
+        this.perfInterval = setInterval(() => {
             this.collectPerformanceMetrics();
         }, 30000);
+        
+        // Cleanup old metrics every 5 minutes to prevent memory growth
+        this.cleanupInterval = setInterval(() => {
+            this.cleanupMetrics();
+        }, 300000);
     }
 
     collectPerformanceMetrics() {
@@ -87,6 +97,26 @@ class MetricsManager {
 
     incrementErrors() {
         this.serverMetrics.errors++;
+    }
+
+    incrementLockedInsert() {
+        this.serverMetrics.lockedInserts++;
+    }
+
+    incrementRetriedInsert() {
+        this.serverMetrics.retriedInserts++;
+    }
+
+    incrementFailedInsert() {
+        this.serverMetrics.failedInserts++;
+    }
+
+    incrementBatchedInsert(count = 1) {
+        this.serverMetrics.batchedInserts += count;
+    }
+
+    incrementBatchFlush() {
+        this.serverMetrics.batchFlushes++;
     }
 
     updateCpuUsage() {
@@ -179,6 +209,39 @@ class MetricsManager {
         const seconds = Math.floor((uptimeMs % (1000 * 60)) / 1000);
         
         return `${hours}h ${minutes}m ${seconds}s`;
+    }
+    
+    cleanupMetrics() {
+        // Limit source metrics to top 100 sources to prevent unbounded growth
+        const sources = Object.keys(this.sourceMetrics);
+        if (sources.length > 100) {
+            // Sort by total logs + bytes, keep top 100
+            const sorted = sources.sort((a, b) => {
+                const scoreA = this.sourceMetrics[a].logs + (this.sourceMetrics[a].bytes / 1000);
+                const scoreB = this.sourceMetrics[b].logs + (this.sourceMetrics[b].bytes / 1000);
+                return scoreB - scoreA;
+            });
+            
+            // Remove bottom entries
+            sorted.slice(100).forEach(source => {
+                delete this.sourceMetrics[source];
+            });
+        }
+        
+        // Limit integration metrics to 50 integrations
+        const integrations = Object.keys(this.integrationMetrics);
+        if (integrations.length > 50) {
+            integrations.slice(50).forEach(integration => {
+                delete this.integrationMetrics[integration];
+            });
+        }
+    }
+    
+    shutdown() {
+        // Clear all intervals to prevent memory leaks
+        if (this.uptimeInterval) clearInterval(this.uptimeInterval);
+        if (this.perfInterval) clearInterval(this.perfInterval);
+        if (this.cleanupInterval) clearInterval(this.cleanupInterval);
     }
 }
 

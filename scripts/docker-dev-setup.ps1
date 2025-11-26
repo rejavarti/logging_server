@@ -21,7 +21,7 @@ docker run -d `
     -p 10180:3000 `
     -v "${currentDir}:/app" `
     -v enhanced-logging-data:/app/data `
-    -e AUTH_PASSWORD=ChangeMe123! `
+    -e AUTH_PASSWORD=$env:AUTH_PASSWORD `
     -e PORT=3000 `
     -e JWT_SECRET=e8f9d17c828074916ce801f9700d498f36c3e8e9a81dd3e0d34f2999a5a44cafffb761c045a0afeac7056277c63b39ac4ff17e4a65704ca398f1dcd549be19bc `
     --workdir /app `
@@ -29,7 +29,7 @@ docker run -d `
 
 Write-Host "✅ Development container created!"
 Write-Host "🔧 You can now edit files and they'll be reflected in the container automatically"
-Write-Host "🌐 Access: http://localhost:10180 (admin / ChangeMe123!)"
+Write-Host "🌐 Access: http://localhost:10180 (admin / ****)"; Write-Host "(Set AUTH_PASSWORD in your environment before running)"
 
 # Optional: Start a shell in the container for direct editing
 Write-Host "💡 To edit files directly in the container:"

@@ -210,26 +210,59 @@ router.get('/', async (req, res) => {
                             </tr>
                         </thead>
                         <tbody>
-                            ${activities.map(activity => `
+                            ${activities.map(activity => {
+                                // Parse details JSON to show helpful info
+                                let detailsPreview = '-';
+                                let hasDetails = false;
+                                const detailsStr = activity.details || activity.metadata || '';
+                                if (detailsStr) {
+                                    try {
+                                        // Handle double-encoded JSON
+                                        let parsed = detailsStr;
+                                        if (typeof parsed === 'string') {
+                                            parsed = JSON.parse(parsed);
+                                            // Check if still a string (double-encoded)
+                                            if (typeof parsed === 'string') {
+                                                parsed = JSON.parse(parsed);
+                                            }
+                                        }
+                                        hasDetails = true;
+                                        // Build a short preview of useful info
+                                        const previewParts = [];
+                                        if (parsed.ip) previewParts.push('IP: ' + parsed.ip);
+                                        if (parsed.username) previewParts.push(parsed.username);
+                                        if (parsed.reason) previewParts.push(parsed.reason);
+                                        if (parsed.method) previewParts.push(parsed.method);
+                                        if (parsed.filename) previewParts.push(parsed.filename);
+                                        if (parsed.changes) previewParts.push(parsed.changes + ' changes');
+                                        detailsPreview = previewParts.length > 0 ? previewParts.slice(0, 2).join(', ') : 'View';
+                                    } catch (e) {
+                                        hasDetails = detailsStr.length > 2;
+                                        detailsPreview = 'View';
+                                    }
+                                }
+                                // Derive target from resource_type + resource_id
+                                const target = activity.resource_id || activity.target || '-';
+                                return `
                                 <tr>
-                                    <td>${formatTimestamp(activity.timestamp)}</td>
+                                    <td>${formatTimestamp(activity.timestamp || activity.created_at)}</td>
                                     <td>
-                                        <span class="severity-badge severity-${getActivityTypeClass(activity.type || activity.action)}">
-                                            ${(activity.type || activity.action || 'Unknown').toUpperCase()}
+                                        <span class="severity-badge severity-${getActivityTypeClass(activity.resource_type || activity.action)}">
+                                            ${(activity.resource_type || activity.action || 'Unknown').toUpperCase()}
                                         </span>
                                     </td>
-                                    <td>${activity.username || 'System'}</td>
-                                    <td>${escapeHtml(activity.action)}</td>
-                                    <td>${activity.target ? escapeHtml(activity.target) : '-'}</td>
+                                    <td>${escapeHtml(activity.username || 'System')}</td>
+                                    <td>${escapeHtml(activity.action || '-')}</td>
+                                    <td>${target !== '-' ? escapeHtml(String(target)) : '-'}</td>
                                     <td>
-                                        ${activity.metadata ? `
-                                        <button onclick="viewActivityDetails(${activity.id})" class="btn-small" title="View Details">
-                                            <i class="fas fa-eye"></i> View
+                                        ${hasDetails ? `
+                                        <button onclick="viewActivityDetails(${activity.id})" class="btn-small btn-info" title="View Details">
+                                            <i class="fas fa-eye"></i> ${escapeHtml(detailsPreview)}
                                         </button>
-                                        ` : '-'}
+                                        ` : '<span style="color: var(--text-muted);">-</span>'}
                                     </td>
                                 </tr>
-                            `).join('')}
+                            `}).join('')}
                         </tbody>
                     </table>
                 </div>
@@ -670,7 +703,7 @@ router.get('/', async (req, res) => {
                 if (window.registerRealtimeTask) {
                     window.registerRealtimeTask('activity-timeline-sync', async () => {
                         try {
-                            const response = await fetch('/api/activity/latest');
+                            const response = await fetch('/api/activity/latest', { credentials: 'same-origin' });
                             if (response.ok) {
                                 const newActivities = await response.json();
                                 if (Array.isArray(newActivities) && newActivities.length) {
@@ -814,6 +847,18 @@ router.get('/', async (req, res) => {
             const content = document.getElementById('activity-detail-content');
             const metadata = activity.metadata ? JSON.parse(activity.metadata) : {};
             
+            // Parse details to check for settings diff (old_value/new_value)
+            let detailsObj = null;
+            let isDiffAvailable = false;
+            try {
+                if (activity.details) {
+                    detailsObj = typeof activity.details === 'string' ? JSON.parse(activity.details) : activity.details;
+                    isDiffAvailable = detailsObj && ('old_value' in detailsObj) && ('new_value' in detailsObj);
+                }
+            } catch (parseErr) {
+                detailsObj = null;
+            }
+            
             content.innerHTML = \`
                 <div class="activity-detail">
                     <div class="detail-section">
@@ -853,6 +898,26 @@ router.get('/', async (req, res) => {
                             <h4><i class="fas fa-comment-alt"></i> Description</h4>
                             <div class="message-display">
                                 \${escapeHtml(activity.description)}
+                            </div>
+                        </div>
+                    \` : ''}
+                    
+                    \${isDiffAvailable ? \`
+                        <div class="detail-section">
+                            <h4><i class="fas fa-code-compare"></i> Before / After Diff</h4>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem;">
+                                <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem;">
+                                    <div style="font-weight: 600; color: var(--error-color); margin-bottom: 0.5rem;">
+                                        <i class="fas fa-minus-circle"></i> Old Value
+                                    </div>
+                                    <pre style="margin: 0; word-wrap: break-word; white-space: pre-wrap; font-size: 0.875rem;"><code>\${escapeHtml(JSON.stringify(detailsObj.old_value, null, 2))}</code></pre>
+                                </div>
+                                <div style="background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; padding: 0.75rem;">
+                                    <div style="font-weight: 600; color: var(--success-color); margin-bottom: 0.5rem;">
+                                        <i class="fas fa-plus-circle"></i> New Value
+                                    </div>
+                                    <pre style="margin: 0; word-wrap: break-word; white-space: pre-wrap; font-size: 0.875rem;"><code>\${escapeHtml(JSON.stringify(detailsObj.new_value, null, 2))}</code></pre>
+                                </div>
                             </div>
                         </div>
                     \` : ''}

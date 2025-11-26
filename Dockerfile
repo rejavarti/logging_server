@@ -1,11 +1,14 @@
 # Enterprise Logging Platform - MODULAR ARCHITECTURE
 # Multi-Source Infrastructure Monitoring
-# Docker Configuration for Unraid Server with Enterprise Features
+# Docker Configuration with BuildKit Cache Support for Slow Internet
 
+# syntax=docker/dockerfile:1
 FROM node:18-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache python3 make g++ sqlite
+# Install build dependencies in smaller chunks to avoid BAD archive issues
+RUN apk add --no-cache python3 py3-setuptools sqlite && \
+    apk add --no-cache build-base || \
+    (echo 'Retrying build-base install' && apk update && apk add --no-cache build-base)
 
 # Set working directory
 WORKDIR /app
@@ -13,8 +16,12 @@ WORKDIR /app
 # Copy package files first for better layer caching
 COPY package*.json ./
 
-# Install all dependencies for build (use npm install since package-lock may be out of sync)
-RUN npm install && npm cache clean --force
+# Install all dependencies with BuildKit cache mount
+# This caches npm downloads between builds - CRITICAL for slow internet!
+# Cache persists in Docker volume even if you delete the image
+RUN --mount=type=cache,target=/root/.npm \
+    --mount=type=cache,target=/app/node_modules/.cache \
+    npm install && npm cache clean --force
 
 # Copy MODULAR application files
 COPY server.js ./
@@ -23,6 +30,7 @@ COPY dual-database-manager.js ./
 COPY log-parser-engine.js ./
 COPY encryption-system.js ./
 COPY universal-sqlite-adapter.js ./
+COPY resilience-workers.js ./
 COPY seed-logs.sql ./
 COPY start.js ./
 

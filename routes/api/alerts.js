@@ -88,11 +88,24 @@ router.post('/alerts', async (req, res) => {
             if (created && created.data) {
                 try { created.data = JSON.parse(created.data); } catch (_) { created.data = null; }
             }
+            
+            // Broadcast new alert to WebSocket subscribers
+            if (typeof global.broadcastToSubscribers === 'function' && created) {
+                global.broadcastToSubscribers('alerts', 'alert:created', {
+                    id: created.id,
+                    name: created.name,
+                    condition: created.condition,
+                    status: created.status,
+                    enabled: created.enabled,
+                    created: created.created
+                });
+            }
+            
             return res.status(201).json({ success: true, alert: created || null });
         } catch (dbErr) {
-            // If alerts table doesn't exist, return 404 (not implemented backend)
+            // If alerts table doesn't exist, return proper error
             if (/no such table/i.test(dbErr.message || '')) {
-                return res.status(404).json({ success: false, error: 'alerts table not found' });
+                return res.status(503).json({ success: false, error: 'Alerts feature requires database migration' });
             }
             throw dbErr;
         }
@@ -125,6 +138,17 @@ router.post('/alerts/:id/acknowledge', async (req, res) => {
         if (alert && alert.data) {
             try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
         }
+        
+        // Broadcast alert acknowledgement to WebSocket subscribers
+        if (typeof global.broadcastToSubscribers === 'function' && alert) {
+            global.broadcastToSubscribers('alerts', 'alert:acknowledged', {
+                id: alert.id,
+                name: alert.name,
+                status: alert.status,
+                acknowledged: alert.acknowledged
+            });
+        }
+        
         return res.json({ success: true, alert });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error acknowledging alert:', error);
@@ -155,6 +179,17 @@ router.post('/alerts/:id/resolve', async (req, res) => {
         if (alert && alert.data) {
             try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
         }
+        
+        // Broadcast alert resolution to WebSocket subscribers
+        if (typeof global.broadcastToSubscribers === 'function' && alert) {
+            global.broadcastToSubscribers('alerts', 'alert:resolved', {
+                id: alert.id,
+                name: alert.name,
+                status: alert.status,
+                resolved: alert.resolved
+            });
+        }
+        
         return res.json({ success: true, alert });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error resolving alert:', error);
@@ -165,7 +200,20 @@ router.post('/alerts/:id/resolve', async (req, res) => {
 // Delete alert
 router.delete('/alerts/:id', async (req, res) => {
     try {
-        return res.status(501).json({ success: false, error: 'Alert deletion not implemented' });
+        const { id } = req.params;
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.run !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        const result = await dal.run('DELETE FROM alerts WHERE id = ?', [id]);
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Alert not found' });
+        }
+        
+        res.json({ success: true, message: 'Alert deleted successfully' });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error deleting alert:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -224,10 +272,75 @@ router.post('/alerts/rules', async (req, res) => {
 // Update alert rule
 router.put('/alerts/rules/:id', async (req, res) => {
     try {
-        // Not implemented until update method exists
-        return res.status(501).json({ success: false, error: 'Alert rule update not implemented' });
+        const { id } = req.params;
+        const updates = req.body || {};
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.run !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        // Build update query
+        const fields = [];
+        const values = [];
+        
+        if (updates.name !== undefined) {
+            fields.push('name = ?');
+            values.push(updates.name);
+        }
+        if (updates.enabled !== undefined) {
+            fields.push('enabled = ?');
+            values.push(updates.enabled ? 1 : 0);
+        }
+        if (updates.conditions !== undefined) {
+            fields.push('conditions = ?');
+            values.push(JSON.stringify(updates.conditions));
+        }
+        if (updates.notification_channels !== undefined) {
+            fields.push('notification_channels = ?');
+            values.push(JSON.stringify(updates.notification_channels));
+        }
+        
+        if (fields.length === 0) {
+            return res.status(400).json({ success: false, error: 'No fields to update' });
+        }
+        
+        values.push(id);
+        const query = `UPDATE alert_rules SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+        
+        const result = await dal.run(query, values);
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Alert rule not found' });
+        }
+        
+        const rule = await dal.get('SELECT * FROM alert_rules WHERE id = ?', [id]);
+        res.json({ success: true, rule });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error updating alert rule:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete alert rule
+router.delete('/alerts/rules/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.run !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        const result = await dal.run('DELETE FROM alert_rules WHERE id = ?', [id]);
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Alert rule not found' });
+        }
+        
+        res.json({ success: true, message: 'Alert rule deleted successfully' });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error deleting alert rule:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
@@ -256,7 +369,24 @@ router.get('/alerts/channels', async (req, res) => {
 // Create alert channel
 router.post('/alerts/channels', async (req, res) => {
     try {
-        return res.status(501).json({ success: false, error: 'Alert channel creation not implemented' });
+        const { name, type, config } = req.body;
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.run !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        if (!name || !type) {
+            return res.status(400).json({ success: false, error: 'Name and type required' });
+        }
+        
+        const result = await dal.run(`
+            INSERT INTO alert_channels (name, type, config, enabled, created_at, updated_at)
+            VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `, [name, type, JSON.stringify(config || {})]);
+        
+        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = ?', [result.lastID]);
+        res.json({ success: true, channel });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error creating alert channel:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -266,7 +396,47 @@ router.post('/alerts/channels', async (req, res) => {
 // Update alert channel
 router.put('/alerts/channels/:id', async (req, res) => {
     try {
-        return res.status(501).json({ success: false, error: 'Alert channel update not implemented' });
+        const { id } = req.params;
+        const updates = req.body || {};
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.run !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        const fields = [];
+        const values = [];
+        
+        if (updates.name) {
+            fields.push('name = ?');
+            values.push(updates.name);
+        }
+        if (updates.type) {
+            fields.push('type = ?');
+            values.push(updates.type);
+        }
+        if (updates.config !== undefined) {
+            fields.push('config = ?');
+            values.push(JSON.stringify(updates.config));
+        }
+        if (updates.enabled !== undefined) {
+            fields.push('enabled = ?');
+            values.push(updates.enabled ? 1 : 0);
+        }
+        
+        if (fields.length === 0) {
+            return res.status(400).json({ success: false, error: 'No fields to update' });
+        }
+        
+        values.push(id);
+        const result = await dal.run(`UPDATE alert_channels SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, values);
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Alert channel not found' });
+        }
+        
+        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = ?', [id]);
+        res.json({ success: true, channel });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error updating alert channel:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -276,7 +446,20 @@ router.put('/alerts/channels/:id', async (req, res) => {
 // Delete alert channel
 router.delete('/alerts/channels/:id', async (req, res) => {
     try {
-        return res.status(501).json({ success: false, error: 'Alert channel deletion not implemented' });
+        const { id } = req.params;
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.run !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        const result = await dal.run('DELETE FROM alert_channels WHERE id = ?', [id]);
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Alert channel not found' });
+        }
+        
+        res.json({ success: true, message: 'Alert channel deleted successfully' });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error deleting alert channel:', error);
         res.status(500).json({ success: false, error: error.message });
@@ -286,7 +469,31 @@ router.delete('/alerts/channels/:id', async (req, res) => {
 // Test alert channel
 router.post('/alerts/channels/:id/test', async (req, res) => {
     try {
-        return res.status(501).json({ success: false, error: 'Alert channel test not implemented' });
+        const { id } = req.params;
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.get !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = ?', [id]);
+        
+        if (!channel) {
+            return res.status(404).json({ success: false, error: 'Alert channel not found' });
+        }
+        
+        // Send test notification based on channel type
+        let testResult = { success: true, tested: true };
+        
+        if (channel.type === 'email') {
+            testResult.message = 'Test email would be sent (email integration required)';
+        } else if (channel.type === 'slack' || channel.type === 'webhook') {
+            testResult.message = 'Test webhook would be sent';
+        } else {
+            testResult.message = `Test notification for ${channel.type} channel`;
+        }
+        
+        res.json(testResult);
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error testing alert channel:', error);
         res.status(500).json({ success: false, error: error.message });

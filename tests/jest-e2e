@@ -54,7 +54,7 @@ async function login() {
   // Ensure fields exist as per server login page
   await page.waitForSelector('#username', { timeout: 5000 });
   await page.type('#username', 'admin');
-  await page.type('#password', process.env.AUTH_PASSWORD || 'testAdmin123!');
+  await page.type('#password', process.env.AUTH_PASSWORD);
   await page.click('#loginBtn');
   // The page uses fetch to /api/auth/login and then redirects
   await page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 15000 }).catch(() => {});

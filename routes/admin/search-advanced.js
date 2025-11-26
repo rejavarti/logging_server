@@ -200,7 +200,7 @@ router.get('/', (req, res) => {
 
             async function loadTemplates() {
                 try {
-                    const response = await fetch('/api/search/templates');
+                    const response = await fetch('/api/search/templates', { credentials: 'same-origin' });
                     const data = await response.json();
                     if (data.success) {
                         templates = data.templates;
@@ -256,7 +256,7 @@ router.get('/', (req, res) => {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ query })
-                        });
+                        , credentials: 'same-origin' });
                         searchData = await response.json();
                     } else if (activeTab === 'fuzzy-tab') {
                         const text = document.getElementById('fuzzyText').value;
@@ -272,7 +272,7 @@ router.get('/', (req, res) => {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ text, field, fuzziness: parseInt(fuzziness) })
-                        });
+                        , credentials: 'same-origin' });
                         searchData = await response.json();
                     }
 
@@ -358,7 +358,7 @@ router.get('/', (req, res) => {
 
             async function showAnalytics() {
                 try {
-                    const response = await fetch('/api/search/analytics?period=24h');
+                    const response = await fetch('/api/search/analytics?period=24h', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success) {
@@ -371,9 +371,41 @@ router.get('/', (req, res) => {
             }
 
             function displayAnalytics(analytics) {
-                // Create analytics modal or section
-                // This would show charts and statistics
-                showToast('Analytics feature coming soon!', 'info');
+                // Display analytics with real data
+                if (!analytics) {
+                    showToast('No analytics data available', 'warning');
+                    return;
+                }
+                
+                let html = '<div class="modal-content">';
+                html += '<div class="modal-header"><h5>Search Analytics</h5></div>';
+                html += '<div class="modal-body">';
+                
+                if (analytics.topSources && analytics.topSources.length > 0) {
+                    html += '<h6>Top Sources</h6><ul class="list-group mb-3">';
+                    analytics.topSources.forEach(item => {
+                        html += '<li class="list-group-item d-flex justify-content-between align-items-center">' + item.source + '<span class="badge bg-primary">' + item.count + '</span></li>';
+                    });
+                    html += '</ul>';
+                }
+                
+                if (analytics.levelDistribution) {
+                    html += '<h6>Level Distribution</h6><ul class="list-group mb-3">';
+                    Object.entries(analytics.levelDistribution).forEach(([level, count]) => {
+                        html += '<li class="list-group-item d-flex justify-content-between align-items-center">' + level + '<span class="badge bg-secondary">' + count + '</span></li>';
+                    });
+                    html += '</ul>';
+                }
+                
+                html += '</div></div>';
+                
+                // Show in modal or alert
+                const analyticsModal = document.createElement('div');
+                analyticsModal.className = 'alert alert-info';
+                analyticsModal.innerHTML = html;
+                document.getElementById('searchResults').prepend(analyticsModal);
+                
+                showToast('Analytics loaded successfully', 'success');
             }
 
             function clearSearch() {

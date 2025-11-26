@@ -109,12 +109,7 @@ router.get('/', async (req, res) => {
                 font-weight: 600;
                 text-transform: uppercase;
             }
-            .severity-info { background: #3182ce; color: #ffffff; }
-            .severity-warn { background: #d69e2e; color: #ffffff; }
-            .severity-warning { background: #d69e2e; color: #ffffff; }
-            .severity-error { background: #e53e3e; color: #ffffff; }
-            .severity-success { background: #38a169; color: #ffffff; }
-            .severity-debug { background: #6b7280; color: #ffffff; }
+            /* Severity badge styles moved to base template */
         `;
 
         const contentBody = `
@@ -147,6 +142,9 @@ router.get('/', async (req, res) => {
                             </button>
                             <button onclick="exportLogsJSON()" class="btn btn-secondary" title="Export visible logs as JSON">
                                 <i class="fas fa-file-code"></i> JSON
+                            </button>
+                            <button onclick="exportLogsNDJSON()" class="btn btn-secondary" title="Export latest logs as NDJSON">
+                                <i class="fas fa-stream"></i> NDJSON
                             </button>
                         </div>
                     </div>
@@ -189,13 +187,13 @@ router.get('/', async (req, res) => {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; gap: 0.5rem;">
                     <div style="display: flex; align-items: center; gap: 0.5rem;">
                         <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary);">
-                            <input type="checkbox" id="auto-update-toggle" checked style="margin: 0;">
+                            <input type="checkbox" id="auto-update-toggle" checked>
                             <i class="fas fa-sync-alt"></i>
                             Auto-update charts (30s)
                         </label>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
-                        <select id="analytics-date-range" onchange="loadAnalytics()" style="padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-primary);">
+                        <select id="analytics-date-range" onchange="loadAnalytics()" class="form-control">
                             <option value="today">Today</option>
                             <option value="yesterday">Yesterday</option>
                             <option value="7days" selected>Last 7 Days</option>
@@ -412,7 +410,7 @@ router.get('/', async (req, res) => {
             // Chart auto-update now handled by Realtime registry; these wrappers preserved for UI toggle logic
             function startChartAutoUpdate() {
                 if (window.registerRealtimeTask) {
-                    window.registerRealtimeTask('logs-analytics-refresh', async () => { try { await loadAnalytics(); } catch(e){} }, 30000, { runImmediately: true });
+                    window.registerRealtimeTask('logs-analytics-refresh', async () => { try { await loadAnalytics(); } catch(e){ console.debug('Analytics refresh error:', e.message); } }, 30000, { runImmediately: true });
                 }
             }
             function stopChartAutoUpdate() {
@@ -467,7 +465,9 @@ router.get('/', async (req, res) => {
                 const dateRange = document.getElementById('analytics-date-range').value;
                 
                 try {
-                    const data = await apiFetch('/api/logs/analytics?range=' + dateRange, { credentials: 'include', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+                    const response = await apiFetch('/api/logs/analytics?range=' + dateRange, { credentials: 'include', headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' } });
+                    // API returns data nested under 'analytics' key
+                    const data = response.analytics || response;
                     latestAnalytics = data;
                     updateAnalyticsStats(data);
                     updateAnalyticsCharts(data);
@@ -490,15 +490,25 @@ router.get('/', async (req, res) => {
             }
 
             function updateAnalyticsCharts(data) {
+                if (!data) return;
                 waitForChart(() => {
-                    updateHourlyChart(data.hourlyData);
-                    updateSeverityChart(data.severityData);
-                    updateCategoryChart(data.categoryData);
+                    if (data.hourlyData) updateHourlyChart(data.hourlyData);
+                    if (data.severityData) updateSeverityChart(data.severityData);
+                    if (data.categoryData) updateCategoryChart(data.categoryData);
                 });
             }
 
             function updateHourlyChart(data) {
-                const ctx = document.getElementById('hourly-chart').getContext('2d');
+                if (!data || !data.labels || !data.values) {
+                    console.warn('Invalid hourly chart data:', data);
+                    return;
+                }
+                
+                const ctx = document.getElementById('hourly-chart');
+                if (!ctx) {
+                    console.error('Canvas element "hourly-chart" not found');
+                    return;
+                }
                 
                 // If chart exists, update data instead of recreating
                 if (hourlyChart) {
@@ -506,7 +516,7 @@ router.get('/', async (req, res) => {
                     return;
                 }
                 
-                hourlyChart = new Chart(ctx, {
+                hourlyChart = new Chart(ctx.getContext('2d'), {
                     type: 'line',
                     data: {
                         labels: data.labels || [],
@@ -539,7 +549,16 @@ router.get('/', async (req, res) => {
             }
 
             function updateSeverityChart(data) {
-                const ctx = document.getElementById('severity-chart').getContext('2d');
+                if (!data || !data.labels || !data.values) {
+                    console.warn('Invalid severity chart data:', data);
+                    return;
+                }
+                
+                const ctx = document.getElementById('severity-chart');
+                if (!ctx) {
+                    console.error('Canvas element "severity-chart" not found');
+                    return;
+                }
                 
                 // If chart exists, update data instead of recreating
                 if (severityChart) {
@@ -577,7 +596,16 @@ router.get('/', async (req, res) => {
             }
 
             function updateCategoryChart(data) {
-                const ctx = document.getElementById('category-chart').getContext('2d');
+                if (!data || !data.labels || !data.values) {
+                    console.warn('Invalid category chart data:', data);
+                    return;
+                }
+                
+                const ctx = document.getElementById('category-chart');
+                if (!ctx) {
+                    console.error('Canvas element "category-chart" not found');
+                    return;
+                }
                 
                 // If chart exists, update data instead of recreating
                 if (categoryChart) {
@@ -585,7 +613,7 @@ router.get('/', async (req, res) => {
                     return;
                 }
                 
-                categoryChart = new Chart(ctx, {
+                categoryChart = new Chart(ctx.getContext('2d'), {
                     type: 'bar',
                     data: {
                         labels: data.labels || [],
@@ -763,6 +791,27 @@ router.get('/', async (req, res) => {
                 showToast('Logs exported (JSON)', 'success');
             }
 
+            // NDJSON export hits backend streaming exporter for correctness and low memory
+            async function exportLogsNDJSON() {
+                try {
+                    const resp = await fetch('/api/logs/export?format=ndjson&limit=10000', { credentials: 'same-origin' });
+                    if (!resp.ok) { showToast('NDJSON export failed', 'error'); return; }
+                    const blob = await resp.blob();
+                    var ndjsonName = 'logs-export-' + new Date().toISOString().split('T')[0] + '.ndjson';
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = ndjsonName;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    showToast('Logs exported (NDJSON)', 'success');
+                } catch (e) {
+                    showToast('NDJSON export error: ' + (e && e.message ? e.message : 'Unknown error'), 'error');
+                }
+            }
+
             // Analytics export
             function exportAnalyticsCSV() {
                 if (!latestAnalytics) {
@@ -838,6 +887,7 @@ router.get('/', async (req, res) => {
             window.loadLogs = typeof loadLogs === 'function' ? loadLogs : undefined;
             window.exportLogsCSV = typeof exportLogsCSV === 'function' ? exportLogsCSV : undefined;
             window.exportLogsJSON = typeof exportLogsJSON === 'function' ? exportLogsJSON : undefined;
+            window.exportLogsNDJSON = typeof exportLogsNDJSON === 'function' ? exportLogsNDJSON : undefined;
             window.loadAnalytics = typeof loadAnalytics === 'function' ? loadAnalytics : undefined;
             window.exportAnalyticsCSV = typeof exportAnalyticsCSV === 'function' ? exportAnalyticsCSV : undefined;
             window.exportAnalyticsJSON = typeof exportAnalyticsJSON === 'function' ? exportAnalyticsJSON : undefined;

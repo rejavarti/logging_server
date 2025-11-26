@@ -190,7 +190,7 @@ router.get('/', (req, res) => {
             
             async function loadTracingStatus() {
                 try {
-                    const response = await fetch('/api/tracing/status');
+                    const response = await fetch('/api/tracing/status', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success && data.stats) {
@@ -266,7 +266,7 @@ router.get('/', (req, res) => {
             
             async function loadServiceDependencies() {
                 try {
-                    const response = await fetch('/api/tracing/dependencies');
+                    const response = await fetch('/api/tracing/dependencies', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success) {
@@ -303,7 +303,7 @@ router.get('/', (req, res) => {
                 
                 // Ensure dependencies is always an array
                 if (!dependencies || !Array.isArray(dependencies) || dependencies.length === 0) {
-                    mapDiv.innerHTML = '<div class="text-center text-muted"><p>No service dependencies found</p></div>';
+                    mapDiv.innerHTML = '<div class="empty-state"><i class="fas fa-project-diagram empty-state-icon"></i><br>No service dependencies detected<br><small>Service-to-service calls will appear here when logged with trace metadata</small></div>';
                     return;
                 }
                 
@@ -316,7 +316,7 @@ router.get('/', (req, res) => {
                         <div class="d-flex align-items-center justify-content-between border-bottom py-2">
                             <div class="flex-grow-1">
                                 <strong>\${dep.from}</strong> <i class="fas fa-arrow-right text-muted mx-2"></i> <strong>\${dep.to}</strong>
-                                <br><small class="text-muted">\${dep.count} calls • \${Math.round(dep.avgDuration)}ms avg</small>
+                                <br><small class="text-muted">\${dep.count.toLocaleString()} calls • \${Math.round(dep.avgDuration)}ms avg</small>
                             </div>
                             <span class="badge bg-\${statusClass}">\${errorRate}% errors</span>
                         </div>
@@ -443,13 +443,23 @@ router.get('/', (req, res) => {
                 return new Date(timestamp).toLocaleString();
             }
             
+            let tracingRefreshInterval = null;
+            
             // Load data on page load
             document.addEventListener('DOMContentLoaded', () => {
                 loadTracingStatus();
                 loadServiceDependencies();
                 
                 // Refresh every 30 seconds
-                setInterval(refreshData, 30000);
+                tracingRefreshInterval = setInterval(refreshData, 30000);
+            });
+            
+            // Cleanup interval on page unload to prevent memory leaks
+            window.addEventListener('beforeunload', () => {
+                if (tracingRefreshInterval) {
+                    clearInterval(tracingRefreshInterval);
+                    tracingRefreshInterval = null;
+                }
             });
         </script>
     `;

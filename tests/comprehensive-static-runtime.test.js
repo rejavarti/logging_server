@@ -34,7 +34,7 @@ beforeAll(async () => {
   app = await createTestApp();
   const login = await request(app)
     .post('/api/auth/login')
-    .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' })
+    .send({ username: 'admin', password: process.env.AUTH_PASSWORD })
     .timeout(SHORT_TIMEOUT);
   adminToken = login.body.token;
 }, 15000);

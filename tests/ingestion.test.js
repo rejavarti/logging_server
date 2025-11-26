@@ -5,7 +5,7 @@ let app; let token;
 
 beforeAll(async () => {
   app = await createTestApp();
-  const login = await request(app).post('/api/auth/login').send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' });
+  const login = await request(app).post('/api/auth/login').send({ username: 'admin', password: process.env.AUTH_PASSWORD });
   token = login.body.token;
 });
 

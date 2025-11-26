@@ -10,7 +10,8 @@ const axios = require('axios');
 (async () => {
   const baseUrl = process.env.SMOKE_BASE_URL || 'http://localhost:10180';
   const username = process.env.SMOKE_USERNAME || 'admin';
-  const password = process.env.SMOKE_PASSWORD || process.env.AUTH_PASSWORD || 'ChangeMe123!';
+  const password = process.env.SMOKE_PASSWORD || process.env.AUTH_PASSWORD;
+  if (!password) throw new Error('AUTH_PASSWORD or SMOKE_PASSWORD must be set for smoke test');
 
   function log(step) { console.log(`SMOKE: ${step}`); }
 

@@ -199,7 +199,7 @@ router.get('/', (req, res) => {
             
             async function loadIngestionStats() {
                 try {
-                    const response = await fetch('/api/ingestion/status');
+                    const response = await fetch('/api/ingestion/status', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success) {
@@ -217,19 +217,19 @@ router.get('/', (req, res) => {
                     <div class="row text-center">
                         <div class="col-6 mb-3">
                             <h4 class="text-primary">\${stats.totalMessages.toLocaleString()}</h4>
-                            <small class="text-muted">Total Messages</small>
+                            <small style="color: var(--text-secondary, #6c757d);">Total Messages</small>
                         </div>
                         <div class="col-6 mb-3">
                             <h4 class="text-success">\${stats.connectionsActive}</h4>
-                            <small class="text-muted">Active Connections</small>
+                            <small style="color: var(--text-secondary, #6c757d);">Active Connections</small>
                         </div>
                         <div class="col-6 mb-3">
                             <h4 class="text-info">\${formatBytes(stats.bytesReceived)}</h4>
-                            <small class="text-muted">Bytes Received</small>
+                            <small style="color: var(--text-secondary, #6c757d);">Bytes Received</small>
                         </div>
                         <div class="col-6 mb-3">
                             <h4 class="text-warning">\${stats.errors}</h4>
-                            <small class="text-muted">Parse Errors</small>
+                            <small style="color: var(--text-secondary, #6c757d);">Parse Errors</small>
                         </div>
                     </div>
                 \`;
@@ -252,6 +252,13 @@ router.get('/', (req, res) => {
                 const bgColors = hasData 
                     ? ['#007bff', '#28a745', '#ffc107', '#17a2b8', '#6f42c1', '#e83e8c']
                     : ['#e0e0e0'];
+
+                // Theme-aware colors with explicit white for dark/ocean
+                const currentTheme = (document.documentElement.getAttribute('data-theme') || 'auto').toLowerCase();
+                const isDarkish = currentTheme === 'dark' || currentTheme === 'ocean' || currentTheme === 'auto';
+                const textPrimary = isDarkish ? '#ffffff' : '#1f2937';
+                const textSecondary = isDarkish ? '#cbd5e1' : '#6b7280';
+                const surfaceColor = isDarkish ? 'rgba(15,23,42,0.9)' : 'rgba(255,255,255,0.95)';
                 
                 protocolChart = new Chart(ctx, {
                     type: 'doughnut',
@@ -266,15 +273,19 @@ router.get('/', (req, res) => {
                     },
                     options: {
                         responsive: true,
+                        color: textPrimary,
                         plugins: {
                             legend: {
                                 position: 'bottom',
-                                labels: {
-                                    color: hasData ? '#333' : '#999'
-                                }
+                                labels: { color: hasData ? textPrimary : textSecondary }
                             },
                             tooltip: {
                                 enabled: hasData,
+                                titleColor: textPrimary,
+                                bodyColor: textPrimary,
+                                backgroundColor: surfaceColor,
+                                borderColor: textSecondary,
+                                borderWidth: 1,
                                 callbacks: hasData ? undefined : {
                                     label: () => 'No log data ingested yet'
                                 }
@@ -315,7 +326,7 @@ router.get('/', (req, res) => {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({ protocol, message })
-                    });
+                    , credentials: 'same-origin' });
                     
                     const result = await response.json();
                     
@@ -374,12 +385,22 @@ router.get('/', (req, res) => {
                 }
             }
             
+            let ingestionRefreshInterval = null;
+            
             // Load stats on page load
             document.addEventListener('DOMContentLoaded', () => {
                 loadChartJS();
                 
                 // Refresh stats every 30 seconds
-                setInterval(loadIngestionStats, 30000);
+                ingestionRefreshInterval = setInterval(loadIngestionStats, 30000);
+            });
+            
+            // Cleanup interval on page unload to prevent memory leaks
+            window.addEventListener('beforeunload', () => {
+                if (ingestionRefreshInterval) {
+                    clearInterval(ingestionRefreshInterval);
+                    ingestionRefreshInterval = null;
+                }
             });
         </script>
     `;

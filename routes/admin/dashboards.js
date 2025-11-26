@@ -310,21 +310,31 @@ router.get('/', (req, res) => {
         </style>
 
         <script>
+            let dashboardRefreshInterval = null;
+            
             document.addEventListener('DOMContentLoaded', function() {
                 loadDashboards();
                 loadWidgetTypes();
                 loadDashboardStats();
                 
                 // Refresh data every 30 seconds
-                setInterval(() => {
+                dashboardRefreshInterval = setInterval(() => {
                     loadDashboards();
                     loadDashboardStats();
                 }, 30000);
             });
+            
+            // Cleanup interval on page unload to prevent memory leaks
+            window.addEventListener('beforeunload', () => {
+                if (dashboardRefreshInterval) {
+                    clearInterval(dashboardRefreshInterval);
+                    dashboardRefreshInterval = null;
+                }
+            });
 
             async function loadDashboards() {
                 try {
-                    const response = await fetch('/api/dashboards');
+                    const response = await fetch('/api/dashboards', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success) {
@@ -340,7 +350,7 @@ router.get('/', (req, res) => {
 
             async function loadWidgetTypes() {
                 try {
-                    const response = await fetch('/api/dashboards/widget-types');
+                    const response = await fetch('/api/dashboards/widget-types', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success) {
@@ -355,7 +365,7 @@ router.get('/', (req, res) => {
 
             async function loadDashboardStats() {
                 try {
-                    const response = await fetch('/api/dashboards');
+                    const response = await fetch('/api/dashboards', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success) {
@@ -502,7 +512,7 @@ router.get('/', (req, res) => {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify(formData)
-                    });
+                    , credentials: 'same-origin' });
                     
                     const data = await response.json();
                     
@@ -534,7 +544,7 @@ router.get('/', (req, res) => {
                 try {
                     const response = await fetch('/api/dashboards/' + dashboardId, {
                         method: 'DELETE'
-                    });
+                    , credentials: 'same-origin' });
                     
                     const data = await response.json();
                     

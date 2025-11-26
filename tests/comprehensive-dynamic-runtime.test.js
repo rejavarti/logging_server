@@ -39,7 +39,7 @@ beforeAll(async () => {
     .post('/api/auth/login')
     .send({ 
       username: 'admin', 
-      password: process.env.AUTH_PASSWORD || 'testAdmin123!' 
+      password: process.env.AUTH_PASSWORD 
     });
   
   expect(loginRes.statusCode).toBe(200);
@@ -53,7 +53,7 @@ describe('🚀 COMPREHENSIVE DYNAMIC RUNTIME - AUTHENTICATION FLOWS', () => {
     test('successful admin login returns token and user', withTimeout(async () => {
       const res = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' });
+        .send({ username: 'admin', password: process.env.AUTH_PASSWORD });
       
       expect(res.statusCode).toBe(200);
       expect(res.body.success).toBe(true);
@@ -120,7 +120,7 @@ describe('🚀 COMPREHENSIVE DYNAMIC RUNTIME - AUTHENTICATION FLOWS', () => {
     test('login returns session cookie', withTimeout(async () => {
       const res = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' });
+        .send({ username: 'admin', password: process.env.AUTH_PASSWORD });
       
       expect(res.statusCode).toBe(200);
       const cookies = res.headers['set-cookie'];
@@ -247,7 +247,7 @@ describe('🚀 COMPREHENSIVE DYNAMIC RUNTIME - MIDDLEWARE ORDERING', () => {
     test('rate limit headers present', withTimeout(async () => {
       const res = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' });
+        .send({ username: 'admin', password: process.env.AUTH_PASSWORD });
       
       // Headers may be x-ratelimit-* or ratelimit-*
       const hasStd = 'ratelimit-limit' in res.headers && 'ratelimit-remaining' in res.headers;

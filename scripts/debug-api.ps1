@@ -5,7 +5,8 @@
 Write-Host "Checking API endpoint responses..."
 
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-$loginData = @{ username="admin"; password="ChangeMe123!" } | ConvertTo-Json
+if (-not $env:AUTH_PASSWORD) { throw "AUTH_PASSWORD must be set" }
+$loginData = @{ username="admin"; password=$env:AUTH_PASSWORD } | ConvertTo-Json
 Invoke-RestMethod -Uri "http://localhost:10180/api/auth/login" -Method POST -Body $loginData -ContentType "application/json" -WebSession $session | Out-Null
 
 # Check what endpoints exist vs what dashboard expects

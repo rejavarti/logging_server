@@ -1,7 +1,7 @@
 // UI style and theming consistency checks across pages, including login
 const { test, expect } = require('@playwright/test');
 
-async function login(page, username = 'admin', password = process.env.AUTH_PASSWORD || 'testAdmin123!') {
+async function login(page, username = 'admin', password = process.env.AUTH_PASSWORD) {
   // Fast path: authenticate via API using the same browser context so cookies persist
   try {
     const res = await page.request.post('/api/auth/login', {

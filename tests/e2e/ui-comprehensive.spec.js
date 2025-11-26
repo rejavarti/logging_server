@@ -8,7 +8,7 @@ const { injectAxe, checkA11y } = require('@axe-core/playwright');
  */
 
 // Helper to login once and reuse session
-async function login(page, username = 'admin', password = 'testAdmin123!') {
+async function login(page, username = 'admin', password = process.env.AUTH_PASSWORD) {
   await page.goto('/login');
   await page.fill('#username', username);
   await page.fill('#password', password);

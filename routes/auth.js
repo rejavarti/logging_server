@@ -56,7 +56,17 @@ module.exports = function(dependencies) {
 
                 // Log successful login via DAL
                 try {
-                    await dal.logActivity(result.user.id, 'login', '/api/auth/login', `Successful login from ${req.ip}`, req);
+                    const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+                    const userAgent = req.headers['user-agent'] || 'unknown';
+                    await dal.logActivity({
+                        user_id: result.user.id,
+                        action: 'login',
+                        resource_type: 'LOGIN',
+                        resource_id: result.user.username,
+                        details: { username: result.user.username, ip: clientIp },
+                        ip_address: clientIp,
+                        user_agent: userAgent
+                    });
                 } catch (activityErr) {
                     loggers?.system?.warn('Login activity log failed:', activityErr.message);
                 }
@@ -101,7 +111,17 @@ module.exports = function(dependencies) {
 
             if (req.user) {
                 try {
-                    await dal.logActivity(req.user.id, 'logout', '/api/auth/logout', `User logged out from ${req.ip}`, req);
+                    const clientIp = req.ip || req.connection?.remoteAddress || 'unknown';
+                    const userAgent = req.headers['user-agent'] || 'unknown';
+                    await dal.logActivity({
+                        user_id: req.user.id,
+                        action: 'logout',
+                        resource_type: 'LOGOUT',
+                        resource_id: req.user.username,
+                        details: { username: req.user.username, ip: clientIp },
+                        ip_address: clientIp,
+                        user_agent: userAgent
+                    });
                 } catch (activityErr) {
                     loggers?.system?.warn('Logout activity log failed:', activityErr.message);
                 }

@@ -34,7 +34,7 @@ describe('Notifications API', () => {
     // Initialize Express app (this will create its own DAL and default admin user)
     process.env.DATABASE_PATH = dbPath;
     process.env.JWT_SECRET = 'test-secret-key';
-    process.env.AUTH_PASSWORD = 'testAdmin123!';
+    if (!process.env.AUTH_PASSWORD) throw new Error('AUTH_PASSWORD must be set');
     process.env.PORT = '0'; // Random available port
     const { createTestApp } = require('../../server');
     app = await createTestApp();

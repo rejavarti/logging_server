@@ -54,3 +54,11 @@ SIMPLE_VALIDATION.ps1
 ULTRA_VALIDATION.ps1
 validate-production.ps1
 update-unraid-server.ps1
+
+# Test reports and temporary test artifacts
+browser-test-report-*.json
+test-report-*.json
+playwright-test-output.txt
+test-results.txt
+dashboard-test.html
+dashboard-response.html

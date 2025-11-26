@@ -23,20 +23,28 @@ router.get('/saved-searches', async (req, res) => {
 // Create saved search
 router.post('/saved-searches', async (req, res) => {
     try {
-        if (!req.dal || !req.dal.createSavedSearch) {
-            return res.status(501).json({ success: false, error: 'Saved search creation not implemented' });
-        }
-        const { name, query, filters } = req.body;
+        const { name, query, filters, description } = req.body;
         if (!name || !query) {
             return res.status(400).json({ success: false, error: 'Name and query are required' });
         }
-        const result = await req.dal.createSavedSearch({
-            user_id: req.user?.id || null,
-            name,
-            query,
-            filters: filters || {}
-        });
-        const created = await req.dal.getSavedSearchById(result.lastID, req.user?.id || null);
+        
+        const queryData = JSON.stringify({ query, filters: filters || {} });
+        const userId = req.user?.id || 1; // Default to admin user if not authenticated
+        
+        if (!req.dal) {
+            return res.status(500).json({ success: false, error: 'Database not available' });
+        }
+        
+        const result = await req.dal.run(
+            `INSERT INTO saved_searches (name, description, query_data, created_by) VALUES (?, ?, ?, ?)`,
+            [name, description || null, queryData, userId]
+        );
+        
+        const created = await req.dal.get(
+            `SELECT * FROM saved_searches WHERE id = ?`,
+            [result.lastID]
+        );
+        
         res.json({ success: true, search: created });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error creating saved search:', error);
@@ -47,14 +55,56 @@ router.post('/saved-searches', async (req, res) => {
 // Update saved search
 router.put('/saved-searches/:id', async (req, res) => {
     try {
-        if (!req.dal || !req.dal.updateSavedSearch) {
-            return res.status(501).json({ success: false, error: 'Saved search update not implemented' });
-        }
         const { id } = req.params;
-        const updates = req.body || {};
-        await req.dal.updateSavedSearch(id, req.user?.id || null, updates);
-        const updated = await req.dal.getSavedSearchById(id, req.user?.id || null);
-        if (!updated) return res.status(404).json({ success: false, error: 'Saved search not found' });
+        const { name, query, filters, description } = req.body;
+        
+        if (!req.dal) {
+            return res.status(500).json({ success: false, error: 'Database not available' });
+        }
+        
+        // Build dynamic update query
+        const updates = [];
+        const params = [];
+        
+        if (name !== undefined) {
+            updates.push('name = ?');
+            params.push(name);
+        }
+        if (description !== undefined) {
+            updates.push('description = ?');
+            params.push(description);
+        }
+        if (query !== undefined || filters !== undefined) {
+            // Get current query_data to merge
+            const current = await req.dal.get(`SELECT query_data FROM saved_searches WHERE id = ?`, [id]);
+            if (current) {
+                const currentData = JSON.parse(current.query_data);
+                const newData = {
+                    query: query !== undefined ? query : currentData.query,
+                    filters: filters !== undefined ? filters : currentData.filters
+                };
+                updates.push('query_data = ?');
+                params.push(JSON.stringify(newData));
+            }
+        }
+        
+        if (updates.length === 0) {
+            return res.status(400).json({ success: false, error: 'No fields to update' });
+        }
+        
+        updates.push('updated_at = CURRENT_TIMESTAMP');
+        params.push(id);
+        
+        const result = await req.dal.run(
+            `UPDATE saved_searches SET ${updates.join(', ')} WHERE id = ?`,
+            params
+        );
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Saved search not found' });
+        }
+        
+        const updated = await req.dal.get(`SELECT * FROM saved_searches WHERE id = ?`, [id]);
         res.json({ success: true, search: updated });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error updating saved search:', error);
@@ -65,14 +115,18 @@ router.put('/saved-searches/:id', async (req, res) => {
 // Delete saved search
 router.delete('/saved-searches/:id', async (req, res) => {
     try {
-        if (!req.dal || !req.dal.deleteSavedSearch) {
-            return res.status(501).json({ success: false, error: 'Saved search deletion not implemented' });
-        }
         const { id } = req.params;
-        const result = await req.dal.deleteSavedSearch(id, req.user?.id || null);
-        if ((result?.changes || 0) === 0) {
+        
+        if (!req.dal) {
+            return res.status(500).json({ success: false, error: 'Database not available' });
+        }
+        
+        const result = await req.dal.run(`DELETE FROM saved_searches WHERE id = ?`, [id]);
+        
+        if (result.changes === 0) {
             return res.status(404).json({ success: false, error: 'Saved search not found' });
         }
+        
         res.json({ success: true, message: 'Saved search deleted successfully' });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error deleting saved search:', error);
@@ -85,17 +139,67 @@ router.post('/saved-searches/:id/use', async (req, res) => {
     try {
         const { id } = req.params;
         
-        // Require real implementation - no mock search execution
-        if (!req.dal || !req.dal.executeSavedSearch) {
-            return res.status(501).json({ 
-                success: false, 
-                error: 'Saved search execution not implemented - database access layer unavailable' 
-            });
+        if (!req.dal) {
+            return res.status(500).json({ success: false, error: 'Database not available' });
         }
         
-        const results = await req.dal.executeSavedSearch(id);
-
-        res.json({ success: true, ...results });
+        // Get the saved search
+        const search = await req.dal.get(`SELECT * FROM saved_searches WHERE id = ?`, [id]);
+        if (!search) {
+            return res.status(404).json({ success: false, error: 'Saved search not found' });
+        }
+        
+        // Parse query data
+        const queryData = JSON.parse(search.query_data);
+        
+        // Build query for logs
+        let query = `SELECT * FROM logs WHERE 1=1`;
+        const params = [];
+        
+        if (queryData.query) {
+            query += ` AND (message LIKE ? OR source LIKE ?)`;
+            params.push(`%${queryData.query}%`, `%${queryData.query}%`);
+        }
+        
+        if (queryData.filters) {
+            if (queryData.filters.level) {
+                query += ` AND level = ?`;
+                params.push(queryData.filters.level);
+            }
+            if (queryData.filters.source) {
+                query += ` AND source = ?`;
+                params.push(queryData.filters.source);
+            }
+            if (queryData.filters.startDate) {
+                query += ` AND timestamp >= ?`;
+                params.push(queryData.filters.startDate);
+            }
+            if (queryData.filters.endDate) {
+                query += ` AND timestamp <= ?`;
+                params.push(queryData.filters.endDate);
+            }
+        }
+        
+        query += ` ORDER BY timestamp DESC LIMIT 1000`;
+        
+        const results = await req.dal.all(query, params);
+        
+        // Update usage stats
+        await req.dal.run(
+            `UPDATE saved_searches SET use_count = use_count + 1, last_used = CURRENT_TIMESTAMP WHERE id = ?`,
+            [id]
+        );
+        
+        res.json({ 
+            success: true, 
+            search: {
+                id: search.id,
+                name: search.name,
+                query: queryData
+            },
+            results,
+            count: results.length
+        });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error executing saved search:', error);
         res.status(500).json({ success: false, error: error.message });

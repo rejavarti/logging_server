@@ -25,7 +25,8 @@ try {
 # Test 3: Authentication
 Write-Host "`n3. Authentication Test:"
 $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-$loginData = @{ username="admin"; password="ChangeMe123!" } | ConvertTo-Json
+if (-not $env:AUTH_PASSWORD) { throw "AUTH_PASSWORD must be set" }
+$loginData = @{ username="admin"; password=$env:AUTH_PASSWORD } | ConvertTo-Json
 try {
     $loginResp = Invoke-RestMethod -Uri "http://localhost:10180/api/auth/login" -Method POST -Body $loginData -ContentType "application/json" -WebSession $session
     Write-Host "Login: $($loginResp.success)"

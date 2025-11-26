@@ -181,7 +181,7 @@ Write-Host "  -v /path/to/logs:/app/logs \\" -ForegroundColor Cyan
 Write-Host "  -e NODE_ENV=production \\" -ForegroundColor Cyan
 Write-Host "  -e TZ=America/Denver \\" -ForegroundColor Cyan
 Write-Host "  -e AUTH_USERNAME=admin \\" -ForegroundColor Cyan
-Write-Host "  -e AUTH_PASSWORD=ChangeMe123! \\" -ForegroundColor Cyan
+Write-Host "  -e AUTH_PASSWORD=\$AUTH_PASSWORD \\" -ForegroundColor Cyan
 Write-Host "  ${FullImageName}:latest" -ForegroundColor Cyan
 Write-Host ""
 

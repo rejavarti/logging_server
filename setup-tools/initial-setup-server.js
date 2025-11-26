@@ -701,7 +701,7 @@ DATE_FORMAT=YYYY-MM-DD HH:mm:ss
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(config)
-                });
+                , credentials: 'same-origin' });
                 
                 const result = await response.json();
                 
@@ -713,7 +713,7 @@ DATE_FORMAT=YYYY-MM-DD HH:mm:ss
                     // Auto-complete and transition to main server
                     setTimeout(async () => {
                         try {
-                            const completeResponse = await fetch('/api/setup/complete', { method: 'POST' });
+                            const completeResponse = await fetch('/api/setup/complete', { method: 'POST', credentials: 'same-origin' });
                             const completeResult = await completeResponse.json();
                             
                             if (completeResult.success) {

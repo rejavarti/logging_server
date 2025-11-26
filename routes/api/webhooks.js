@@ -207,29 +207,101 @@ router.post('/deliveries/:id/retry', async (req, res) => {
         
         req.app.locals?.loggers?.api?.info(`Retrying webhook delivery ${id} by user ${req.user ? req.user.username : 'system'}`);
         
-        // Require actual implementation - no simulation
-        if (!req.dal || !req.dal.retryWebhookDelivery) {
-            return res.status(501).json({ 
-                success: false, 
-                error: 'Webhook retry not implemented - database access layer unavailable' 
-            });
+        if (!req.dal) {
+            return res.status(500).json({ success: false, error: 'Database not available' });
         }
         
-        const result = await req.dal.retryWebhookDelivery(id);
+        // Get the original delivery
+        const delivery = await req.dal.get(
+            `SELECT * FROM webhook_deliveries WHERE id = ?`,
+            [id]
+        );
+        
+        if (!delivery) {
+            return res.status(404).json({ success: false, error: 'Webhook delivery not found' });
+        }
+        
+        // Get the webhook configuration
+        const webhook = await req.dal.get(
+            `SELECT * FROM webhooks WHERE id = ?`,
+            [delivery.webhook_id]
+        );
+        
+        if (!webhook) {
+            return res.status(404).json({ success: false, error: 'Webhook configuration not found' });
+        }
+        
+        // Attempt to resend the webhook
+        const axios = require('axios');
+        let retryResult = {
+            status: 'failed',
+            status_code: null,
+            error: null,
+            response_body: null
+        };
+        
+        try {
+            const startTime = Date.now();
+            const response = await axios.post(webhook.url, JSON.parse(delivery.request_body), {
+                headers: webhook.headers ? JSON.parse(webhook.headers) : {},
+                timeout: 30000
+            });
+            const duration = Date.now() - startTime;
+            
+            retryResult = {
+                status: 'success',
+                status_code: response.status,
+                response_body: JSON.stringify(response.data),
+                duration_ms: duration
+            };
+        } catch (error) {
+            retryResult.error = error.message;
+            retryResult.status_code = error.response?.status || null;
+        }
+        
+        // Create new delivery record for retry
+        const result = await req.dal.run(
+            `INSERT INTO webhook_deliveries (webhook_id, status, status_code, request_body, response_body, error, attempt_number, duration_ms)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                delivery.webhook_id,
+                retryResult.status,
+                retryResult.status_code,
+                delivery.request_body,
+                retryResult.response_body,
+                retryResult.error,
+                delivery.attempt_number + 1,
+                retryResult.duration_ms
+            ]
+        );
         
         // Log the activity
-        if (req.dal && req.dal.logUserActivity) {
-            await req.dal.logUserActivity(
-                req.user ? req.user.id : 0,
-                'webhook_retry',
-                `delivery_${id}`,
-                { status: result.status },
-                req.ip,
-                req.get('User-Agent')
-            );
+        if (req.dal.run) {
+            await req.dal.run(
+                `INSERT INTO activity_log (user_id, action, resource_type, resource_id, details, ip_address, user_agent)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    req.user ? req.user.id : 0,
+                    'webhook_retry',
+                    'webhook_delivery',
+                    id,
+                    JSON.stringify({ status: retryResult.status }),
+                    req.ip || 'unknown',
+                    req.get('User-Agent') || 'unknown'
+                ]
+            ).catch(() => {}); // Ignore activity log errors
         }
 
-        res.json({ success: true, retry: result });
+        res.json({ 
+            success: true, 
+            retry: {
+                id: result.lastID,
+                originalDeliveryId: id,
+                status: retryResult.status,
+                statusCode: retryResult.status_code,
+                attemptNumber: delivery.attempt_number + 1
+            }
+        });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API webhook retry error:', error);
         res.status(500).json({ error: 'Failed to retry webhook delivery' });

@@ -931,7 +931,7 @@ router.get('/', async (req, res) => {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(searchData)
-                });
+                , credentials: 'same-origin' });
                 
                 if (response.ok) {
                     showToast('Search saved successfully', 'success');

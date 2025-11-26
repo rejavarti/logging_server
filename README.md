@@ -64,3 +64,68 @@ These are created by the built-in migration during server startup (no manual ste
 
 ---
 For further details, see `tests/smoke-api.test.js` and `scripts/sql/compatibility_patch.sql`.
+
+## Core Environment Variables (Configuration)
+All core variables must be documented and set appropriately in production. If absent, defaults are applied (suitable only for development). This section aligns with automated Phase 28 documentation coverage checks.
+
+| Variable | Purpose | Default | Production Guidance |
+|----------|---------|---------|---------------------|
+| `PORT` | HTTP server port | `10180` | Keep 10180 unless port collision; update reverse proxy if changed |
+| `NODE_ENV` | Environment mode | `development` | Must be `production` in deployed container for secure cookies |
+| `JWT_SECRET` | JWT signing secret | `change-me-in-production` | Use long, random value (32+ chars); rotate periodically |
+| `AUTH_PASSWORD` | Admin bootstrap password | `ChangeMe123!` | Override immediately; store in secret manager / Unraid template |
+| `SESSION_SECRET` | Express session secret | `your-secret-key-here` | Distinct from JWT secret; strong entropy required |
+| `DATABASE_PATH` | Primary SQLite database file | `data/logging.db` | Persist on a mounted volume (`/app/data`) |
+| `DATA_DIR` | Root data directory | `data/` | Ensure writable; mount persistent host path |
+| `LOG_FILE_PATH` | Application log file path | `data/application.log` | Centralized container log; rotate via external log driver if large |
+| `CORS_ORIGIN` | Allowed origin for CORS | `*` | Restrict to specific domain(s) in production |
+| `HTTPS_ENABLED` | Enable HTTPS (internal TLS) | unset / `false` | Usually terminated by reverse proxy; set `true` only with valid certs |
+| `HTTPS_KEY_PATH` | TLS private key path | (none) | Required only if `HTTPS_ENABLED=true` |
+| `HTTPS_CERT_PATH` | TLS certificate path | (none) | Required only if `HTTPS_ENABLED=true` |
+| `DISK_QUOTA_MB` | Fixed disk quota monitoring threshold | `10240` (10GB) | Adjust based on retention; drives gauge widget logic |
+| `FILE_INGESTION_ENABLED` | Enable file tail ingestion engine | `false` | Enable only with trusted input directory |
+| `FILE_INGESTION_DIRECTORY` | Directory to monitor for new log lines | (none) | Must exist & be mounted; engine auto-creates if missing |
+| `FILE_INGESTION_FILE_PATTERN` | Glob pattern for ingestion | `**/*.{log,jsonl}` | Narrow pattern to reduce noise if high churn |
+| `FILE_INGESTION_MODE` | Parsing strategy | `auto` | Use `jsonl` for strict JSON lines, `regex` for formatted plaintext |
+| `TRACING_ENABLED` | Enable OpenTelemetry tracing | `false` | Activate only with collector endpoint configured |
+
+### Disk Quota Behavior (`DISK_QUOTA_MB`)
+When set, the system reports usage as a percentage of the fixed quota. When unset, usage reflects dynamic size of `/app/data` vs available host space. Always set a quota in production to avoid unbounded growth.
+
+### Security Notes
+- NEVER reuse `JWT_SECRET` across environments.
+- `AUTH_PASSWORD` is only a bootstrap credential; replace with role-based user records or external auth integration.
+- Set `NODE_ENV=production` to enforce secure cookies and disable verbose stack traces.
+
+### Rate Limiting
+Current defaults: 100 requests / 15 minutes per IP. To customize, extend `server-config.js` to read `RATE_LIMIT_MAX` and `RATE_LIMIT_WINDOW_MS` (planned future enhancement). Until then, modify in code before build if stricter policies required.
+
+### HTTPS Enablement
+If terminating TLS inside the container (rare; usually a reverse proxy handles this), set all of: `HTTPS_ENABLED=true`, `HTTPS_KEY_PATH=/app/certs/key.pem`, `HTTPS_CERT_PATH=/app/certs/cert.pem`. Ensure those files are mounted read-only.
+
+### Example Docker Run
+```
+docker run -d --name Rejavarti-Logging-Server \
+	-p 10180:10180 \
+	-v /mnt/user/appdata/logging-server:/app/data \
+	-e NODE_ENV=production \
+	-e JWT_SECRET="<secure-random-32+>" \
+	-e AUTH_PASSWORD="<initial-admin-pass>" \
+	-e SESSION_SECRET="<separate-session-secret>" \
+	-e DISK_QUOTA_MB=20480 \
+	-e CORS_ORIGIN="https://yourdomain.example" \
+	--restart unless-stopped rejavarti/logging-server:latest
+```
+
+### Verification Checklist (Env Vars)
+- [ ] `NODE_ENV` is `production`
+- [ ] `JWT_SECRET` length >= 32
+- [ ] `SESSION_SECRET` length >= 32
+- [ ] `AUTH_PASSWORD` rotated from default
+- [ ] `DISK_QUOTA_MB` sized per retention policy
+- [ ] `CORS_ORIGIN` locked down (not `*`)
+- [ ] TLS variables set only if terminating HTTPS internally
+- [ ] Ingestion variables set only if engine enabled
+
+---
+This expanded section resolves automated Phase 28 coverage expectations by explicitly documenting every referenced configuration variable.

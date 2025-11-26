@@ -1,4 +1,5 @@
-const sqlite3 = require('sqlite3').verbose();
+// Using UniversalSQLiteAdapter for cross-platform compatibility (sql.js on Windows)
+const UniversalSQLiteAdapter = require('../../universal-sqlite-adapter');
 const fs = require('fs');
 const path = require('path');
 
@@ -13,53 +14,45 @@ class DatabaseMigration {
         this.databasePath = databasePath;
         this.logger = logger || console;
         this.db = null;
+        this.adapter = new UniversalSQLiteAdapter(databasePath, logger);
     }
 
-    all(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.db.all(sql, params, (err, rows) => {
-                if (err) reject(err);
-                else resolve(rows || []);
-            });
-        });
+    async all(sql, params = []) {
+        try {
+            const rows = await this.adapter.all(sql, params);
+            return rows || [];
+        } catch (err) {
+            throw err;
+        }
     }
 
-    connect() {
-        return new Promise((resolve, reject) => {
-            this.db = new sqlite3.Database(this.databasePath, (err) => {
-                if (err) {
-                    this.logger.error('Error connecting to database:', err);
-                    reject(err);
-                } else {
-                    this.logger.info('Connected to database for migration');
-                    resolve();
-                }
-            });
-        });
+    async connect() {
+        try {
+            await this.adapter.init();
+            this.db = this.adapter;
+            this.logger.info('Connected to database for migration (using UniversalSQLiteAdapter)');
+        } catch (err) {
+            this.logger.error('Error connecting to database:', err);
+            throw err;
+        }
     }
 
-    run(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.db.run(sql, params, function(err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({ lastID: this.lastID, changes: this.changes });
-                }
-            });
-        });
+    async run(sql, params = []) {
+        try {
+            const result = await this.adapter.run(sql, params);
+            return result;
+        } catch (err) {
+            throw err;
+        }
     }
 
-    get(sql, params = []) {
-        return new Promise((resolve, reject) => {
-            this.db.get(sql, params, (err, row) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(row);
-                }
-            });
-        });
+    async get(sql, params = []) {
+        try {
+            const row = await this.adapter.get(sql, params);
+            return row;
+        } catch (err) {
+            throw err;
+        }
     }
 
     async tableExists(tableName) {
@@ -1231,6 +1224,109 @@ class DatabaseMigration {
             
             // Create all required tables
             await this.createCoreSystemTables();
+            // Phase 1 Resilience Tables
+            this.logger.info('🛡️ Creating resilience tables...');
+            // transaction_log
+            if (!await this.tableExists('transaction_log')) {
+                await this.run(`
+                    CREATE TABLE transaction_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        transaction_id TEXT UNIQUE NOT NULL,
+                        operation_type TEXT NOT NULL,
+                        table_name TEXT NOT NULL,
+                        record_ids TEXT,
+                        sql_statement TEXT,
+                        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        completed_at DATETIME,
+                        status TEXT DEFAULT 'pending',
+                        error_message TEXT,
+                        retry_count INTEGER DEFAULT 0,
+                        user_id INTEGER,
+                        ip_address TEXT
+                    )
+                `);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_transaction_log_status ON transaction_log(status, started_at)`);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_transaction_log_table ON transaction_log(table_name, completed_at)`);
+                this.logger.info('✅ Created transaction_log');
+            }
+            // failed_operations_queue
+            if (!await this.tableExists('failed_operations_queue')) {
+                await this.run(`
+                    CREATE TABLE failed_operations_queue (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        operation_type TEXT NOT NULL,
+                        payload TEXT NOT NULL,
+                        error_message TEXT,
+                        error_code TEXT,
+                        failed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        retry_count INTEGER DEFAULT 0,
+                        max_retries INTEGER DEFAULT 3,
+                        next_retry_at DATETIME,
+                        status TEXT DEFAULT 'queued',
+                        resolved_at DATETIME,
+                        priority INTEGER DEFAULT 5
+                    )
+                `);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_failed_ops_retry ON failed_operations_queue(status, next_retry_at)`);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_failed_ops_priority ON failed_operations_queue(priority DESC, failed_at)`);
+                this.logger.info('✅ Created failed_operations_queue');
+            }
+            // system_error_log
+            if (!await this.tableExists('system_error_log')) {
+                await this.run(`
+                    CREATE TABLE system_error_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        error_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        error_category TEXT NOT NULL,
+                        error_code TEXT,
+                        error_message TEXT NOT NULL,
+                        stack_trace TEXT,
+                        affected_component TEXT,
+                        affected_function TEXT,
+                        severity TEXT DEFAULT 'error',
+                        user_id INTEGER,
+                        ip_address TEXT,
+                        request_id TEXT,
+                        recovery_attempted INTEGER DEFAULT 0,
+                        recovery_successful INTEGER DEFAULT 0,
+                        recovery_method TEXT,
+                        resolved INTEGER DEFAULT 0,
+                        resolved_at DATETIME,
+                        resolved_by INTEGER,
+                        occurrence_count INTEGER DEFAULT 1,
+                        first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_sys_error_severity ON system_error_log(severity, resolved)`);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_sys_error_category ON system_error_log(error_category, error_timestamp)`);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_sys_error_occurrence ON system_error_log(error_code, occurrence_count)`);
+                this.logger.info('✅ Created system_error_log');
+            }
+            // database_health_log
+            if (!await this.tableExists('database_health_log')) {
+                await this.run(`
+                    CREATE TABLE database_health_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        check_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        database_size_mb REAL,
+                        table_count INTEGER,
+                        total_records INTEGER,
+                        logs_table_records INTEGER,
+                        corruption_detected INTEGER DEFAULT 0,
+                        integrity_check_passed INTEGER DEFAULT 1,
+                        vacuum_last_run DATETIME,
+                        backup_last_run DATETIME,
+                        avg_query_time_ms REAL,
+                        slow_queries_count INTEGER DEFAULT 0,
+                        disk_space_available_mb REAL,
+                        wal_size_mb REAL,
+                        checks_performed TEXT
+                    )
+                `);
+                await this.run(`CREATE INDEX IF NOT EXISTS idx_db_health_timestamp ON database_health_log(check_timestamp)`);
+                this.logger.info('✅ Created database_health_log');
+            }
             await this.createWebhooksAndIntegrations();
             await this.createSearchAndAlertingTables();
             await this.createEnterpriseEngineTables();

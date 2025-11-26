@@ -10,12 +10,27 @@
  * - Performance analytics
  */
 
+// OpenTelemetry SDK imports (installed via package.json)
+let NodeSDK, JaegerExporter, getNodeAutoInstrumentations;
+try {
+    const { NodeSDK: SDK } = require('@opentelemetry/sdk-node');
+    const { JaegerExporter: Exporter } = require('@opentelemetry/exporter-jaeger');
+    const { getNodeAutoInstrumentations: getInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+    NodeSDK = SDK;
+    JaegerExporter = Exporter;
+    getNodeAutoInstrumentations = getInstrumentations;
+} catch (err) {
+    // OpenTelemetry packages not installed - tracing will be disabled
+    NodeSDK = null;
+}
+
 class DistributedTracingEngine {
     constructor(dal, loggers, config = {}) {
         this.dal = dal;
         this.loggers = loggers;
         this.config = config.tracing || {};
         this.isInitialized = false;
+        this.otelSDK = null;
         this.traces = [];
         this.spans = [];
         this.services = new Set();
@@ -35,12 +50,65 @@ class DistributedTracingEngine {
             this.loggers.system.info('🔍 Initializing Distributed Tracing Engine...');
             
             // Initialize OpenTelemetry if configured
-            if (this.config && this.config.enabled) {
-                // OpenTelemetry initialization required but not implemented (no placeholder actions)
-                this.loggers.system.info('   • OpenTelemetry SDK: Pending installation');
-                this.loggers.system.info('   • Jaeger Exporter: Not initialized');
-                this.loggers.system.info('   • Service Name (configured):', this.config.serviceName);
-                this.loggers.system.info('   • Sampling Rate (configured):', this.config.samplingRate);
+            if (this.config && this.config.enabled && NodeSDK) {
+                try {
+                    const serviceName = this.config.serviceName || 'logging-server';
+                    const jaegerEndpoint = this.config.jaegerEndpoint || 'http://localhost:14268/api/traces';
+                    const samplingRate = this.config.samplingRate || 0.1;
+                    
+                    // Configure Jaeger exporter
+                    const jaegerExporter = new JaegerExporter({
+                        endpoint: jaegerEndpoint,
+                        serviceName: serviceName
+                    });
+                    
+                    // Configure OpenTelemetry SDK with auto-instrumentation
+                    this.otelSDK = new NodeSDK({
+                        serviceName: serviceName,
+                        traceExporter: jaegerExporter,
+                        instrumentations: [
+                            getNodeAutoInstrumentations({
+                                '@opentelemetry/instrumentation-fs': {
+                                    enabled: false // Disable fs to reduce noise
+                                },
+                                '@opentelemetry/instrumentation-http': {
+                                    enabled: true,
+                                    requestHook: (span, request) => {
+                                        span.setAttribute('http.client_ip', request.socket?.remoteAddress || 'unknown');
+                                    }
+                                },
+                                '@opentelemetry/instrumentation-express': {
+                                    enabled: true
+                                }
+                            })
+                        ],
+                        sampler: {
+                            shouldSample: () => {
+                                // Simple probability-based sampling
+                                return Math.random() < samplingRate 
+                                    ? { decision: 1 } // RECORD_AND_SAMPLE
+                                    : { decision: 0 }; // NOT_RECORD
+                            },
+                            toString: () => `ProbabilitySampler{${samplingRate}}`
+                        }
+                    });
+                    
+                    // Start the SDK
+                    await this.otelSDK.start();
+                    
+                    this.loggers.system.info('   ✅ OpenTelemetry SDK started');
+                    this.loggers.system.info('   • Service Name:', serviceName);
+                    this.loggers.system.info('   • Jaeger Endpoint:', jaegerEndpoint);
+                    this.loggers.system.info('   • Sampling Rate:', (samplingRate * 100).toFixed(1) + '%');
+                    this.loggers.system.info('   • Auto-instrumentation: Enabled (HTTP, Express)');
+                } catch (otelError) {
+                    this.loggers.system.error('   ❌ OpenTelemetry initialization failed:', otelError.message);
+                    this.loggers.system.warn('   • Tracing will be disabled');
+                }
+            } else if (this.config && this.config.enabled && !NodeSDK) {
+                this.loggers.system.warn('   ⚠️  OpenTelemetry packages not installed');
+                this.loggers.system.warn('   • Install: npm install @opentelemetry/sdk-node @opentelemetry/auto-instrumentations-node @opentelemetry/exporter-jaeger');
+                this.loggers.system.warn('   • Tracing will be disabled');
             } else {
                 this.loggers.system.info('   • Distributed Tracing: Disabled');
             }
@@ -73,8 +141,65 @@ class DistributedTracingEngine {
     }
 
     async searchTraces(filters = {}) {
-        // No mock implementation - tracing requires OpenTelemetry SDK
-        throw new Error('Distributed tracing not implemented - OpenTelemetry SDK required. Install @opentelemetry/sdk-node and @opentelemetry/auto-instrumentations-node packages.');
+        try {
+            const {
+                traceId,
+                service,
+                minDuration,
+                maxDuration,
+                hasError,
+                startTime,
+                endTime,
+                limit = 100
+            } = filters;
+            
+            let results = [...this.traces];
+            
+            // Apply filters
+            if (traceId) {
+                results = results.filter(t => t.traceId === traceId);
+            }
+            
+            if (service) {
+                results = results.filter(t => t.service === service);
+            }
+            
+            if (minDuration !== undefined) {
+                results = results.filter(t => t.duration >= minDuration);
+            }
+            
+            if (maxDuration !== undefined) {
+                results = results.filter(t => t.duration <= maxDuration);
+            }
+            
+            if (hasError !== undefined) {
+                results = results.filter(t => t.error === hasError);
+            }
+            
+            if (startTime) {
+                results = results.filter(t => new Date(t.timestamp) >= new Date(startTime));
+            }
+            
+            if (endTime) {
+                results = results.filter(t => new Date(t.timestamp) <= new Date(endTime));
+            }
+            
+            // Sort by timestamp descending (newest first)
+            results.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            
+            // Apply limit
+            results = results.slice(0, limit);
+            
+            return {
+                success: true,
+                traces: results,
+                total: results.length,
+                filtered: results.length < this.traces.length
+            };
+        } catch (error) {
+            this.loggers.system.error('Error searching traces:', error);
+            throw error;
+        }
     }
 
     async getTraceData(traceId) {
@@ -262,6 +387,13 @@ class DistributedTracingEngine {
 
     cleanup() {
         try {
+            // Shutdown OpenTelemetry SDK
+            if (this.otelSDK) {
+                this.otelSDK.shutdown()
+                    .then(() => this.loggers.system.info('OpenTelemetry SDK shutdown complete'))
+                    .catch(err => this.loggers.system.error('OpenTelemetry SDK shutdown error:', err));
+            }
+            
             // Clean up old traces (keep only last 1000)
             if (this.traces.length > 1000) {
                 this.traces = this.traces.slice(-1000);

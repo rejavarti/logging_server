@@ -114,21 +114,21 @@ router.post('/backups/create', async (req, res) => {
         
         // Add database file if included
         if (includes.includes('database')) {
-            const dbPath = path.join(__dirname, '../../data/logs.db');
+            const dbPath = path.join(__dirname, '../../data/databases/logs.db');
             try {
                 await fs.access(dbPath);
                 archive.file(dbPath, { name: 'logs.db' });
             } catch (err) {
-                req.app.locals?.loggers?.api?.warn('Database file not found for backup');
+                req.app.locals?.loggers?.api?.warn('Database file not found for backup (checked /data/databases/logs.db)');
             }
             
-            // Also backup enterprise_logs.db
-            const enterpriseDbPath = path.join(__dirname, '../../data/enterprise_logs.db');
+            // Also backup enterprise_logs.db (REAL database with actual data)
+            const enterpriseDbPath = path.join(__dirname, '../../data/databases/enterprise_logs.db');
             try {
                 await fs.access(enterpriseDbPath);
                 archive.file(enterpriseDbPath, { name: 'enterprise_logs.db' });
             } catch (err) {
-                req.app.locals?.loggers?.api?.warn('Enterprise database file not found for backup');
+                req.app.locals?.loggers?.api?.warn('Enterprise database file not found for backup (checked /data/databases/enterprise_logs.db)');
             }
         }
         
@@ -139,7 +139,7 @@ router.post('/backups/create', async (req, res) => {
                 await fs.access(settingsPath);
                 archive.file(settingsPath, { name: 'settings.json' });
             } catch (err) {
-                // Settings file does not exist; skip without adding a placeholder
+                // Settings file does not exist; skip gracefully (no settings.json yet)
             }
         }
         
@@ -272,27 +272,74 @@ router.post('/backups/:filename/restore', async (req, res) => {
     try {
         const { filename } = req.params;
         const { components = ['database', 'settings'] } = req.body;
+        const fs = require('fs').promises;
+        const path = require('path');
+        const AdmZip = require('adm-zip');
         
-        // Require real implementation - no simulation
-        if (!req.dal || !req.dal.restoreBackup) {
-            return res.status(501).json({ 
-                success: false, 
-                error: 'Backup restore not implemented - database access layer unavailable' 
-            });
+        // Validate filename
+        if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+            return res.status(400).json({ success: false, error: 'Invalid filename' });
         }
         
-        const result = await req.dal.restoreBackup(filename, components);
+        const backupDir = path.join(__dirname, '../../data/backups');
+        const backupPath = path.join(backupDir, filename);
         
-        req.app.locals?.loggers?.api?.info(`Backup restore initiated: ${filename} by ${req.user ? req.user.username : 'system'}`);
+        // Check if backup exists
+        try {
+            await fs.access(backupPath);
+        } catch {
+            return res.status(404).json({ success: false, error: 'Backup file not found' });
+        }
+        
+        // Extract and restore
+        const zip = new AdmZip(backupPath);
+        const zipEntries = zip.getEntries();
+        
+        const restoredComponents = [];
+        
+        // Restore database
+        if (components.includes('database')) {
+            const dbEntry = zipEntries.find(e => e.entryName === 'logs.db');
+            if (dbEntry) {
+                const dbPath = path.join(__dirname, '../../data/databases/logs.db');
+                const backupDbPath = dbPath + '.backup-' + Date.now();
+                
+                // Backup current database
+                try {
+                    await fs.copyFile(dbPath, backupDbPath);
+                } catch (err) {
+                    req.app.locals?.loggers?.api?.warn('Could not backup current database:', err);
+                }
+                
+                // Restore from backup
+                zip.extractEntryTo(dbEntry, path.dirname(dbPath), false, true);
+                restoredComponents.push('database');
+            }
+        }
+        
+        // Restore settings
+        if (components.includes('settings')) {
+            const settingsEntry = zipEntries.find(e => e.entryName === 'settings.json');
+            if (settingsEntry) {
+                const settingsPath = path.join(__dirname, '../../data/config/settings.json');
+                const settingsDir = path.dirname(settingsPath);
+                
+                await fs.mkdir(settingsDir, { recursive: true });
+                zip.extractEntryTo(settingsEntry, settingsDir, false, true);
+                restoredComponents.push('settings');
+            }
+        }
+        
+        req.app.locals?.loggers?.api?.info(`Backup restored: ${filename} (${restoredComponents.join(', ')}) by ${req.user ? req.user.username : 'system'}`);
         
         res.json({
             success: true,
-            message: 'Backup restore completed successfully',
+            message: 'Backup restored successfully',
             filename,
-            components,
+            components: restoredComponents,
             restoredBy: req.user ? req.user.username : 'system',
             timestamp: new Date().toISOString(),
-            requiresRestart: result.requiresRestart || true
+            requiresRestart: true
         });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error restoring backup:', error);

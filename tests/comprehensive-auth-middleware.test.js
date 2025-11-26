@@ -36,7 +36,7 @@ beforeAll(async () => {
   // Login as admin
   const adminLogin = await request(app)
     .post('/api/auth/login')
-    .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' })
+    .send({ username: 'admin', password: process.env.AUTH_PASSWORD })
     .timeout(SHORT_TIMEOUT);
   adminToken = adminLogin.body.token;
 }, 15000);
@@ -47,7 +47,7 @@ describe('🔐 COMPREHENSIVE AUTHENTICATION TESTS', () => {
     test('✓ Valid admin credentials return token', withSafeAsync(async () => {
       const res = await request(app)
         .post('/api/auth/login')
-        .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' })
+        .send({ username: 'admin', password: process.env.AUTH_PASSWORD })
         .timeout(SHORT_TIMEOUT);
       
       expect(res.statusCode).toBe(200);
@@ -473,7 +473,7 @@ describe('🛡️ SECURITY & EDGE CASE TESTS', () => {
         promises.push(
           request(app)
             .post('/api/auth/login')
-            .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' })
+            .send({ username: 'admin', password: process.env.AUTH_PASSWORD })
             .timeout(SHORT_TIMEOUT)
         );
       }

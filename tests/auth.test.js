@@ -18,7 +18,7 @@ describe('Authentication Flow', () => {
   test('Login with valid admin credentials returns token', async () => {
     const res = await request(app)
       .post('/api/auth/login')
-      .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' });
+      .send({ username: 'admin', password: process.env.AUTH_PASSWORD });
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
     expect(res.body.token).toBeDefined();

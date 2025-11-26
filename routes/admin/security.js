@@ -166,7 +166,7 @@ module.exports = (getPageTemplate, requireAuth) => {
             
             async function refreshRateLimits() {
                 try {
-                    const statsResponse = await fetch('/api/rate-limits/stats');
+                    const statsResponse = await fetch('/api/rate-limits/stats', { credentials: 'same-origin' });
                     if (!statsResponse.ok) throw new Error('Failed to fetch stats');
                     const stats = await statsResponse.json();
                     
@@ -174,7 +174,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                     document.getElementById('total-requests-count').textContent = (stats.totalRequests || 0).toLocaleString();
                     document.getElementById('unique-ips-count').textContent = stats.uniqueIPs || 0;
                     
-                    const response = await fetch('/api/rate-limits');
+                    const response = await fetch('/api/rate-limits', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed to fetch rate limits');
                     const data = await response.json();
                     
@@ -231,7 +231,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                         method: 'POST', 
                         headers: { 'Content-Type': 'application/json' }, 
                         body: JSON.stringify({ ip }) 
-                    }); 
+                    , credentials: 'same-origin' }); 
                     if (!response.ok) throw new Error('Failed'); 
                     showToast(\`IP \${ip} unblocked\`, 'success'); 
                     refreshRateLimits(); 
@@ -242,7 +242,7 @@ module.exports = (getPageTemplate, requireAuth) => {
             
             async function loadUsers() {
                 try { 
-                    const response = await fetch('/api/users'); 
+                    const response = await fetch('/api/users', { credentials: 'same-origin' }); 
                     if (!response.ok) throw new Error('Failed'); 
                     const users = await response.json(); 
                     const select = document.getElementById('filter-user'); 

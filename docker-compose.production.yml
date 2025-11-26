@@ -1,0 +1,18 @@
+version: "3.8"
+services:
+  logging-server:
+    build: .
+    image: rejavarti/logging-server:latest
+    container_name: Rejavarti-Logging-Server
+    network_mode: bridge
+    ports:
+      - "10180:10180"
+    environment:
+      NODE_ENV: "production"
+      # REQUIRED in production: do not use defaults
+      JWT_SECRET: "${JWT_SECRET}"
+      AUTH_PASSWORD: "${AUTH_PASSWORD}"
+      TIMEZONE: "America/Edmonton"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

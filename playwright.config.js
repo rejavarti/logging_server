@@ -49,7 +49,7 @@ module.exports = defineConfig({
   ],
 
   webServer: {
-    command: 'cross-env PORT=3000 AUTH_PASSWORD=testAdmin123! NODE_ENV=test TEST_DISABLE_NETWORK=true node server.js',
+    command: 'cross-env PORT=3000 NODE_ENV=test TEST_DISABLE_NETWORK=true node server.js',
     url: 'http://localhost:3000/health',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

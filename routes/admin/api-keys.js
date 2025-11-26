@@ -147,7 +147,7 @@ module.exports = (getPageTemplate, requireAuth) => {
         const additionalJS = `
             // Swallow unexpected runtime errors to avoid breaking the page (logged as warnings)
             window.onerror = function(message, source, lineno, colno, error) {
-                try { req.app.locals?.loggers?.admin?.warn('Runtime error:', message, 'at', source+':'+lineno+':'+colno); } catch(_){}
+                try { console.warn('Runtime error:', message, 'at', source+':'+lineno+':'+colno); } catch(_){ /* Error handler catch non-critical */ }
                 return true; // prevent default error handling
             };
 
@@ -186,7 +186,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                             description,
                             expires_in_days: expiresInDays > 0 ? expiresInDays : null
                         })
-                    });
+                    , credentials: 'same-origin' });
 
                     if (!response.ok) throw new Error('Failed to create API key');
 
@@ -232,7 +232,7 @@ module.exports = (getPageTemplate, requireAuth) => {
 
             async function loadApiKeys() {
                 try {
-                    const response = await fetch('/api/api-keys');
+                    const response = await fetch('/api/api-keys', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed to load API keys');
 
                     const data = await response.json();

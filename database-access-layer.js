@@ -19,12 +19,27 @@ class DatabaseAccessLayer extends EventEmitter {
         // Cross-platform CPU sampling (for Windows where os.loadavg is zero)
         this._lastCpuSample = null; // { usage: process.cpuUsage(), time: Date.now() }
         
+        // Prepared statement cache for frequently used queries
+        this.preparedStatements = new Map();
+        this.maxCacheSize = 50;
+
+        // Batched log insertion buffers
+        this.logBatch = [];
+        this.batchMaxSize = parseInt(process.env.LOG_BATCH_SIZE || '50', 10);
+        this.batchIntervalMs = parseInt(process.env.LOG_BATCH_INTERVAL_MS || '100', 10);
+        this.batchFlushInProgress = false;
+        this.batchTimer = null;
+        
         // Initialize with optimizations
         this.initializeConnection();
     }
 
     async initializeConnection() {
         try {
+            // Ensure the underlying adapter is initialized (async)
+            if (this.db && typeof this.db.init === 'function') {
+                await this.db.init();
+            }
             // Additional pragma settings if needed
             if (this.db.dbType === 'sqlite3') {
                 await this.db.run('PRAGMA foreign_keys = ON');
@@ -35,9 +50,101 @@ class DatabaseAccessLayer extends EventEmitter {
             
             const driverInfo = this.db.getDriverInfo();
             this.logger.info(`Database initialized with ${driverInfo.type} (${driverInfo.performance})`);
+
+            // Start batch flush timer after successful init
+            this.startBatchTimer();
         } catch (error) {
             this.logger.error('Database initialization error:', error);
         }
+    }
+
+    startBatchTimer() {
+        if (this.batchTimer) clearInterval(this.batchTimer);
+        this.batchTimer = setInterval(() => {
+            if (this.logBatch.length > 0) {
+                this.flushLogBatch();
+            }
+        }, this.batchIntervalMs);
+    }
+
+    enqueueLogEntry(entry) {
+        this.logBatch.push(entry);
+        this.logger.debug(`Enqueued log entry. Batch size: ${this.logBatch.length}/${this.batchMaxSize}`);
+        if (this.logBatch.length >= this.batchMaxSize) {
+            this.logger.info(`Batch size threshold reached (${this.logBatch.length}), flushing...`);
+            this.flushLogBatch();
+        }
+    }
+
+    async flushLogBatch() {
+        if (this.batchFlushInProgress) {
+            this.logger.debug('Batch flush already in progress, skipping');
+            return;
+        }
+        if (this.logBatch.length === 0) return;
+        this.logger.info(`Starting batch flush for ${this.logBatch.length} entries...`);
+        this.batchFlushInProgress = true;
+        const batch = this.logBatch.splice(0, this.logBatch.length); // drain
+        let successCount = 0;
+        try {
+            if (this.db.dbType === 'better-sqlite3' && this.db.db?.prepare) {
+                const stmt = this.preparedStatements.get('insert_log') || this.db.db.prepare(`INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+                if (!this.preparedStatements.get('insert_log')) this.preparedStatements.set('insert_log', stmt);
+                const transaction = this.db.db.transaction((entries) => {
+                    for (const e of entries) {
+                        const meta = this._serializeMetadata(e);
+                        const tags = this._serializeTags(e);
+                        stmt.run(
+                            e.timestamp || new Date().toISOString(),
+                            e.level || 'info',
+                            e.source || e.category || 'system',
+                            e.message || '',
+                            meta,
+                            e.ip || e.clientIp || null,
+                            e.user_id || e.userId || null,
+                            tags
+                        );
+                        successCount++;
+                    }
+                });
+                transaction(batch);
+            } else {
+                // Fallback: sequential inserts with minimal await
+                for (const e of batch) {
+                    try {
+                        await this.createLogEntry(e); // uses retry logic
+                        successCount++;
+                    } catch { /* already logged */ }
+                }
+            }
+            if (this.metricsManager) {
+                this.metricsManager.incrementBatchFlush();
+                this.metricsManager.incrementBatchedInsert(successCount);
+            }
+            this.logger.info(`Batch flush completed: ${successCount}/${batch.length} entries written`);
+        } catch (err) {
+            this.logger.error(`Batch flush failed (${batch.length} entries):`, err.message);
+            // Fallback: re-queue remaining entries for individual retry
+            for (const e of batch) {
+                try { await this.createLogEntry(e); successCount++; } catch { /* swallow */ }
+            }
+        } finally {
+            this.batchFlushInProgress = false;
+        }
+    }
+
+    _serializeMetadata(entry) {
+        if (entry.metadata) return typeof entry.metadata === 'string' ? entry.metadata : JSON.stringify(entry.metadata);
+        const derived = {};
+        ['user_agent','country','region','city','timezone','coordinates','browser','os','device','device_id'].forEach(f => { if (entry[f] !== undefined) derived[f] = entry[f]; });
+        return Object.keys(derived).length ? JSON.stringify(derived) : null;
+    }
+
+    _serializeTags(entry) {
+        if (!entry.tags) return null;
+        if (Array.isArray(entry.tags)) return entry.tags.join(',');
+        if (typeof entry.tags === 'object') return Object.keys(entry.tags).join(',');
+        return String(entry.tags);
     }
 
     // Ensure required tables exist (especially user_sessions which is critical for session tracking)
@@ -69,6 +176,137 @@ class DatabaseAccessLayer extends EventEmitter {
                 CREATE INDEX IF NOT EXISTS idx_user_sessions_active 
                 ON user_sessions(is_active, expires_at)
             `);
+            
+            // Create encrypted_secrets table for secure credential storage
+            await this.db.run(`
+                CREATE TABLE IF NOT EXISTS encrypted_secrets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    key_name TEXT UNIQUE NOT NULL,
+                    encrypted_value TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_accessed DATETIME,
+                    metadata TEXT
+                )
+            `);
+            
+            await this.db.run(`
+                CREATE INDEX IF NOT EXISTS idx_encrypted_secrets_key 
+                ON encrypted_secrets(key_name)
+            `);
+
+            // Resilience tables (Phase 1)
+            await this.db.run(`
+                CREATE TABLE IF NOT EXISTS transaction_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    transaction_id TEXT UNIQUE NOT NULL,
+                    operation_type TEXT NOT NULL,
+                    table_name TEXT NOT NULL,
+                    record_ids TEXT,
+                    sql_statement TEXT,
+                    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    completed_at DATETIME,
+                    status TEXT DEFAULT 'pending',
+                    error_message TEXT,
+                    retry_count INTEGER DEFAULT 0,
+                    user_id INTEGER,
+                    ip_address TEXT
+                )
+            `);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_transaction_log_status ON transaction_log(status, started_at)`);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_transaction_log_table ON transaction_log(table_name, completed_at)`);
+
+            await this.db.run(`
+                CREATE TABLE IF NOT EXISTS failed_operations_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    operation_type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    error_message TEXT,
+                    error_code TEXT,
+                    failed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    retry_count INTEGER DEFAULT 0,
+                    max_retries INTEGER DEFAULT 3,
+                    next_retry_at DATETIME,
+                    status TEXT DEFAULT 'queued',
+                    resolved_at DATETIME,
+                    priority INTEGER DEFAULT 5
+                )
+            `);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_failed_ops_retry ON failed_operations_queue(status, next_retry_at)`);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_failed_ops_priority ON failed_operations_queue(priority DESC, failed_at)`);
+
+            await this.db.run(`
+                CREATE TABLE IF NOT EXISTS system_error_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    error_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    error_category TEXT NOT NULL,
+                    error_code TEXT,
+                    error_message TEXT NOT NULL,
+                    stack_trace TEXT,
+                    affected_component TEXT,
+                    affected_function TEXT,
+                    severity TEXT DEFAULT 'error',
+                    user_id INTEGER,
+                    ip_address TEXT,
+                    request_id TEXT,
+                    recovery_attempted INTEGER DEFAULT 0,
+                    recovery_successful INTEGER DEFAULT 0,
+                    recovery_method TEXT,
+                    resolved INTEGER DEFAULT 0,
+                    resolved_at DATETIME,
+                    resolved_by INTEGER,
+                    occurrence_count INTEGER DEFAULT 1,
+                    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            `);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_sys_error_severity ON system_error_log(severity, resolved)`);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_sys_error_category ON system_error_log(error_category, error_timestamp)`);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_sys_error_occurrence ON system_error_log(error_code, occurrence_count)`);
+
+            await this.db.run(`
+                CREATE TABLE IF NOT EXISTS database_health_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    check_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    database_size_mb REAL,
+                    table_count INTEGER,
+                    total_records INTEGER,
+                    logs_table_records INTEGER,
+                    corruption_detected INTEGER DEFAULT 0,
+                    integrity_check_passed INTEGER DEFAULT 1,
+                    vacuum_last_run DATETIME,
+                    backup_last_run DATETIME,
+                    avg_query_time_ms REAL,
+                    slow_queries_count INTEGER DEFAULT 0,
+                    disk_space_available_mb REAL,
+                    wal_size_mb REAL,
+                    checks_performed TEXT
+                )
+            `);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_db_health_timestamp ON database_health_log(check_timestamp)`);
+            
+            // Alert rules table for managing alert definitions
+            await this.db.run(`
+                CREATE TABLE IF NOT EXISTS alert_rules (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    type TEXT NOT NULL DEFAULT 'pattern',
+                    condition TEXT NOT NULL,
+                    severity TEXT DEFAULT 'warning',
+                    cooldown INTEGER DEFAULT 300,
+                    enabled INTEGER DEFAULT 1,
+                    channels TEXT DEFAULT '[]',
+                    escalation_rules TEXT,
+                    trigger_count INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    created_by INTEGER,
+                    FOREIGN KEY (created_by) REFERENCES users (id)
+                )
+            `);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_alert_rules_enabled ON alert_rules(enabled)`);
+            await this.db.run(`CREATE INDEX IF NOT EXISTS idx_alert_rules_type ON alert_rules(type)`);
             
             this.logger.info('Required tables verified/created successfully');
         } catch (error) {
@@ -320,11 +558,54 @@ class DatabaseAccessLayer extends EventEmitter {
      */
     async createLogEntry(entry) {
         try {
-            // Build metadata object if not explicitly provided as JSON/string
+            // Use faster synchronous insert when available (better-sqlite3)
+            if (this.db.dbType === 'better-sqlite3' && typeof this.db.db?.prepare === 'function') {
+                // Build metadata object
+                let meta = null;
+                if (entry.metadata) {
+                    meta = typeof entry.metadata === 'string' ? entry.metadata : JSON.stringify(entry.metadata);
+                } else {
+                    const derived = {};
+                    ['user_agent','country','region','city','timezone','coordinates','browser','os','device','device_id'].forEach(f => {
+                        if (entry[f] !== undefined) derived[f] = entry[f];
+                    });
+                    if (Object.keys(derived).length) meta = JSON.stringify(derived);
+                }
+
+                // Normalize tags
+                let tags = null;
+                if (entry.tags) {
+                    if (Array.isArray(entry.tags)) tags = entry.tags.join(',');
+                    else if (typeof entry.tags === 'object') tags = Object.keys(entry.tags).join(',');
+                    else tags = String(entry.tags);
+                }
+
+                // Use prepared statement from cache
+                const cacheKey = 'insert_log';
+                let stmt = this.preparedStatements.get(cacheKey);
+                if (!stmt) {
+                    stmt = this.db.db.prepare(`INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+                    this.preparedStatements.set(cacheKey, stmt);
+                }
+
+                const result = stmt.run(
+                    entry.timestamp || new Date().toISOString(),
+                    entry.level || 'info',
+                    entry.source || entry.category || 'system',
+                    entry.message || '',
+                    meta,
+                    entry.ip || entry.clientIp || null,
+                    entry.user_id || entry.userId || null,
+                    tags
+                );
+                
+                return { changes: result.changes, lastID: result.lastInsertRowid };
+            }
+            
+            // Fallback to async for other adapters
             let meta = null;
             if (entry.metadata) {
                 if (typeof entry.metadata === 'string') {
-                    // Assume already serialized
                     meta = entry.metadata;
                 } else {
                     meta = JSON.stringify(entry.metadata);
@@ -333,10 +614,9 @@ class DatabaseAccessLayer extends EventEmitter {
                 const derived = {};
                 const metaFields = ['user_agent','country','region','city','timezone','coordinates','browser','os','device','device_id'];
                 metaFields.forEach(f => { if (entry[f] !== undefined) derived[f] = entry[f]; });
-                if (Object.keys(derived).length) meta = JSON.stringify(derived); // Only set if we captured something
+                if (Object.keys(derived).length) meta = JSON.stringify(derived);
             }
 
-            // Normalize tags (can be array, object, string)
             let tags = null;
             if (entry.tags) {
                 if (Array.isArray(entry.tags)) tags = entry.tags.join(',');
@@ -348,7 +628,6 @@ class DatabaseAccessLayer extends EventEmitter {
             const params = [
                 entry.timestamp || new Date().toISOString(),
                 entry.level || 'info',
-                // Allow category fallback for legacy callers
                 entry.source || entry.category || 'system',
                 entry.message || '',
                 meta,
@@ -359,7 +638,45 @@ class DatabaseAccessLayer extends EventEmitter {
             return await this.run(sql, params);
         } catch (error) {
             this.logger.error('Failed to create log entry:', error);
-            throw error;
+            // Queue for retry only if database is locked/busy
+            const msg = (error.message || '').toLowerCase();
+            if (msg.includes('busy') || msg.includes('locked') || msg.includes('database is locked')) {
+                if (this.metricsManager) this.metricsManager.incrementLockedInsert();
+                // Retry with exponential backoff up to 3 attempts
+                const delays = [10, 25, 50];
+                for (let i = 0; i < delays.length; i++) {
+                    await new Promise(r => setTimeout(r, delays[i]));
+                    try {
+                        return await this.createLogEntry({...entry, retryAttempt: (entry.retryAttempt||0)+1});
+                    } catch (e2) {
+                        if (i === delays.length - 1) {
+                            if (this.metricsManager) this.metricsManager.incrementFailedInsert();
+                            await this.logSystemError({
+                                error_category: 'database',
+                                error_code: 'LOG_INSERT_LOCK_FINAL',
+                                error_message: e2.message,
+                                stack_trace: e2.stack,
+                                affected_component: 'DAL',
+                                affected_function: 'createLogEntry'
+                            });
+                            throw e2;
+                        } else {
+                            if (this.metricsManager) this.metricsManager.incrementRetriedInsert();
+                        }
+                    }
+                }
+            } else {
+                if (this.metricsManager) this.metricsManager.incrementFailedInsert();
+                await this.logSystemError({
+                    error_category: 'database',
+                    error_code: 'LOG_INSERT_FAIL',
+                    error_message: error.message,
+                    stack_trace: error.stack,
+                    affected_component: 'DAL',
+                    affected_function: 'createLogEntry'
+                });
+                throw error;
+            }
         }
     }
 
@@ -425,7 +742,8 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getRecentParseErrors(limit = 10) {
         try {
-            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors ORDER BY created_at DESC LIMIT ?`;
+            // Only return unacknowledged notifications - acknowledged ones are "cleared"
+            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors WHERE acknowledged = 0 ORDER BY created_at DESC LIMIT ?`;
             return await this.all(sql, [limit]);
         } catch (error) {
             this.logger.warn('Failed to get recent parse errors:', error.message);
@@ -679,12 +997,9 @@ class DatabaseAccessLayer extends EventEmitter {
         return await this.run(sql, [status, deviceId]);
     }
 
-    // Cleanup and maintenance
-    async cleanup() {
-        if (this.db) {
-            this.db.close();
-        }
-    }
+    // Cleanup and maintenance (deprecated - use the cleanup() at end of class)
+    // This version is kept for backward compatibility but delegates to the main cleanup
+    // Note: The main cleanup() method properly clears timers and flushes batches
 
     // System settings methods
     async getSetting(key, defaultValue = null) {
@@ -788,17 +1103,24 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async createAlertRule(ruleData) {
-        const sql = `INSERT INTO alert_rules (name, condition_sql, threshold_value, comparison_operator, 
-                     severity, enabled, notification_channels, created_at, updated_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
+        // Handle both frontend format (condition object) and direct condition string
+        const conditionValue = typeof ruleData.condition === 'object' 
+            ? JSON.stringify(ruleData.condition) 
+            : (ruleData.condition || '{}');
+        
+        const sql = `INSERT INTO alert_rules (name, description, type, condition, severity, cooldown, 
+                     enabled, channels, escalation_rules, created_at, updated_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
         const params = [
             ruleData.name,
-            ruleData.condition_sql,
-            ruleData.threshold_value,
-            ruleData.comparison_operator,
-            ruleData.severity,
-            ruleData.enabled || 1,
-            ruleData.notification_channels ? JSON.stringify(ruleData.notification_channels) : null
+            ruleData.description || null,
+            ruleData.type || 'pattern',
+            conditionValue,
+            ruleData.severity || 'warning',
+            ruleData.cooldown || 300,
+            ruleData.enabled !== undefined ? (ruleData.enabled ? 1 : 0) : 1,
+            ruleData.channels ? JSON.stringify(ruleData.channels) : '[]',
+            ruleData.escalation_rules ? JSON.stringify(ruleData.escalation_rules) : null
         ];
         return await this.run(sql, params);
     }
@@ -948,12 +1270,25 @@ class DatabaseAccessLayer extends EventEmitter {
         const sql = `INSERT INTO activity_log (user_id, action, resource_type, resource_id, 
                      details, ip_address, user_agent, timestamp) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`;
+        
+        // Handle details field - avoid double-stringifying
+        let detailsValue = null;
+        if (activityData.details) {
+            if (typeof activityData.details === 'string') {
+                // Already a string, use as-is
+                detailsValue = activityData.details;
+            } else {
+                // Object, stringify it
+                detailsValue = JSON.stringify(activityData.details);
+            }
+        }
+        
         const params = [
             activityData.user_id,
             activityData.action,
             activityData.resource_type,
             activityData.resource_id,
-            activityData.details ? JSON.stringify(activityData.details) : null,
+            detailsValue,
             activityData.ip_address,
             activityData.user_agent
         ];
@@ -974,15 +1309,30 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getActivityLog(userId = null, limit = 100, offset = 0) {
-        let sql = `SELECT * FROM activity_log`;
+        // JOIN with users table to get username, and map fields for display
+        let sql = `
+            SELECT 
+                a.id,
+                a.user_id,
+                COALESCE(u.username, 'System') as username,
+                a.action,
+                a.resource_type as type,
+                a.resource_id as target,
+                a.details as metadata,
+                a.ip_address,
+                a.user_agent,
+                a.created_at as timestamp
+            FROM activity_log a
+            LEFT JOIN users u ON a.user_id = u.id
+        `;
         const params = [];
         
         if (userId) {
-            sql += ` WHERE user_id = ?`;
+            sql += ` WHERE a.user_id = ?`;
             params.push(userId);
         }
         
-        sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+        sql += ` ORDER BY a.created_at DESC LIMIT ? OFFSET ?`;
         params.push(limit, offset);
 
         return await this.all(sql, params);
@@ -1071,27 +1421,45 @@ class DatabaseAccessLayer extends EventEmitter {
             // Calculate memory as percentage of actual system memory
             const memPercent = Math.min(Math.round((usedMem / totalMem) * 100), 100);
             
-            // Calculate disk as percentage of actual available space
-            // Use du command to get /app/data directory size in MB
+            // Calculate disk usage based on actual /app/data directory size
+            // NOT the entire mounted filesystem (which can be misleading in Docker)
             let diskUsedMB = dbSize;
-            let diskTotalMB = 10240; // Default 10GB
+            let diskTotalMB = parseInt(process.env.DISK_QUOTA_MB) || 10240; // Default quota: 10GB, override with DISK_QUOTA_MB env var
+            let diskPath = '/app/data';
+            
             try {
                 const { execSync } = require('child_process');
-                // Get disk usage of /app/data mount point
+                // Get actual size of /app/data directory (not the entire mounted filesystem)
+                const duOutput = execSync('du -sm /app/data 2>/dev/null || echo "0"', { encoding: 'utf8' }).trim();
+                const actualUsedMB = parseInt(duOutput.split(/\s+/)[0]) || diskUsedMB;
+                diskUsedMB = actualUsedMB;
+                
+                // Get available space on the mount point to provide accurate capacity
                 const dfOutput = execSync('df -BM /app/data 2>/dev/null || echo "error"', { encoding: 'utf8' });
                 if (!dfOutput.includes('error')) {
                     const lines = dfOutput.trim().split('\n');
                     if (lines.length > 1) {
                         const parts = lines[1].split(/\s+/);
                         // Format: Filesystem Size Used Available Use% Mounted
-                        if (parts.length >= 4) {
-                            diskTotalMB = parseInt(parts[1].replace('M', '')) || diskTotalMB;
-                            diskUsedMB = parseInt(parts[2].replace('M', '')) || diskUsedMB;
+                        if (parts.length >= 6) {
+                            const filesystemTotalMB = parseInt(parts[1].replace('M', '')) || 0;
+                            const filesystemUsedMB = parseInt(parts[2].replace('M', '')) || 0;
+                            const availableMB = parseInt(parts[3].replace('M', '')) || 0;
+                            diskPath = parts[5] || '/app/data';
+                            
+                            // Use environment variable to decide behavior:
+                            // - If DISK_QUOTA_MB is set: use that as the limit
+                            // - Otherwise: show percentage of the logging directory relative to available space
+                            if (!process.env.DISK_QUOTA_MB && availableMB > 0) {
+                                // Dynamic: show how much space we're using out of what's available to grow into
+                                diskTotalMB = diskUsedMB + availableMB;
+                            }
+                            // If DISK_QUOTA_MB is set, it takes precedence (keeps diskTotalMB from line 1094)
                         }
                     }
                 }
             } catch (error) {
-                // Fallback to database size only if df fails
+                // Fallback to database size only if commands fail
                 diskUsedMB = dbSize;
             }
             const diskPercent = Math.min(Math.round((diskUsedMB / diskTotalMB) * 100), 100);
@@ -1102,8 +1470,13 @@ class DatabaseAccessLayer extends EventEmitter {
                 memory: memPercent,
                 cpu: cpuPercent,
                 disk: diskPercent,
+                // Detailed disk metrics (logging data directory focus)
+                diskUsedMB,
+                diskTotalMB,
+                diskPath: '/app/data',
+                diskMethod: 'du+df',
                 memoryMB: memUsedMB,
-                diskMB: dbSize,
+                databaseSizeMB: dbSize,
                 totalMemoryMB: Math.round(totalMem / 1024 / 1024),
                 freeMemoryMB: Math.round(freeMem / 1024 / 1024),
                 database_driver: this.db.dbType || 'unknown'
@@ -1211,7 +1584,10 @@ class DatabaseAccessLayer extends EventEmitter {
     // Activity log additional methods
     async getActivityById(activityId) {
         try {
-            const sql = `SELECT * FROM activity_log WHERE id = ?`;
+            const sql = `SELECT a.*, u.username, a.created_at as timestamp
+                         FROM activity_log a 
+                         LEFT JOIN users u ON a.user_id = u.id
+                         WHERE a.id = ?`;
             return await this.db.get(sql, [activityId]);
         } catch (error) {
             this.logger.warn('Failed to get activity by ID:', error.message);
@@ -1221,7 +1597,11 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getActivitiesSince(timestamp) {
         try {
-            const sql = `SELECT * FROM activity_log WHERE created_at >= ? ORDER BY created_at DESC`;
+            const sql = `SELECT a.*, u.username, a.created_at as timestamp
+                         FROM activity_log a 
+                         LEFT JOIN users u ON a.user_id = u.id
+                         WHERE a.created_at >= ? 
+                         ORDER BY a.created_at DESC`;
             return await this.db.all(sql, [timestamp]);
         } catch (error) {
             this.logger.warn('Failed to get activities since timestamp:', error.message);
@@ -1231,31 +1611,34 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getAllActivity(filters = {}) {
         try {
-            let sql = `SELECT * FROM activity_log WHERE 1=1`;
+            let sql = `SELECT a.*, u.username, a.created_at as timestamp
+                       FROM activity_log a 
+                       LEFT JOIN users u ON a.user_id = u.id
+                       WHERE 1=1`;
             const params = [];
 
             if (filters.user_id) {
-                sql += ` AND user_id = ?`;
+                sql += ` AND a.user_id = ?`;
                 params.push(filters.user_id);
             }
             if (filters.action) {
-                sql += ` AND action = ?`;
+                sql += ` AND a.action = ?`;
                 params.push(filters.action);
             }
             if (filters.resource_type) {
-                sql += ` AND resource_type = ?`;
+                sql += ` AND a.resource_type = ?`;
                 params.push(filters.resource_type);
             }
             if (filters.start_date) {
-                sql += ` AND created_at >= ?`;
+                sql += ` AND a.created_at >= ?`;
                 params.push(filters.start_date);
             }
             if (filters.end_date) {
-                sql += ` AND created_at <= ?`;
+                sql += ` AND a.created_at <= ?`;
                 params.push(filters.end_date);
             }
 
-            sql += ` ORDER BY created_at DESC`;
+            sql += ` ORDER BY a.created_at DESC`;
             
             if (filters.limit) {
                 sql += ` LIMIT ?`;
@@ -1265,6 +1648,49 @@ class DatabaseAccessLayer extends EventEmitter {
             return await this.db.all(sql, params);
         } catch (error) {
             this.logger.warn('Failed to get all activity:', error.message);
+            return [];
+        }
+    }
+
+    async exportActivities(filters = {}) {
+        try {
+            let sql = `SELECT a.*, u.username, a.resource_type as resource, a.created_at as timestamp
+                       FROM activity_log a 
+                       LEFT JOIN users u ON a.user_id = u.id
+                       WHERE 1=1`;
+            const params = [];
+
+            if (filters.user_id) {
+                sql += ` AND a.user_id = ?`;
+                params.push(filters.user_id);
+            }
+            if (filters.action) {
+                sql += ` AND a.action = ?`;
+                params.push(filters.action);
+            }
+            if (filters.resource_type) {
+                sql += ` AND a.resource_type = ?`;
+                params.push(filters.resource_type);
+            }
+            if (filters.start_date) {
+                sql += ` AND a.created_at >= ?`;
+                params.push(filters.start_date);
+            }
+            if (filters.end_date) {
+                sql += ` AND a.created_at <= ?`;
+                params.push(filters.end_date);
+            }
+
+            sql += ` ORDER BY a.created_at DESC`;
+            
+            if (filters.limit) {
+                sql += ` LIMIT ?`;
+                params.push(parseInt(filters.limit));
+            }
+
+            return await this.db.all(sql, params);
+        } catch (error) {
+            this.logger.warn('Failed to export activities:', error.message);
             return [];
         }
     }
@@ -1479,18 +1905,18 @@ class DatabaseAccessLayer extends EventEmitter {
             let sql = `SELECT * FROM logs WHERE 1=1`;
             const params = [];
 
-            // Text search
+            // Text search - check message OR source for match
             if (query) {
                 if (regex) {
                     // SQLite doesn't support REGEXP by default, use LIKE with wildcards
-                    sql += ` AND message LIKE ?`;
-                    params.push(`%${query}%`);
+                    sql += ` AND (message LIKE ? OR source LIKE ?)`;
+                    params.push(`%${query}%`, `%${query}%`);
                 } else if (caseSensitive) {
-                    sql += ` AND message GLOB ?`;
-                    params.push(`*${query}*`);
+                    sql += ` AND (message GLOB ? OR source GLOB ?)`;
+                    params.push(`*${query}*`, `*${query}*`);
                 } else {
-                    sql += ` AND message LIKE ?`;
-                    params.push(`%${query}%`);
+                    sql += ` AND (message LIKE ? OR source LIKE ?)`;
+                    params.push(`%${query}%`, `%${query}%`);
                 }
             }
 
@@ -1544,10 +1970,239 @@ class DatabaseAccessLayer extends EventEmitter {
         return this.db ? this.db.getDriverInfo() : null;
     }
 
+    // Encrypted secrets management
+    async storeEncryptedSecret(keyName, encryptedValue, metadata = null) {
+        try {
+            const existing = await this.get(
+                `SELECT id FROM encrypted_secrets WHERE key_name = ?`,
+                [keyName]
+            );
+            
+            if (existing) {
+                // Update existing
+                await this.run(
+                    `UPDATE encrypted_secrets SET encrypted_value = ?, updated_at = datetime('now'), metadata = ? WHERE key_name = ?`,
+                    [encryptedValue, metadata ? JSON.stringify(metadata) : null, keyName]
+                );
+            } else {
+                // Insert new
+                await this.run(
+                    `INSERT INTO encrypted_secrets (key_name, encrypted_value, metadata) VALUES (?, ?, ?)`,
+                    [keyName, encryptedValue, metadata ? JSON.stringify(metadata) : null]
+                );
+            }
+            return { success: true };
+        } catch (error) {
+            this.logger.error('Failed to store encrypted secret:', error);
+            throw error;
+        }
+    }
+
+    async getEncryptedSecret(keyName) {
+        try {
+            const result = await this.get(
+                `SELECT encrypted_value, metadata, created_at, updated_at FROM encrypted_secrets WHERE key_name = ?`,
+                [keyName]
+            );
+            
+            if (result) {
+                // Update last_accessed timestamp
+                await this.run(
+                    `UPDATE encrypted_secrets SET last_accessed = datetime('now') WHERE key_name = ?`,
+                    [keyName]
+                );
+                
+                return {
+                    encryptedValue: result.encrypted_value,
+                    metadata: result.metadata ? JSON.parse(result.metadata) : null,
+                    createdAt: result.created_at,
+                    updatedAt: result.updated_at
+                };
+            }
+            return null;
+        } catch (error) {
+            this.logger.error('Failed to retrieve encrypted secret:', error);
+            throw error;
+        }
+    }
+
+    async deleteEncryptedSecret(keyName) {
+        try {
+            await this.run(`DELETE FROM encrypted_secrets WHERE key_name = ?`, [keyName]);
+            return { success: true };
+        } catch (error) {
+            this.logger.error('Failed to delete encrypted secret:', error);
+            throw error;
+        }
+    }
+
+    async listEncryptedSecretKeys() {
+        try {
+            const results = await this.all(
+                `SELECT key_name, created_at, updated_at, last_accessed FROM encrypted_secrets ORDER BY key_name`
+            );
+            return results || [];
+        } catch (error) {
+            this.logger.error('Failed to list encrypted secret keys:', error);
+            return [];
+        }
+    }
+
     // Cleanup and maintenance
     async cleanup() {
+        // Clear batch timer to prevent memory leaks
+        if (this.batchTimer) {
+            clearInterval(this.batchTimer);
+            this.batchTimer = null;
+        }
+        // Flush any pending log entries before closing
+        if (this.logBatch && this.logBatch.length > 0) {
+            try {
+                await this.flushLogBatch();
+            } catch (e) {
+                this.logger.warn('Failed to flush log batch during cleanup:', e.message);
+            }
+        }
         if (this.db) {
             this.db.close();
+        }
+    }
+
+    // ===== Resilience Helper Methods =====
+    async logTransaction(entry) {
+        try {
+            const {
+                transaction_id,
+                operation_type,
+                table_name,
+                record_ids,
+                sql_statement,
+                status = 'pending',
+                error_message = null,
+                retry_count = 0,
+                user_id = null,
+                ip_address = null
+            } = entry;
+            return await this.run(`
+                INSERT INTO transaction_log (
+                    transaction_id, operation_type, table_name, record_ids, sql_statement,
+                    status, error_message, retry_count, user_id, ip_address
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [transaction_id, operation_type, table_name, record_ids ? JSON.stringify(record_ids) : null, sql_statement, status, error_message, retry_count, user_id, ip_address]);
+        } catch (error) {
+            this.logger.error('Failed to log transaction:', error);
+            throw error;
+        }
+    }
+
+    async updateTransactionStatus(transaction_id, status, error_message = null) {
+        try {
+            await this.run(`UPDATE transaction_log SET status = ?, error_message = ?, completed_at = datetime('now') WHERE transaction_id = ?`, [status, error_message, transaction_id]);
+        } catch (error) {
+            this.logger.error('Failed to update transaction status:', error);
+        }
+    }
+
+    async queueFailedOperation(op) {
+        try {
+            const {
+                operation_type,
+                payload,
+                error_message = null,
+                error_code = null,
+                retry_count = 0,
+                max_retries = 3,
+                next_retry_at = new Date(Date.now() + 60_000).toISOString(),
+                status = 'queued',
+                priority = 5
+            } = op;
+            return await this.run(`
+                INSERT INTO failed_operations_queue (
+                    operation_type, payload, error_message, error_code, retry_count, max_retries,
+                    next_retry_at, status, priority
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [operation_type, JSON.stringify(payload), error_message, error_code, retry_count, max_retries, next_retry_at, status, priority]);
+        } catch (error) {
+            this.logger.error('Failed to queue failed operation:', error);
+        }
+    }
+
+    async fetchRetryableFailedOperations(limit = 20) {
+        try {
+            const nowIso = new Date().toISOString();
+            return await this.all(`
+                SELECT * FROM failed_operations_queue 
+                WHERE status = 'queued' AND (next_retry_at IS NULL OR next_retry_at <= ?) 
+                ORDER BY priority ASC, failed_at ASC LIMIT ?
+            `, [nowIso, limit]);
+        } catch (error) {
+            this.logger.error('Failed to fetch retryable failed operations:', error);
+            return [];
+        }
+    }
+
+    async markFailedOperation(id, fields) {
+        const sets = [];
+        const params = [];
+        for (const [k, v] of Object.entries(fields)) {
+            sets.push(`${k} = ?`);
+            params.push(v);
+        }
+        params.push(id);
+        await this.run(`UPDATE failed_operations_queue SET ${sets.join(', ')} WHERE id = ?`, params);
+    }
+
+    async logSystemError(entry) {
+        try {
+            const {
+                error_category,
+                error_code,
+                error_message,
+                stack_trace = null,
+                affected_component = null,
+                affected_function = null,
+                severity = 'error',
+                user_id = null,
+                ip_address = null,
+                request_id = null
+            } = entry;
+            return await this.run(`
+                INSERT INTO system_error_log (
+                    error_category, error_code, error_message, stack_trace, affected_component,
+                    affected_function, severity, user_id, ip_address, request_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [error_category, error_code, error_message, stack_trace, affected_component, affected_function, severity, user_id, ip_address, request_id]);
+        } catch (error) {
+            this.logger.error('Failed to log system error:', error);
+        }
+    }
+
+    async logDatabaseHealthSnapshot(snapshot) {
+        try {
+            const {
+                database_size_mb = null,
+                table_count = null,
+                total_records = null,
+                logs_table_records = null,
+                corruption_detected = 0,
+                integrity_check_passed = 1,
+                vacuum_last_run = null,
+                backup_last_run = null,
+                avg_query_time_ms = null,
+                slow_queries_count = 0,
+                disk_space_available_mb = null,
+                wal_size_mb = null,
+                checks_performed = null
+            } = snapshot;
+            return await this.run(`
+                INSERT INTO database_health_log (
+                    database_size_mb, table_count, total_records, logs_table_records,
+                    corruption_detected, integrity_check_passed, vacuum_last_run, backup_last_run,
+                    avg_query_time_ms, slow_queries_count, disk_space_available_mb, wal_size_mb, checks_performed
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `, [database_size_mb, table_count, total_records, logs_table_records, corruption_detected, integrity_check_passed, vacuum_last_run, backup_last_run, avg_query_time_ms, slow_queries_count, disk_space_available_mb, wal_size_mb, checks_performed ? JSON.stringify(checks_performed) : null]);
+        } catch (error) {
+            this.logger.error('Failed to log database health snapshot:', error);
         }
     }
 }

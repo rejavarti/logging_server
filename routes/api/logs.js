@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const queryParser = require('../../utils/query-parser');
 
 // GET /api/logs - Get logs with filtering and pagination
 router.get('/', async (req, res) => {
@@ -10,6 +11,7 @@ router.get('/', async (req, res) => {
             level,
             source,
             search,
+            q, // Structured query (e.g., "level:error AND source:api")
             startDate,
             endDate,
             category
@@ -40,36 +42,46 @@ router.get('/', async (req, res) => {
         let countQuery = 'SELECT COUNT(*) as count FROM logs WHERE 1=1';
         let params = [];
 
-        if (level) {
-            query += ' AND level = ?';
-            countQuery += ' AND level = ?';
-            params.push(level);
-        }
-        if (source) {
-            query += ' AND source = ?';
-            countQuery += ' AND source = ?';
-            params.push(source);
-        }
-        if (search) {
-            query += ' AND (message LIKE ? OR source LIKE ?)';
-            countQuery += ' AND (message LIKE ? OR source LIKE ?)';
-            params.push(`%${search}%`, `%${search}%`);
-        }
-        if (startDate) {
-            query += ' AND timestamp >= ?';
-            countQuery += ' AND timestamp >= ?';
-            params.push(startDate);
-        }
-        if (endDate) {
-            query += ' AND timestamp <= ?';
-            countQuery += ' AND timestamp <= ?';
-            params.push(endDate);
-        }
-        if (category) {
-            // Map legacy 'category' filter to 'source'
-            query += ' AND source = ?';
-            countQuery += ' AND source = ?';
-            params.push(category);
+        // Check if structured query is provided
+        if (q && queryParser.isValid(q)) {
+            const parsed = queryParser.parse(q);
+            query += ' AND (' + parsed.where + ')';
+            countQuery += ' AND (' + parsed.where + ')';
+            // Convert named params to positional for SQLite
+            Object.values(parsed.params).forEach(v => params.push(v));
+        } else {
+            // Fall back to legacy filters
+            if (level) {
+                query += ' AND level = ?';
+                countQuery += ' AND level = ?';
+                params.push(level);
+            }
+            if (source) {
+                query += ' AND source = ?';
+                countQuery += ' AND source = ?';
+                params.push(source);
+            }
+            if (search) {
+                query += ' AND (message LIKE ? OR source LIKE ?)';
+                countQuery += ' AND (message LIKE ? OR source LIKE ?)';
+                params.push(`%${search}%`, `%${search}%`);
+            }
+            if (startDate) {
+                query += ' AND timestamp >= ?';
+                countQuery += ' AND timestamp >= ?';
+                params.push(startDate);
+            }
+            if (endDate) {
+                query += ' AND timestamp <= ?';
+                countQuery += ' AND timestamp <= ?';
+                params.push(endDate);
+            }
+            if (category) {
+                // Map legacy 'category' filter to 'source'
+                query += ' AND source = ?';
+                countQuery += ' AND source = ?';
+                params.push(category);
+            }
         }
 
     query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
@@ -86,7 +98,8 @@ router.get('/', async (req, res) => {
             limit: filters.limit,
             offset: filters.offset,
             page: page || Math.floor(filters.offset / filters.limit) + 1,
-            pageSize: filters.limit
+            pageSize: filters.limit,
+            query: q || null
         });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API logs error:', error);
@@ -209,32 +222,54 @@ router.get('/analytics', async (req, res) => {
 // GET /api/logs/export - Export logs
 router.get('/export', async (req, res) => {
     try {
-        const filters = { ...req.query };
-        delete filters.format;
+        // Params
+        const { format = 'json' } = req.query;
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10000, 1), 100000);
 
-        const logs = await req.dal.all(`
-            SELECT * FROM logs 
-            ORDER BY timestamp DESC 
-            LIMIT 10000
-        `);
-        const format = req.query.format || 'json';
+        // Fetch data using existing columns only
+        const logs = await req.dal.all(
+            `SELECT id, timestamp, level, source, ip, message, metadata
+             FROM logs
+             ORDER BY timestamp DESC
+             LIMIT ?`,
+            [limit]
+        );
 
         if (format === 'csv') {
+            const header = 'Timestamp,Level,Source,Message';
             const csv = logs.map(log => {
-                return `"${log.timestamp}","${log.level}","${log.source}","${log.message?.replace(/"/g, '""') || ''}"`;
+                return '"' + (log.timestamp || '') + '",' +
+                       '"' + (log.level || '') + '",' +
+                       '"' + (log.source || '') + '",' +
+                       '"' + ((log.message || '').replace(/"/g, '""')) + '"';
             }).join('\n');
-            
-            const csvContent = 'Timestamp,Level,Source,Message\n' + csv;
-            
+
             res.setHeader('Content-Type', 'text/csv');
             res.setHeader('Content-Disposition', 'attachment; filename=logs.csv');
-            res.send(csvContent);
-        } else {
-            res.json({ logs });
+            return res.send(header + '\n' + csv);
         }
+
+        if (format === 'ndjson') {
+            res.setHeader('Content-Type', 'application/x-ndjson');
+            res.setHeader('Content-Disposition', 'attachment; filename=logs.ndjson');
+
+            // Stream NDJSON lines to the response to avoid building a huge string in memory
+            for (const log of logs) {
+                // Ensure metadata is object when possible
+                const out = { ...log };
+                if (typeof out.metadata === 'string') {
+                    try { out.metadata = JSON.parse(out.metadata); } catch (_) { /* Metadata parse non-critical, keep as string */ }
+                }
+                res.write(JSON.stringify(out) + '\n');
+            }
+            return res.end();
+        }
+
+        // Default JSON
+        return res.json({ logs });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API logs export error:', error);
-        res.status(500).json({ error: 'Failed to export logs' });
+        return res.status(500).json({ error: 'Failed to export logs' });
     }
 });
 
@@ -299,7 +334,110 @@ router.get('/count/today', async (req, res) => {
     }
 });
 
+// GET /api/logs/stats - Get log statistics and aggregations
+// NOTE: This MUST come BEFORE /:id route to avoid matching "stats" as an ID
+router.get('/stats', async (req, res) => {
+    try {
+        const { period = '24h', groupBy = 'hour', level } = req.query;
+        
+        if (!req.dal) {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        // Calculate time range based on period
+        const periodMap = {
+            '1h': 1, '24h': 24, '7d': 24 * 7, '30d': 24 * 30
+        };
+        const hours = periodMap[period] || 24;
+        const startTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
+        
+        // Base query with time filter
+        let whereClause = 'WHERE timestamp >= ?';
+        let params = [startTime];
+        
+        if (level) {
+            whereClause += ' AND level = ?';
+            params.push(level);
+        }
+        
+        // Group by time periods
+        if (groupBy === 'hour') {
+            const query = `
+                SELECT strftime('%Y-%m-%d %H:00', timestamp) as period, COUNT(*) as count
+                FROM logs
+                ${whereClause}
+                GROUP BY period
+                ORDER BY period ASC
+            `;
+            const rows = await req.dal.all(query, params);
+            
+            const labels = rows.map(r => r.period.split(' ')[1] || r.period);
+            const values = rows.map(r => r.count);
+            
+            return res.json({ success: true, labels, values, total: values.reduce((a, b) => a + b, 0) });
+        } else if (groupBy === 'day') {
+            const query = `
+                SELECT strftime('%Y-%m-%d', timestamp) as period, COUNT(*) as count
+                FROM logs
+                ${whereClause}
+                GROUP BY period
+                ORDER BY period ASC
+            `;
+            const rows = await req.dal.all(query, params);
+            
+            const labels = rows.map(r => r.period);
+            const values = rows.map(r => r.count);
+            
+            return res.json({ success: true, labels, values, total: values.reduce((a, b) => a + b, 0) });
+        } else if (groupBy === 'level') {
+            const query = `
+                SELECT level, COUNT(*) as count
+                FROM logs
+                ${whereClause}
+                GROUP BY level
+                ORDER BY count DESC
+            `;
+            const rows = await req.dal.all(query, params);
+            
+            const byLevel = {};
+            rows.forEach(r => {
+                byLevel[r.level || 'unknown'] = r.count;
+            });
+            
+            return res.json({ success: true, byLevel, total: rows.reduce((sum, r) => sum + r.count, 0) });
+        } else if (groupBy === 'source') {
+            const query = `
+                SELECT source, COUNT(*) as count
+                FROM logs
+                ${whereClause}
+                GROUP BY source
+                ORDER BY count DESC
+                LIMIT 10
+            `;
+            const rows = await req.dal.all(query, params);
+            
+            const bySource = {};
+            rows.forEach(r => {
+                bySource[r.source || 'unknown'] = r.count;
+            });
+            
+            return res.json({ success: true, bySource, total: rows.reduce((sum, r) => sum + r.count, 0) });
+        }
+        
+        // Default: return basic stats
+        const totalQuery = `SELECT COUNT(*) as total FROM logs ${whereClause}`;
+        const totalResult = await req.dal.get(totalQuery, params);
+        
+        return res.json({ success: true, total: totalResult.total || 0 });
+        
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Log stats error:', error);
+        res.status(500).json({ success: false, error: 'Failed to fetch statistics' });
+    }
+});
+
 // GET /api/logs/:id - Get single log entry details
+// NOTE: This MUST come AFTER specific routes like /stats to avoid matching them as IDs
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
@@ -353,14 +491,79 @@ router.post('/', async (req, res) => {
             return res.status(503).json({ success: false, error: 'Database not available' });
         }
         const ts = timestamp || new Date().toISOString();
-        const result = await req.dal.run(
-            `INSERT INTO logs (level, message, source, ip, timestamp) VALUES (?, ?, ?, ?, ?)`,
-            [level, message, source, req.ip || 'unknown', ts]
-        );
-        return res.status(201).json({ success: true, id: result.lastID });
+        let insertedId = null;
+        let usedBatching = false;
+        // Prefer batched ingestion when available for reliability under load
+        if (req.dal && typeof req.dal.enqueueLogEntry === 'function') {
+            req.dal.enqueueLogEntry({ level, message, source, ip: req.ip || 'unknown', timestamp: ts });
+            // Batched ingestion: respond with accepted status and temporary ID = -1 (actual ID assigned asynchronously)
+            insertedId = -1;
+            usedBatching = true;
+            req.app.locals?.loggers?.api?.debug(`Enqueued log entry (batch size now: ${req.dal.logBatch?.length || 0})`);
+        } else {
+            const result = await req.dal.run(
+                `INSERT INTO logs (level, message, source, ip, timestamp) VALUES (?, ?, ?, ?, ?)`,
+                [level, message, source, req.ip || 'unknown', ts]
+            );
+            insertedId = result.lastID;
+        }
+        
+        // Broadcast new log to WebSocket subscribers (only if we have real ID)
+        if (!usedBatching && typeof global.broadcastToSubscribers === 'function') {
+            global.broadcastToSubscribers('logs', 'log:created', {
+                id: insertedId,
+                level,
+                message,
+                source,
+                timestamp: ts
+            });
+        }
+        
+        return res.status(201).json({ success: true, id: insertedId, batched: usedBatching });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API create log error:', error);
         res.status(500).json({ success: false, error: 'Failed to create log' });
+    }
+});
+
+// DELETE /api/logs/:id - Delete a specific log entry
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        if (!req.dal || !req.dal.run) {
+            return res.status(503).json({ 
+                success: false, 
+                error: 'Database not available' 
+            });
+        }
+        
+        // Check if log exists first
+        const log = await req.dal.get('SELECT id FROM logs WHERE id = ?', [id]);
+        if (!log) {
+            return res.status(404).json({ 
+                success: false, 
+                error: 'Log entry not found' 
+            });
+        }
+        
+        // Delete the log entry
+        const result = await req.dal.run('DELETE FROM logs WHERE id = ?', [id]);
+        
+        // Broadcast deletion to WebSocket subscribers
+        if (typeof global.broadcastToSubscribers === 'function') {
+            global.broadcastToSubscribers('logs', 'log:deleted', { id: parseInt(id) });
+        }
+        
+        res.json({ 
+            success: true, 
+            message: 'Log entry deleted',
+            id: parseInt(id),
+            changes: result.changes 
+        });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error deleting log:', error);
+        res.status(500).json({ success: false, error: 'Failed to delete log: ' + error.message });
     }
 });
 

@@ -48,6 +48,38 @@ const _defaultWidgetTypes = [
         icon: 'fas fa-chart-pie',
         category: 'charts',
         defaultSize: { w: 4, h: 3 }
+    },
+    {
+        id: 'system-stats',
+        name: 'System Statistics',
+        description: 'Overall system performance metrics',
+        icon: 'fas fa-tachometer-alt',
+        category: 'system',
+        defaultSize: { w: 4, h: 3 }
+    },
+    {
+        id: 'log-levels',
+        name: 'Log Levels',
+        description: 'Distribution of log severity levels',
+        icon: 'fas fa-layer-group',
+        category: 'charts',
+        defaultSize: { w: 4, h: 3 }
+    },
+    {
+        id: 'timeline',
+        name: 'Timeline',
+        description: 'Chronological log activity',
+        icon: 'fas fa-timeline',
+        category: 'charts',
+        defaultSize: { w: 6, h: 3 }
+    },
+    {
+        id: 'integrations',
+        name: 'Integrations',
+        description: 'Active integrations and connections',
+        icon: 'fas fa-plug',
+        category: 'integrations',
+        defaultSize: { w: 4, h: 3 }
     }
 ];
 
@@ -144,7 +176,7 @@ router.get('/refresh', async (req, res) => {
 // GET /api/dashboard/widgets - Get available widget types
 router.get('/widgets', async (req, res) => {
     try {
-        res.json({ widgetTypes: _defaultWidgetTypes });
+        res.json({ widgets: _defaultWidgetTypes, widgetTypes: _defaultWidgetTypes });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API dashboard widgets error:', error);
         res.status(500).json({ error: 'Failed to get widget types' });

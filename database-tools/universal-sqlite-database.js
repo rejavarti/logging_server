@@ -21,7 +21,7 @@ const path = require('path');
 const { existsSync } = require('fs');
 
 class UniversalSQLiteDatabase {
-    constructor(dbPath = './data/logging.db') {
+    constructor(dbPath = './data/databases/logging.db') {
         this.dbPath = path.resolve(dbPath);
         this.dbDir = path.dirname(this.dbPath);
         this.driver = null;

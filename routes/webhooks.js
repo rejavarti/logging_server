@@ -159,22 +159,21 @@ router.get('/', async (req, res) => {
                             </div>
                             
                             <div class="webhook-actions">
-                                <button onclick="testWebhook(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="Test Webhook">
+                                <button onclick="testWebhook(${webhook.id})" class="btn-small btn-warning" title="Test Webhook">
                                     <i class="fas fa-play"></i> Test
                                 </button>
-                                <button onclick="editWebhook(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="Edit Webhook">
+                                <button onclick="editWebhook(${webhook.id})" class="btn-small btn-primary" title="Edit Webhook">
                                     <i class="fas fa-edit"></i> Edit
                                 </button>
-                                <button onclick="viewWebhookLogs(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="View Logs">
+                                <button onclick="viewWebhookLogs(${webhook.id})" class="btn-small btn-info" title="View Logs">
                                     <i class="fas fa-history"></i> Logs
                                 </button>
                                 <button onclick="toggleWebhook(${webhook.id}, ${webhook.active})" 
-                                        class="btn-small" 
-                                        style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, ${webhook.active ? '#f59e0b' : '#10b981'} 0%, ${webhook.active ? '#d97706' : '#059669'} 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" 
+                                        class="btn-small ${webhook.active ? 'btn-warning' : 'btn-success'}" 
                                         title="${webhook.active ? 'Disable' : 'Enable'} Webhook">
                                     <i class="fas fa-${webhook.active ? 'pause' : 'play'}"></i>
                                 </button>
-                                <button onclick="deleteWebhook(${webhook.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 6px; transition: all 0.2s;" title="Delete Webhook">
+                                <button onclick="deleteWebhook(${webhook.id})" class="btn-small btn-danger" title="Delete Webhook">
                                     <i class="fas fa-trash"></i>
                                 </button>
                             </div>
@@ -222,12 +221,12 @@ router.get('/', async (req, res) => {
                                         <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(delivery.webhookName)}</div>
                                     </td>
                                     <td>
-                                        <span class="event-badge" style="background: var(--bg-tertiary); color: var(--text-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 500;">
+                                        <span class="event-badge">
                                             ${delivery.event}
                                         </span>
                                     </td>
                                     <td style="text-align: center;">
-                                        <span class="status-badge" style="background: ${delivery.success ? '#10b981' : '#ef4444'}; padding: 0.4rem 0.8rem; border-radius: 20px; font-size: 0.75rem; font-weight: 600; color: white;">
+                                        <span class="status-badge" style="background: ${delivery.success ? '#10b981' : '#ef4444'};">
                                             <i class="fas fa-${delivery.success ? 'check-circle' : 'times-circle'}"></i> ${delivery.success ? 'Success' : 'Failed'}
                                         </span>
                                         ${delivery.statusCode ? `<div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">HTTP ${delivery.statusCode}</div>` : ''}
@@ -242,11 +241,11 @@ router.get('/', async (req, res) => {
                                     </td>
                                     <td>
                                         <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
-                                            <button onclick="viewDeliveryDetails(${delivery.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; border: none; transition: all 0.2s;" title="View Details">
+                                            <button onclick="viewDeliveryDetails(${delivery.id})" class="btn-small btn-info" title="View Details">
                                                 <i class="fas fa-eye"></i>
                                             </button>
                                             ${!delivery.success ? `
-                                            <button onclick="retryDelivery(${delivery.id})" class="btn-small" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; transition: all 0.2s;" title="Retry">
+                                            <button onclick="retryDelivery(${delivery.id})" class="btn-small btn-warning" title="Retry">
                                                 <i class="fas fa-redo"></i>
                                             </button>
                                             ` : ''}
@@ -929,7 +928,7 @@ X-Custom-Header: value"></textarea>
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(testData)
-                });
+                , credentials: 'same-origin' });
                 
                 const result = await response.json();
                 

@@ -1,6 +1,6 @@
 // Ensure stable test environment variables (silence warnings, deterministic auth)
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret';
-process.env.AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'testAdmin123!';
+if (!process.env.AUTH_PASSWORD) throw new Error('AUTH_PASSWORD not set');
 process.env.NODE_ENV = process.env.NODE_ENV || 'test';
 
 // Global safety timeout so the assistant doesn't hang if server logic stalls

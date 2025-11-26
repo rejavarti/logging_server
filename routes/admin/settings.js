@@ -708,7 +708,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
 
             async function loadSettings() {
                 try {
-                    const response = await fetch('/api/settings');
+                    const response = await fetch('/api/settings', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed to fetch settings');
                     
                     currentSettings = await response.json();
@@ -891,6 +891,51 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                                         <option value="Africa/Nairobi" \${settings.system?.timezone === 'Africa/Nairobi' ? 'selected' : ''}>Nairobi</option>
                                     </optgroup>
                                 </select>
+                            </div>
+                        </div>
+
+                        <!-- Server Location -->
+                        <div class="section-header">
+                            <i class="fas fa-map-marker-alt"></i> Server Location (Geolocation)
+                        </div>
+                        
+                        <div class="setting-item">
+                            <div>
+                                <div class="setting-label"><i class="fas fa-globe"></i> Server Latitude</div>
+                                <div class="setting-description">Latitude coordinate for server location on maps</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="number" id="server-latitude" value="\${settings.system?.server_latitude || ''}" 
+                                       placeholder="e.g. 51.5074" step="0.0001" min="-90" max="90">
+                                <span style="color: var(--text-muted); font-size: 0.875rem;">°N</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <div>
+                                <div class="setting-label"><i class="fas fa-compass"></i> Server Longitude</div>
+                                <div class="setting-description">Longitude coordinate for server location on maps</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="number" id="server-longitude" value="\${settings.system?.server_longitude || ''}" 
+                                       placeholder="e.g. -0.1278" step="0.0001" min="-180" max="180">
+                                <span style="color: var(--text-muted); font-size: 0.875rem;">°E</span>
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item" style="grid-column: 1 / -1;">
+                            <div style="padding: 1rem; background: var(--bg-tertiary); border-radius: 6px; border-left: 3px solid var(--info-color);">
+                                <div style="display: flex; align-items: start; gap: 0.75rem;">
+                                    <i class="fas fa-info-circle" style="color: var(--info-color); margin-top: 0.25rem;"></i>
+                                    <div style="flex: 1;">
+                                        <strong style="color: var(--text-primary);">How to find coordinates:</strong>
+                                        <ul style="margin: 0.5rem 0 0 0; padding-left: 1.25rem; color: var(--text-muted); font-size: 0.875rem;">
+                                            <li>Google Maps: Right-click location → Click coordinates at top</li>
+                                            <li>Example: London = 51.5074, -0.1278</li>
+                                            <li>Leave empty to auto-detect from server IP (if public)</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -1157,7 +1202,9 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                             log_level: document.getElementById('log-level')?.value || 'info',
                             timezone: document.getElementById('timezone')?.value || 'UTC',
                             auto_archive: document.getElementById('auto-archive')?.checked || false,
-                            compression_enabled: document.getElementById('compression-enabled')?.checked || false
+                            compression_enabled: document.getElementById('compression-enabled')?.checked || false,
+                            server_latitude: parseFloat(document.getElementById('server-latitude')?.value) || null,
+                            server_longitude: parseFloat(document.getElementById('server-longitude')?.value) || null
                         },
                         alerts: {
                             email_enabled: document.getElementById('email-enabled')?.checked || false,
@@ -1193,7 +1240,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(updatedSettings)
-                    });
+                    , credentials: 'same-origin' });
                     
                     if (!response.ok) throw new Error('Failed to save settings');
                     
@@ -1208,7 +1255,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
             // Ingestion Port Status helpers
             async function loadPortStatus() {
                 try {
-                    const res = await fetch('/api/ingestion/ports-status');
+                    const res = await fetch('/api/ingestion/ports-status', { credentials: 'same-origin' });
                     if (!res.ok) throw new Error('Failed to fetch port status');
                     const data = await res.json();
                     renderPortStatus(data.ports || []);
@@ -1237,7 +1284,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
             // API Keys Functions
             async function loadAPIKeys() {
                 try {
-                    const response = await fetch('/api/api-keys');
+                    const response = await fetch('/api/api-keys', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed to fetch API keys');
                     
                     const data = await response.json();
@@ -1376,7 +1423,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, description })
-                    });
+                    , credentials: 'same-origin' });
                     
                     if (!response.ok) throw new Error('Failed to create key');
                     const data = await response.json();
@@ -1468,7 +1515,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
             // Backups Functions
             async function loadBackups() {
                 try {
-                    const response = await fetch('/api/backups');
+                    const response = await fetch('/api/backups', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed to fetch backups');
                     const data = await response.json();
                     
@@ -1559,7 +1606,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                 if (!confirm('Create a new backup of the database?')) return;
                 try {
                     showToast('Creating backup...', 'info');
-                    const response = await fetch('/api/backups/create', { method: 'POST' });
+                    const response = await fetch('/api/backups/create', { method: 'POST', credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed');
                     showToast('Backup created successfully', 'success');
                     loadBackups();
@@ -1701,7 +1748,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
 
             async function loadThemeSettings() {
                 try {
-                    const response = await fetch('/api/user/theme');
+                    const response = await fetch('/api/user/theme', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed to load theme');
                     
                     const theme = await response.json();
@@ -1899,7 +1946,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(themeData)
-                    });
+                    , credentials: 'same-origin' });
                     
                     if (!response.ok) throw new Error('Failed to save theme');
                     
@@ -1914,7 +1961,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                 if (!confirm('Are you sure you want to reset to the default theme? This will reload the page.')) return;
                 
                 try {
-                    const response = await fetch('/api/user/theme', { method: 'DELETE' });
+                    const response = await fetch('/api/user/theme', { method: 'DELETE', credentials: 'same-origin' });
                     
                     if (!response.ok) throw new Error('Failed to reset theme');
                     
@@ -1974,7 +2021,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                             name: 'Custom Theme',
                             data: themeData
                         })
-                    });
+                    , credentials: 'same-origin' });
                     
                     if (!response.ok) throw new Error('Failed to save theme');
                     applyThemeToPage({ data: themeData });
@@ -2003,7 +2050,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                             name: themeName,
                             data: { colors: currentColors }
                         })
-                    });
+                    , credentials: 'same-origin' });
                     
                     if (!response.ok) throw new Error('Failed');
                     showToast(\`Theme "\${themeName}" saved successfully!\`, 'success');
@@ -2015,7 +2062,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
             async function resetTheme() {
                 if (!confirm('Reset theme to system default?')) return;
                 try {
-                    const response = await fetch('/api/themes/reset', { method: 'POST' });
+                    const response = await fetch('/api/themes/reset', { method: 'POST', credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed');
                     location.reload(); // Reload to apply default theme
                 } catch (error) {
@@ -2025,7 +2072,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
 
             async function exportTheme() {
                 try {
-                    const response = await fetch('/api/themes/current');
+                    const response = await fetch('/api/themes/current', { credentials: 'same-origin' });
                     if (!response.ok) throw new Error('Failed');
                     const data = await response.json();
                     
@@ -2059,7 +2106,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(theme)
-                        });
+                        , credentials: 'same-origin' });
                         
                         if (!response.ok) throw new Error('Failed');
                         applyThemeToPage(theme);
@@ -2112,7 +2159,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
             // Tracing Configuration Functions
             async function loadTracingConfig() {
                 try {
-                    const response = await fetch('/api/tracing/status');
+                    const response = await fetch('/api/tracing/status', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success && data.status) {
@@ -2154,7 +2201,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
             async function testTracingConnection() {
                 try {
                     showToast('Testing tracing connection...', 'info');
-                    const response = await fetch('/api/tracing/status');
+                    const response = await fetch('/api/tracing/status', { credentials: 'same-origin' });
                     const data = await response.json();
                     
                     if (data.success && data.status && data.status.health === 'healthy') {

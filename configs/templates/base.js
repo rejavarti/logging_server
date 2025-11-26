@@ -39,30 +39,63 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
     }
 
     // ===== CENTRAL REAL-TIME UPDATE REGISTRY (Polling Abstraction) =====
-    // Provides unified control over all periodic refresh intervals.
-    // Future enhancement: swap out polling with WebSocket push without touching page code.
+    // Provides unified control over real-time updates via WebSocket with polling fallback.
+    // WebSocket receives push updates from server for logs, alerts, metrics, and sessions.
     // Injected once per template render (idempotent guard via window.Realtime)
     const realtimeRegistryJS = `
     (function(){
         if (window.Realtime) return; // Already initialised
         const Realtime = (function() {
             const tasks = new Map(); // name => { intervalMs, handler, timer }
+            const subscriptions = new Map(); // channel => Set of task names
             let enabled = true;
-            let globalSocket = null; // placeholder for future WebSocket integration
+            let globalSocket = null;
+            let reconnectTimer = null;
+            let reconnectAttempts = 0;
+            const maxReconnectDelay = 30000; // 30 seconds
 
             function startTask(name) {
                 const task = tasks.get(name);
-                if (!task || task.timer || !enabled) return;
-                task.timer = setInterval(async () => {
-                    try { await task.handler(); } catch(err){ console.warn('Realtime task failed:', name, err.message); }
-                }, task.intervalMs);
+                if (!task || !enabled) return;
+                
+                // If WebSocket connected and task has channel subscription, rely on push updates
+                if (globalSocket && globalSocket.readyState === WebSocket.OPEN && task.options?.channel) {
+                    // Subscribe to WebSocket channel for push updates
+                    if (!subscriptions.has(task.options.channel)) {
+                        subscriptions.set(task.options.channel, new Set());
+                    }
+                    subscriptions.get(task.options.channel).add(name);
+                    return; // No polling needed, will receive push updates
+                }
+                
+                // Fallback to polling if WebSocket not available or no channel specified
+                if (!task.timer) {
+                    task.timer = setInterval(async () => {
+                        try { await task.handler(); } catch(err){ console.warn('Realtime task failed:', name, err.message); }
+                    }, task.intervalMs);
+                }
             }
 
             function stopTask(name) {
                 const task = tasks.get(name);
-                if (!task || !task.timer) return;
-                clearInterval(task.timer);
-                task.timer = null;
+                if (!task) return;
+                
+                // Remove from subscription map
+                if (task.options?.channel) {
+                    const channelSubs = subscriptions.get(task.options.channel);
+                    if (channelSubs) {
+                        channelSubs.delete(name);
+                        if (channelSubs.size === 0) {
+                            subscriptions.delete(task.options.channel);
+                        }
+                    }
+                }
+                
+                // Clear polling timer
+                if (task.timer) {
+                    clearInterval(task.timer);
+                    task.timer = null;
+                }
             }
 
             function register(name, handler, intervalMs = 30000, options = {}) {
@@ -70,6 +103,7 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                     const existing = tasks.get(name);
                     existing.intervalMs = intervalMs;
                     existing.handler = handler;
+                    existing.options = options;
                     if (existing.timer) { clearInterval(existing.timer); existing.timer = null; }
                     if (enabled) startTask(name);
                     return;
@@ -81,27 +115,193 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                 if (enabled) startTask(name);
             }
 
-            function unregister(name) { stopTask(name); tasks.delete(name); }
-            function enable() { if (enabled) return; enabled = true; tasks.forEach((_v,k)=>startTask(k)); showToast && showToast('Real-time updates enabled','success'); updateRealtimeToggleUI(); }
-            function disable() { if (!enabled) return; enabled = false; tasks.forEach((_v,k)=>stopTask(k)); showToast && showToast('Real-time updates disabled','warning'); updateRealtimeToggleUI(); }
+            function unregister(name) { 
+                stopTask(name); 
+                tasks.delete(name); 
+            }
+            
+            function enable() { 
+                if (enabled) return; 
+                enabled = true; 
+                
+                // Reconnect WebSocket if not connected
+                if (!globalSocket || globalSocket.readyState !== WebSocket.OPEN) {
+                    connectSocket();
+                }
+                
+                tasks.forEach((_v,k)=>startTask(k)); 
+                showToast && showToast('Real-time updates enabled','success'); 
+                updateRealtimeToggleUI(); 
+            }
+            
+            function disable() { 
+                if (!enabled) return; 
+                enabled = false; 
+                
+                // Close WebSocket connection
+                if (globalSocket) {
+                    try { globalSocket.close(); } catch(_){}
+                    globalSocket = null;
+                }
+                
+                // Clear reconnect timer
+                if (reconnectTimer) {
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = null;
+                }
+                
+                tasks.forEach((_v,k)=>stopTask(k)); 
+                showToast && showToast('Real-time updates disabled','warning'); 
+                updateRealtimeToggleUI(); 
+            }
+            
             function toggle(){ enabled ? disable() : enable(); }
             function isEnabled(){ return enabled; }
 
-            async function connectSocket(url){
+            function connectSocket(url){
+                // Build WebSocket endpoint on same port as HTTP server (WebSocket server shares the HTTP server)
+                if (!url) {
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    const host = window.location.hostname;
+                    const port = window.location.port || (window.location.protocol === 'https:' ? '443' : '80');
+                    // WebSocket runs on same port with path '/ws'
+                    url = protocol + '//' + host + ':' + port + '/ws';
+                }
+                
                 try {
+                    console.log('Connecting to WebSocket:', url);
                     globalSocket = new WebSocket(url);
-                    globalSocket.onopen = () => console.log('Realtime socket connected');
-                    globalSocket.onmessage = (evt) => handleSocketMessage(evt.data);
-                    globalSocket.onclose = () => console.log('Realtime socket closed');
-                    globalSocket.onerror = (e) => console.warn('Realtime socket error:', e);
-                } catch(err){ console.warn('Socket connect failed, falling back to polling:', err.message); }
+                    
+                    globalSocket.onopen = () => {
+                        console.log('WebSocket connected');
+                        reconnectAttempts = 0;
+                        
+                        // Authenticate with JWT token from localStorage
+                        const token = localStorage.getItem('authToken');
+                        if (token) {
+                            globalSocket.send(JSON.stringify({
+                                event: 'authenticate',
+                                payload: { token }
+                            }));
+                        }
+                        
+                        // Subscribe to all active channels
+                        const channels = Array.from(subscriptions.keys());
+                        if (channels.length > 0) {
+                            globalSocket.send(JSON.stringify({
+                                event: 'subscribe',
+                                payload: { channels }
+                            }));
+                        }
+                        
+                        // Stop polling timers for tasks with channel subscriptions
+                        tasks.forEach((task, name) => {
+                            if (task.options?.channel && task.timer) {
+                                clearInterval(task.timer);
+                                task.timer = null;
+                            }
+                        });
+                        
+                        showToast && showToast('Real-time connection established', 'success');
+                    };
+                    
+                    globalSocket.onmessage = (evt) => {
+                        try {
+                            handleSocketMessage(evt.data);
+                        } catch(err) {
+                            console.warn('WebSocket message handling failed:', err);
+                        }
+                    };
+                    
+                    globalSocket.onclose = () => {
+                        console.log('WebSocket disconnected');
+                        globalSocket = null;
+                        
+                        // Restart polling timers as fallback
+                        tasks.forEach((task, name) => {
+                            if (task.options?.channel && !task.timer && enabled) {
+                                task.timer = setInterval(async () => {
+                                    try { await task.handler(); } catch(err){ console.warn('Realtime task failed:', name, err.message); }
+                                }, task.intervalMs);
+                            }
+                        });
+                        
+                        // Attempt reconnection with exponential backoff
+                        if (enabled) {
+                            scheduleReconnect();
+                        }
+                    };
+                    
+                    globalSocket.onerror = (e) => {
+                        console.warn('WebSocket error:', e);
+                    };
+                    
+                } catch(err){ 
+                    console.warn('WebSocket connection failed, using polling fallback:', err.message);
+                    // Polling timers already started by startTask()
+                }
+            }
+            
+            function scheduleReconnect() {
+                if (reconnectTimer) return;
+                
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+                reconnectAttempts++;
+                
+                console.log('Reconnecting in ' + delay + 'ms (attempt ' + reconnectAttempts + ')...');
+                
+                reconnectTimer = setTimeout(() => {
+                    reconnectTimer = null;
+                    connectSocket();
+                }, delay);
             }
 
             function handleSocketMessage(raw){
-                try { const msg = JSON.parse(raw); console.log('Realtime message:', msg.type || 'event'); } catch(_){}
+                try { 
+                    const msg = JSON.parse(raw);
+                    const { event, channel, data } = msg;
+                    
+                    // Handle special control events
+                    if (event === 'connected' || event === 'authenticated' || event === 'subscribed') {
+                        console.log('WebSocket:', event, msg);
+                        return;
+                    }
+                    
+                    if (event === 'error') {
+                        console.error('WebSocket error:', data);
+                        return;
+                    }
+                    
+                    // Dispatch to subscribed task handlers
+                    if (channel && subscriptions.has(channel)) {
+                        const taskNames = subscriptions.get(channel);
+                        taskNames.forEach(taskName => {
+                            const task = tasks.get(taskName);
+                            if (task && task.handler) {
+                                // Call handler with push data (skip if handler doesn't accept params)
+                                Promise.resolve().then(() => task.handler(data, event)).catch(e => {
+                                    console.warn('Task handler failed for ' + taskName + ':', e);
+                                });
+                            }
+                        });
+                    }
+                    
+                } catch(err){
+                    console.warn('WebSocket message parse failed:', err);
+                }
             }
 
-            function shutdown(){ tasks.forEach((_v,k)=>stopTask(k)); if(globalSocket){ try{ globalSocket.close(); }catch(_){} } }
+            function shutdown(){ 
+                tasks.forEach((_v,k)=>stopTask(k)); 
+                if (reconnectTimer) {
+                    clearTimeout(reconnectTimer);
+                    reconnectTimer = null;
+                }
+                if(globalSocket){ 
+                    try{ globalSocket.close(); }catch(_){} 
+                    globalSocket = null;
+                } 
+            }
 
             function ensureToggleButton(){
                 const headerActions = document.querySelector('.header-actions');
@@ -127,8 +327,15 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                 else { btn.innerHTML = '<i class="fas fa-pause"></i> Live Off'; btn.classList.add('btn-danger'); }
             }
 
+            // Auto-connect on load if enabled
+            document.addEventListener('DOMContentLoaded', () => {
+                ensureToggleButton();
+                if (enabled) {
+                    connectSocket();
+                }
+            });
+            
             window.addEventListener('beforeunload', shutdown);
-            document.addEventListener('DOMContentLoaded', ensureToggleButton);
             return { register, unregister, enable, disable, toggle, isEnabled, connectSocket };
         })();
 
@@ -962,6 +1169,213 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                 border: 1px solid #f59e0b;
             }
 
+            /* Health Status Badges */
+            .status-badge.healthy {
+                background: #10b981;
+                color: white;
+            }
+
+            .status-badge.degraded {
+                background: #f59e0b;
+                color: white;
+            }
+
+            .status-badge.unhealthy {
+                background: #ef4444;
+                color: white;
+            }
+
+            .status-badge.unknown {
+                background: #6b7280;
+                color: white;
+            }
+
+            /* Severity Badges for Log Levels */
+            .severity-badge {
+                display: inline-flex;
+                align-items: center;
+                padding: 0.25rem 0.75rem;
+                border-radius: 20px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.3px;
+            }
+
+            .severity-info, .severity-badge.info {
+                background: #3182ce;
+                color: #ffffff;
+            }
+
+            .severity-warn, .severity-badge.warn,
+            .severity-warning, .severity-badge.warning {
+                background: #d69e2e;
+                color: #ffffff;
+            }
+
+            .severity-error, .severity-badge.error {
+                background: #e53e3e;
+                color: #ffffff;
+            }
+
+            .severity-success, .severity-badge.success {
+                background: #38a169;
+                color: #ffffff;
+            }
+
+            .severity-debug, .severity-badge.debug {
+                background: #6b7280;
+                color: #ffffff;
+            }
+
+            /* Small Button Variant */
+            .btn-small {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.85rem;
+                border: none;
+                border-radius: 6px;
+                color: white;
+                cursor: pointer;
+                font-weight: 600;
+                transition: all 0.2s ease;
+                text-decoration: none;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.375rem;
+            }
+
+            .btn-small:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            }
+
+            .btn-small.btn-primary {
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            }
+
+            .btn-small.btn-warning {
+                background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            }
+
+            .btn-small.btn-danger {
+                background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            }
+
+            .btn-small.btn-success {
+                background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            }
+
+            .btn-small.btn-info {
+                background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            }
+
+            /* Event Badge Utility */
+            .event-badge {
+                background: var(--bg-tertiary);
+                color: var(--text-secondary);
+                padding: 0.25rem 0.5rem;
+                border-radius: 4px;
+                font-size: 0.8rem;
+                font-weight: 500;
+                display: inline-block;
+            }
+
+            /* Empty State Utility Classes */
+            .empty-state {
+                padding: 2rem;
+                text-align: center;
+                color: var(--text-muted);
+            }
+
+            .empty-state-icon {
+                font-size: 3rem;
+                opacity: 0.3;
+                margin-bottom: 1rem;
+            }
+
+            .empty-state.error {
+                color: #fca5a5;
+            }
+
+            .empty-state.error .empty-state-icon {
+                font-size: 2rem;
+                opacity: 0.4;
+            }
+
+            .empty-state.success {
+                color: var(--success-color);
+            }
+
+            /* Widget Content Styling */
+            .widget-loading {
+                text-align: center;
+                color: var(--text-muted);
+                padding: 2rem;
+            }
+
+            .widget-error {
+                padding: 2rem;
+                text-align: center;
+                color: #fca5a5;
+            }
+
+            /* Stat Card Components for Analytics */
+            .stat-card {
+                text-align: center;
+                padding: 1.5rem;
+            }
+
+            .stat-card-icon {
+                font-size: 2rem;
+                margin-bottom: 0.5rem;
+            }
+
+            .stat-card-value {
+                font-size: 2rem;
+                font-weight: 700;
+                color: var(--text-primary);
+            }
+
+            .stat-card-label {
+                color: var(--text-muted);
+                font-size: 0.875rem;
+                margin-top: 0.25rem;
+            }
+
+            .stat-card-trend {
+                font-size: 0.75rem;
+                margin-top: 0.5rem;
+            }
+
+            /* Tab Button Components */
+            .tab-btn {
+                padding: 0.75rem 1.5rem;
+                border: none;
+                background: var(--bg-secondary);
+                color: var(--text-primary);
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: 600;
+                transition: all 0.3s ease;
+                display: inline-flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+
+            .tab-btn:hover {
+                background: var(--bg-tertiary);
+                transform: translateY(-2px);
+            }
+
+            .tab-btn.active {
+                background: var(--gradient-ocean);
+                color: white;
+            }
+
+            .tab-btn i {
+                font-size: 0.875rem;
+            }
+
             /* Form Components */
             .form-group {
                 margin-bottom: 1.5rem;
@@ -1278,6 +1692,30 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                         }
                     });
                 } catch (e) { /* no-op */ }
+                
+                // Set Chart.js global defaults for readability
+                if (typeof Chart !== 'undefined' && Chart.defaults) {
+                    // Global font color for all text in charts
+                    Chart.defaults.color = '#e2e8f0'; // Light grey text
+                    
+                    // Plugin defaults
+                    Chart.defaults.plugins.legend.labels.color = '#f1f5f9'; // Bright white for legend
+                    Chart.defaults.plugins.title.color = '#f8fafc'; // Brightest white for titles
+                    Chart.defaults.plugins.tooltip.titleColor = '#f8fafc'; // Bright white
+                    Chart.defaults.plugins.tooltip.bodyColor = '#e2e8f0'; // Light grey
+                    Chart.defaults.plugins.tooltip.footerColor = '#cbd5e1'; // Medium grey
+                    
+                    // Scale defaults for axes
+                    Chart.defaults.scale.ticks.color = '#cbd5e1'; // Medium grey for tick labels
+                    Chart.defaults.scale.grid.color = 'rgba(203, 213, 225, 0.1)'; // Subtle grid lines
+                    
+                    // Make sure all chart text is readable
+                    Chart.defaults.font = {
+                        family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                        size: 12,
+                        weight: 'normal'
+                    };
+                }
             });
 
             // Format time in configured timezone
@@ -1347,14 +1785,14 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
 
             // Notification System
             function showNotification(message, type = 'info') {
-                console.log(\`[\${type.toUpperCase()}] \${message}\`);
+                console.log('[' + type.toUpperCase() + '] ' + message);
                 alert(message);
             }
 
             // Logout Function
             async function logout() {
                 try {
-                    await fetch('/api/auth/logout', { method: 'POST' });
+                    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' });
                     window.location.href = '/';
                 } catch (error) {
                     console.error('Logout failed:', error);
@@ -1661,7 +2099,7 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                 
                 // Secure toast creation without innerHTML
                 const icon = document.createElement('i');
-                icon.className = \`fas fa-\${icons[type] || icons.info}\`;
+                icon.className = 'fas fa-' + (icons[type] || icons.info);
                 
                 const textSpan = document.createElement('span');
                 textSpan.textContent = message; // XSS-safe text assignment
@@ -1720,7 +2158,7 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
 
             // Format Number with commas
             function formatNumber(num) {
-                return num.toString().replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',');
+                return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
             }
 
             // Get Status Color
@@ -1771,9 +2209,9 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                 const diffDays = Math.floor(diffMs / 86400000);
                 
                 if (diffMins < 1) return 'Just now';
-                if (diffMins < 60) return \`\${diffMins} minute\${diffMins !== 1 ? 's' : ''} ago\`;
-                if (diffHours < 24) return \`\${diffHours} hour\${diffHours !== 1 ? 's' : ''} ago\`;
-                if (diffDays < 7) return \`\${diffDays} day\${diffDays !== 1 ? 's' : ''} ago\`;
+                if (diffMins < 60) return diffMins + ' minute' + (diffMins !== 1 ? 's' : '') + ' ago';
+                if (diffHours < 24) return diffHours + ' hour' + (diffHours !== 1 ? 's' : '') + ' ago';
+                if (diffDays < 7) return diffDays + ' day' + (diffDays !== 1 ? 's' : '') + ' ago';
                 return time.toLocaleDateString();
             }
 
@@ -1883,7 +2321,7 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                     const iconElement = document.createElement('i');
                     // Sanitize icon name to only allow alphanumeric and hyphens
                     const safeIcon = icon.replace(/[^a-zA-Z0-9\-]/g, '');
-                    iconElement.className = \`fas fa-\${safeIcon}\`;
+                    iconElement.className = 'fas fa-' + safeIcon;
                     iconElement.style.fontSize = '3rem';
                     iconElement.style.opacity = '0.3';
                     iconElement.style.marginBottom = '1rem';
@@ -2089,7 +2527,7 @@ function getPageTemplate(pageTitle, contentBody, additionalCSS, additionalJS, re
                         window.Realtime && Realtime.register('activity-timeline-sync', async () => {
                             if (window.realtimeActivityActive) {
                                 try {
-                                    const resp = await fetch('/api/activity/latest');
+                                    const resp = await fetch('/api/activity/latest', { credentials: 'same-origin' });
                                     if (resp.ok) {
                                         const data = await resp.json();
                                         if (Array.isArray(data) && data.length) prependNewActivities(data);

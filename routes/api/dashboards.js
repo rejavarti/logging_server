@@ -309,7 +309,14 @@ router.get('/data/:widgetType', async (req, res) => {
                 break;
                 
             default:
-                data = { message: `Data for widget type '${widgetType}' not implemented yet` };
+                // Return structured empty data for unknown widget types
+                data = { 
+                    error: 'Unknown widget type',
+                    widgetType,
+                    available: false,
+                    values: [],
+                    message: null
+                };
         }
         
         res.json({ success: true, data, widgetType, timestamp: new Date().toISOString() });
@@ -452,101 +459,5 @@ router.delete('/widgets/:widgetId', async (req, res) => {
 /**
  * GET /api/dashboards/widget-types - Get available widget types (Duplicate moved above)
  */
-router.get('/widget-types', async (req, res) => {
-    try {
-        const result = await req.dashboardBuilder.getWidgetTypes();
-        
-        if (result.success) {
-            res.json({
-                success: true,
-                data: result.types
-            });
-        } else {
-            res.status(500).json(result);
-        }
-    } catch (error) {
-        req.loggers.api.error('Widget types API error:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch widget types' });
-    }
-});
-
-/**
- * GET /api/dashboards/data/:widgetType - Get data for specific widget type
- */
-router.get('/data/:widgetType', async (req, res) => {
-    try {
-        const widgetType = req.params.widgetType;
-        const timeRange = req.query.timeRange || '1h';
-        const limit = parseInt(req.query.limit) || 100;
-        
-        let data = {};
-        
-        // Generate widget-specific data based on type
-        switch (widgetType) {
-            case 'log_timeline':
-                const recentLogs = await req.dal.getRecentLogs(limit);
-                data = {
-                    logs: recentLogs,
-                    timeRange: timeRange,
-                    totalCount: recentLogs.length
-                };
-                break;
-                
-            case 'metrics_chart':
-                const stats = await req.dal.getSystemStats();
-                data = {
-                    metrics: [
-                        { name: 'Total Logs', value: stats.totalLogs, timestamp: new Date() },
-                        { name: 'Logs Today', value: stats.logsToday, timestamp: new Date() },
-                        { name: 'Storage Used', value: stats.storageUsed, timestamp: new Date() }
-                    ]
-                };
-                break;
-                
-            case 'alert_summary':
-                // This would require the alerting engine
-                data = {
-                    alerts: [],
-                    summary: { total: 0, critical: 0, warning: 0, info: 0 }
-                };
-                break;
-                
-            case 'system_status':
-                const health = await req.dal.getSystemHealth();
-                data = {
-                    cpu: health?.cpu || 0,
-                    memory: health?.memory || 0,
-                    disk: health?.disk || 0,
-                    status: health?.status || 'unknown'
-                };
-                break;
-                
-            case 'log_levels_pie':
-                // SECURITY FIX: Sanitize timeRange parameter to prevent SQL injection
-                const validTimeRanges2 = ['1 hour', '24 hours', '7 days', '30 days'];
-                const safeTimeRange2 = validTimeRanges2.includes(timeRange) ? timeRange : '24 hours';
-                
-                const logCounts = await req.dal.all(`
-                    SELECT level, COUNT(*) as count 
-                    FROM logs 
-                    WHERE timestamp >= datetime('now', '-' || ? || '') 
-                    GROUP BY level
-                `, [safeTimeRange2]);
-                data = {
-                    levels: logCounts.map(lc => ({ level: lc.level, count: lc.count }))
-                };
-                break;
-                
-            default:
-                data = { message: `Data for widget type '${widgetType}' not implemented yet` };
-        }
-        
-        res.json({ success: true, data, widgetType, timestamp: new Date().toISOString() });
-        
-    } catch (error) {
-        req.loggers.api.error('Widget data API error:', error);
-        res.status(500).json({ success: false, error: 'Failed to fetch widget data' });
-    }
-});
 
 module.exports = router;

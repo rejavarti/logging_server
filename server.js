@@ -82,7 +82,8 @@ function checkInitialSetup() {
 const express = require('express');
 const compression = require('compression');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+// Temporarily disabled: SQLiteStore requires native sqlite3 bindings
+// const SQLiteStore = require('connect-sqlite3')(session);
 const cors = require('cors');
 const helmet = require('helmet');
 const moment = require('moment-timezone');
@@ -90,17 +91,19 @@ const winston = require('winston');
 const rateLimit = require('express-rate-limit');
 const https = require('https');
 const basicAuth = require('basic-auth');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // Pure JS implementation for Windows compatibility
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const axios = require('axios');
 
 // Advanced features (with graceful fallbacks)
-let geoip, useragent, nodemailer, twilio, Pushover, Fuse, _;
+let geoip, nodemailer, twilio, Pushover, Fuse, _;
+
+// WebSocket for real-time push
+const WebSocket = require('ws');
 
 try {
     geoip = require('geoip-lite');
-    useragent = require('useragent-parser');
     nodemailer = require('nodemailer');
     twilio = require('twilio');
     Pushover = require('pushover-notifications');
@@ -454,8 +457,10 @@ function formatSQLiteTimestamp(sqliteTimestamp, format) {
 
 // Database initialization
 const DatabaseAccessLayer = require('./database-access-layer');
+const AdvancedEncryptionSystem = require('./encryption-system');
 let dal = null;
 let db; // Legacy compatibility
+let encryptionSystem = null;
 
 // Imported modules
 const IntegrationManager = require('./managers/IntegrationManager');
@@ -582,9 +587,10 @@ app.use((req, res, next) => {
     res.setHeader('X-XSS-Protection', '1; mode=block');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+    // Use credentialless COEP to allow external map tiles (OpenStreetMap)
+    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     next();
 });
 
@@ -621,6 +627,10 @@ app.use(express.urlencoded({ extended: true }));
 // Enable gzip/deflate compression for responses
 app.use(compression());
 
+// SLA Tracking Middleware (capture latency metrics before processing)
+const slaTracker = require('./middleware/sla-tracker');
+app.use(slaTracker);
+
 // Static file serving for public assets
 app.use(express.static(path.join(__dirname, 'public'), {
     maxAge: '1d', // Cache static files for 1 day
@@ -628,14 +638,16 @@ app.use(express.static(path.join(__dirname, 'public'), {
     lastModified: true
 }));
 
-// Session configuration - Production-ready SQLite session store
+// Session configuration - Using MemoryStore for Windows compatibility testing
+// (SQLiteStore requires native sqlite3 bindings which fail on Windows Node v25)
 app.use(session({
-    store: new SQLiteStore({
-        db: 'sessions.db',
-        dir: path.join(__dirname, 'data', 'databases'),
-        table: 'sessions',
-        concurrentDB: true
-    }),
+    // Temporarily using MemoryStore instead of SQLiteStore for Windows testing
+    // store: new SQLiteStore({
+    //     db: 'sessions.db',
+    //     dir: path.join(__dirname, 'data', 'databases'),
+    //     table: 'sessions',
+    //     concurrentDB: true
+    // }),
     secret: config.auth.jwtSecret,
     resave: false,
     saveUninitialized: false,
@@ -650,14 +662,18 @@ app.use(session({
 }));
 
 // Rate limiting
+// Can be disabled for stress testing with DISABLE_RATE_LIMIT=true
+const rateLimitDisabled = process.env.DISABLE_RATE_LIMIT === 'true';
+
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500, // Increased limit to accommodate frequent UI requests
+    max: rateLimitDisabled ? 999999 : 500, // Effectively unlimited when disabled
     message: { error: 'Too many requests, please try again later.' },
     standardHeaders: true,
     legacyHeaders: false,
     // Skip rate limiting for polling and frequently accessed endpoints
     skip: (req) => {
+        if (rateLimitDisabled) return true;
         const exemptEndpoints = [
             '/api/notifications/recent',
             '/api/notifications/unread',
@@ -674,14 +690,14 @@ const generalLimiter = rateLimit({
 
 const logIngestionLimiter = rateLimit({
     windowMs: 5 * 60 * 1000, // 5 minutes  
-    max: 1000, // Higher limit for log ingestion
+    max: rateLimitDisabled ? 999999 : 1000, // Effectively unlimited when disabled
     message: { error: 'Log ingestion rate limit exceeded.' },
-    skip: (req) => req.path === '/health'
+    skip: (req) => rateLimitDisabled || req.path === '/health'
 });
 
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === 'test' ? 1000 : 5, // much higher in tests to avoid 429 flakiness
+    max: rateLimitDisabled ? 999999 : (process.env.NODE_ENV === 'test' ? 1000 : 5), // Effectively unlimited when disabled
     message: { error: 'Too many authentication attempts, please try again later.' },
     skipSuccessfulRequests: true,
     standardHeaders: true,
@@ -700,12 +716,17 @@ if (process.env.NODE_ENV !== 'test') {
     app.use('/api/auth/', authLimiter);
 }
 
+if (rateLimitDisabled) {
+    loggers.system.warn('⚠️  RATE LIMITING DISABLED - For stress testing only!');
+}
+
 // Make dependencies available to routes
 app.locals.config = config;
 app.locals.loggers = loggers;
 app.locals.dal = () => dal;
 app.locals.db = () => db;
 app.locals.TIMEZONE = TIMEZONE;
+app.locals.encryptionSystem = null; // Will be set after initialization
 
 // Middleware to inject DAL and engines into request objects
 app.use((req, res, next) => {
@@ -718,6 +739,8 @@ app.use((req, res, next) => {
     // Dashboard builder disabled: do not inject
     req.dashboardBuilder = null;
     req.webhookManager = webhookManager;
+    // Provide integration manager for config update endpoints
+    req.integrationManager = integrationManager;
     next();
 });
 app.locals.getEngines = () => ({
@@ -784,6 +807,7 @@ async function initializeDatabase() {
         await new Promise(resolve => setTimeout(resolve, 200));
         
         dal = new DatabaseAccessLayer(dbPath, loggers.system);
+        // Attach metrics manager reference for reliability counters once initialized
         db = dal.db; // Legacy compatibility
         
         // Load system settings after DAL is initialized
@@ -796,6 +820,51 @@ async function initializeDatabase() {
     } catch (error) {
         loggers.system.error('❌ Database initialization failed:', error.message);
         throw error;
+    }
+}
+
+// Migrate integration secrets from environment variables to encrypted database storage
+async function migrateIntegrationSecretsToDatabase() {
+    try {
+        // Initialize encryption system with JWT_SECRET as master key
+        const masterKey = process.env.JWT_SECRET || 'default-encryption-key-change-me';
+        encryptionSystem = new AdvancedEncryptionSystem();
+        app.locals.encryptionSystem = encryptionSystem;
+        
+        // Migrate Home Assistant token if present in environment and not already in DB
+        if (process.env.HA_TOKEN) {
+            const existing = await dal.getEncryptedSecret('homeassistant_token');
+            if (!existing) {
+                loggers.system.info('🔐 Migrating Home Assistant token to encrypted storage...');
+                const encryptedToken = encryptionSystem.encrypt(process.env.HA_TOKEN, masterKey);
+                await dal.storeEncryptedSecret('homeassistant_token', encryptedToken, {
+                    integration: 'homeassistant',
+                    migrated_from: 'environment',
+                    migrated_at: new Date().toISOString()
+                });
+                loggers.system.info('✅ Home Assistant token migrated to encrypted database storage');
+            }
+        }
+        
+        // Load token from DB and update runtime config
+        const haTokenRecord = await dal.getEncryptedSecret('homeassistant_token');
+        if (haTokenRecord) {
+            try {
+                const decryptedToken = encryptionSystem.decrypt(haTokenRecord.encryptedValue, masterKey);
+                config.integrations.homeAssistant.token = decryptedToken;
+                loggers.system.info('🔐 Home Assistant token loaded from encrypted storage');
+            } catch (decryptError) {
+                loggers.system.error('❌ Failed to decrypt Home Assistant token:', decryptError.message);
+                // Fallback to environment variable if decryption fails
+                if (process.env.HA_TOKEN) {
+                    config.integrations.homeAssistant.token = process.env.HA_TOKEN;
+                    loggers.system.warn('⚠️ Using Home Assistant token from environment (decryption failed)');
+                }
+            }
+        }
+    } catch (error) {
+        loggers.system.error('❌ Secret migration failed:', error.message);
+        // Don't throw - allow app to continue with env vars
     }
 }
 
@@ -840,6 +909,7 @@ async function initializeSystemComponents() {
         // Initialize managers
         metricsManager = new MetricsManager(loggers);
         await metricsManager.initialize();
+        if (dal) dal.metricsManager = metricsManager;
 
         userManager = new UserManager(config, loggers, dal);
         
@@ -973,6 +1043,9 @@ async function initializeSystemComponents() {
         
     integrationManager = new IntegrationManager(config, loggers, logToDatabase, TIMEZONE);
     await integrationManager.initialize();
+    
+    // Migrate HA token from environment to encrypted storage if present
+    await migrateIntegrationSecretsToDatabase();
         
         // Initialize WebhookManager
         webhookManager = new WebhookManager(dal, loggers);
@@ -1084,584 +1157,11 @@ function setupRoutes() {
     app.locals.advancedDashboardBuilder = advancedDashboardBuilder;
     app.locals.distributedTracingEngine = distributedTracingEngine;
 
-        // Login page
-        app.get('/login', (req, res) => {
-            if (req.session?.token && userManager && userManager.verifyJWT(req.session.token)) {
-                return res.redirect('/dashboard');
-            }
-            
-            const loginPageContent = `
-            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
-                <i class="fas fa-palette"></i>
-            </button>
-            <div class="login-container">
-                <div class="login-header">
-                    <h1>🔥 Enterprise Logger</h1>
-                    <p>Advanced Infrastructure Monitoring Platform</p>
-                </div>
-                
-                <div class="login-form">
-                    <div class="welcome-message">
-                        <strong>🚀 Welcome to Enterprise Logging Platform</strong><br>
-                        Secure access to your infrastructure monitoring dashboard
-                    </div>
-                    
-                    <form id="loginForm">
-                        <div class="form-group">
-                            <label for="username">Username</label>
-                            <input type="text" id="username" name="username" placeholder="Enter username" autocomplete="username" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="password">Password</label>
-                            <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
-                        </div>
-                        
-                        <button type="submit" class="login-btn" id="loginBtn">
-                            Sign In
-                        </button>
-                    </form>
-                    
-                    <div id="error-message" class="error-message"></div>
-                </div>
-                
-                <div class="login-footer">
-                    <strong>Enhanced Universal Logging Platform v2.1.0-stable-enhanced</strong><br>
-                    Multi-Source Infrastructure Monitoring
-                </div>
-            </div>`;
+        // Mount authentication pages router (login, etc.)
+        const authPagesRouter = require('./routes/auth-pages');
+        app.use('/', authPagesRouter);
 
-            const loginCSS = `
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body {
-                font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                background: var(--login-bg);
-                min-height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                position: relative;
-                overflow: hidden;
-                transition: all 0.3s ease;
-            }
-            
-            /* Animated background elements */
-            body::before {
-                content: '';
-                position: absolute;
-                top: -50%;
-                left: -50%;
-                width: 200%;
-                height: 200%;
-                background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
-                animation: shimmer 3s ease-in-out infinite;
-            }
-            
-            @keyframes shimmer {
-                0%, 100% { transform: translateX(-100%) translateY(-100%) rotate(30deg); }
-                50% { transform: translateX(100%) translateY(100%) rotate(30deg); }
-            }
-            
-            .login-container {
-                background: var(--bg-primary);
-                backdrop-filter: blur(20px);
-                border-radius: 20px;
-                box-shadow: var(--shadow-medium);
-                overflow: hidden;
-                width: 100%;
-                max-width: 420px;
-                margin: 2rem;
-                border: 1px solid var(--border-color);
-                position: relative;
-                z-index: 1;
-                transition: all 0.3s ease;
-            }
-            
-            .login-header {
-                background: var(--gradient-ocean);
-                color: white;
-                padding: 2.5rem 2rem;
-                text-align: center;
-                position: relative;
-                overflow: hidden;
-            }
-            
-            .login-header::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: linear-gradient(45deg, transparent 30%, rgba(255,255,255,0.1) 50%, transparent 70%);
-                animation: headerShimmer 4s ease-in-out infinite;
-            }
-            
-            @keyframes headerShimmer {
-                0%, 100% { transform: translateX(-100%); }
-                50% { transform: translateX(100%); }
-            }
-            
-            .login-header h1 {
-                font-size: 2rem;
-                margin-bottom: 0.5rem;
-                font-weight: 700;
-                position: relative;
-                z-index: 1;
-                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            }
-            
-            .login-header p {
-                opacity: 0.9;
-                font-size: 0.95rem;
-                position: relative;
-                z-index: 1;
-            }
-            
-            .login-form {
-                padding: 2.5rem 2rem;
-            }
-            
-            /* Theme Toggle Button */
-            .theme-toggle {
-                position: absolute;
-                top: 1rem;
-                right: 1rem;
-                background: var(--gradient-sky);
-                border: 2px solid rgba(255, 255, 255, 0.3);
-                color: white;
-                padding: 0.75rem;
-                border-radius: 50%;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                font-size: 1.2rem;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-                z-index: 10;
-            }
-            .theme-toggle:hover {
-                transform: scale(1.1) rotate(15deg);
-                box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-                background: var(--gradient-deep-blue);
-            }
-            
-            .form-group {
-                margin-bottom: 1.75rem;
-            }
-            
-            .form-group label {
-                display: block;
-                margin-bottom: 0.75rem;
-                font-weight: 600;
-                color: var(--text-primary);
-                font-size: 0.95rem;
-            }
-            
-            .form-group input {
-                width: 100%;
-                padding: 1rem 1.25rem;
-                border: 2px solid var(--border-color);
-                border-radius: 12px;
-                font-size: 1rem;
-                transition: all 0.3s ease;
-                background: var(--bg-secondary);
-                color: var(--text-primary);
-                box-sizing: border-box;
-            }
-            
-            .form-group input:focus {
-                outline: none;
-                border-color: var(--accent-primary);
-                box-shadow: var(--shadow-glow);
-                transform: translateY(-1px);
-            }
-            
-            .login-btn {
-                width: 100%;
-                padding: 1.25rem;
-                background: var(--gradient-ocean);
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-size: 1.05rem;
-                font-weight: 600;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                position: relative;
-                overflow: hidden;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
-            }
-            
-            .login-btn::before {
-                content: '';
-                position: absolute;
-                top: 0;
-                left: -100%;
-                width: 100%;
-                height: 100%;
-                background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-                transition: left 0.5s;
-            }
-            
-            .login-btn:hover::before {
-                left: 100%;
-            }
-            
-            .login-btn:hover {
-                transform: translateY(-3px);
-                box-shadow: var(--shadow-glow);
-                background: var(--gradient-deep-blue);
-            }
-            
-            .login-btn:active {
-                transform: translateY(-1px);
-                box-shadow: 0 8px 20px rgba(29, 78, 216, 0.3);
-            }
-            
-            .error-message {
-                margin-top: 1.5rem;
-                padding: 1rem;
-                background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-                border: 1px solid #fecaca;
-                border-radius: 12px;
-                color: #dc2626;
-                display: none;
-                font-weight: 500;
-            }
-            
-            .login-footer {
-                background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-                padding: 1.75rem;
-                text-align: center;
-                border-top: 1px solid #e2e8f0;
-                color: #64748b;
-                font-size: 0.85rem;
-            }
-            
-            .welcome-message {
-                background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-                padding: 1.25rem;
-                border-radius: 12px;
-                margin-bottom: 1.5rem;
-                font-size: 0.9rem;
-                color: #1e40af;
-                border: 1px solid #93c5fd;
-                font-weight: 500;
-            }
-            
-            /* Responsive design */
-            @media (max-width: 480px) {
-                .login-container {
-                    margin: 1rem;
-                    border-radius: 16px;
-                }
-                
-                .login-header {
-                    padding: 2rem 1.5rem;
-                }
-                
-                .login-form {
-                    padding: 2rem 1.5rem;
-                }
-                
-                .login-header h1 {
-                    font-size: 1.75rem;
-                }
-            }`;
-
-            const loginJS = `
-            // Form validation utility (inline version for login page)
-            function showFieldError(fieldId, message) {
-                const field = document.getElementById(fieldId);
-                if (!field) return;
-                const existingError = field.parentElement.querySelector('.field-error');
-                if (existingError) existingError.remove();
-                field.classList.remove('is-invalid');
-                if (!message) return;
-                field.classList.add('is-invalid');
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'field-error';
-                errorDiv.style.cssText = 'color: #dc2626; font-size: 0.8rem; margin-top: 0.25rem;';
-                errorDiv.textContent = message;
-                field.parentElement.appendChild(errorDiv);
-            }
-            
-            function validateLoginForm() {
-                let isValid = true;
-                showFieldError('username', null);
-                showFieldError('password', null);
-                
-                const username = document.getElementById('username').value.trim();
-                const password = document.getElementById('password').value;
-                
-                if (!username) {
-                    showFieldError('username', 'Username is required');
-                    isValid = false;
-                }
-                
-                if (!password) {
-                    showFieldError('password', 'Password is required');
-                    isValid = false;
-                } else if (password.length < 4) {
-                    showFieldError('password', 'Password must be at least 4 characters');
-                    isValid = false;
-                }
-                
-                return isValid;
-            }
-            
-            // Enhanced login functionality with proper error handling and validation
-            document.getElementById('loginForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                
-                // Validate form before submission
-                if (!validateLoginForm()) {
-                    return;
-                }
-                
-                const username = document.getElementById('username').value.trim();
-                const password = document.getElementById('password').value;
-                const loginBtn = document.getElementById('loginBtn');
-                const errorDiv = document.getElementById('error-message');
-                
-                // Reset error state
-                errorDiv.style.display = 'none';
-                errorDiv.textContent = '';
-                
-                try {
-                    // Save original button text
-                    const originalText = loginBtn.textContent;
-                    loginBtn.disabled = true;
-                    loginBtn.textContent = 'Signing In...';
-                    
-                    const response = await fetch('/api/auth/login', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ username, password })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        // Persist auth token for subsequent API requests (themes, settings, etc.)
-                        try {
-                            if (result.token) {
-                                localStorage.setItem('authToken', result.token);
-                                // Also set a cookie for compatibility with existing middleware token checks
-                                document.cookie = 'token=' + result.token + '; Path=/; SameSite=Lax';
-                            }
-                        } catch (storageErr) {
-                            loggers?.system?.warn('Failed to persist auth token:', storageErr.message);
-                        }
-
-                        loginBtn.textContent = 'Success! Redirecting...';
-                        loginBtn.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-                        setTimeout(() => {
-                            window.location.href = '/dashboard';
-                        }, 500);
-                    } else {
-                        throw new Error(result.error || 'Login failed');
-                    }
-                } catch (error) {
-                    // Show error message
-                    errorDiv.textContent = error.message;
-                    errorDiv.style.display = 'block';
-                    
-                    // Reset button state
-                    loginBtn.disabled = false;
-                    loginBtn.textContent = 'Sign In';
-                    loginBtn.style.background = '';
-                    
-                    // Shake animation for error feedback
-                    loginBtn.style.animation = 'shake 0.5s ease-in-out';
-                    setTimeout(() => {
-                        loginBtn.style.animation = '';
-                    }, 500);
-                }
-            });
-            
-            // Add shake animation
-            const style = document.createElement('style');
-            style.textContent = \`
-                @keyframes shake {
-                    0%, 100% { transform: translateX(0); }
-                    25% { transform: translateX(-5px); }
-                    75% { transform: translateX(5px); }
-                }
-            \`;
-            document.head.appendChild(style);
-            
-            // Enhanced theme management with light/dark/auto
-            function toggleTheme() {
-                const html = document.documentElement;
-                const currentTheme = html.getAttribute('data-theme') || 'auto';
-                let nextTheme;
-                
-                switch(currentTheme) {
-                    case 'auto': nextTheme = 'light'; break;
-                    case 'light': nextTheme = 'dark'; break;
-                    case 'dark': nextTheme = 'auto'; break;
-                    default: nextTheme = 'auto';
-                }
-                
-                html.setAttribute('data-theme', nextTheme);
-                
-                try {
-                    localStorage.setItem('preferred-theme', nextTheme);
-                } catch(e) {
-                    loggers?.system?.warn('Cannot save theme preference:', e);
-                }
-                
-                // Update theme toggle icon and tooltip
-                const toggle = document.querySelector('.theme-toggle i');
-                const button = document.querySelector('.theme-toggle');
-                switch(nextTheme) {
-                    case 'light':
-                        toggle.className = 'fas fa-sun';
-                        button.title = 'Switch to Dark Theme';
-                        break;
-                    case 'dark':
-                        toggle.className = 'fas fa-moon';
-                        button.title = 'Switch to Auto Theme';
-                        break;
-                    case 'auto':
-                        toggle.className = 'fas fa-palette';
-                        button.title = 'Switch to Light Theme';
-                        break;
-                }
-            }
-            
-            // Initialize theme on page load
-            (function() {
-                try {
-                    const saved = localStorage.getItem('preferred-theme') || 'auto';
-                    document.documentElement.setAttribute('data-theme', saved);
-                    
-                    // Set initial icon
-                    const toggle = document.querySelector('.theme-toggle i');
-                    const button = document.querySelector('.theme-toggle');
-                    switch(saved) {
-                        case 'light':
-                            toggle.className = 'fas fa-sun';
-                            button.title = 'Switch to Dark Theme';
-                            break;
-                        case 'dark':
-                            toggle.className = 'fas fa-moon';
-                            button.title = 'Switch to Auto Theme';
-                            break;
-                        case 'auto':
-                            toggle.className = 'fas fa-palette';
-                            button.title = 'Switch to Light Theme';
-                            break;
-                    }
-                } catch(e) {
-                    loggers?.system?.warn('Cannot load theme preference:', e);
-                }
-            })();
-            
-            // Auto-focus username field
-            document.getElementById('username').focus();`;
-
-            // Send login page as standalone HTML (no sidebar/template)
-            res.send(`
-<!DOCTYPE html>
-<html lang="en" data-theme="auto">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🔥 Enterprise Logger - Login</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
-    <!-- Removed external icon CDN to avoid console errors in headless environments -->
-    <style>
-        :root {
-            /* Light Theme Colors */
-            --bg-primary: #ffffff;
-            --bg-secondary: #f8fafc;
-            --bg-tertiary: #f1f5f9;
-            --text-primary: #1e293b;
-            --text-secondary: #475569;
-            --text-muted: #64748b;
-            --border-color: #e2e8f0;
-            --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            --shadow-glow: 0 0 20px rgba(96, 165, 250, 0.2);
-            
-            /* Light Theme Ocean Gradients */
-            --gradient-ocean: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 50%, #6366f1 100%);
-            --gradient-deep-blue: linear-gradient(135deg, #1e40af 0%, #3730a3 50%, #4338ca 100%);
-            --gradient-sky: linear-gradient(135deg, #7dd3fc 0%, #38bdf8 50%, #0ea5e9 100%);
-            
-            /* Standard Colors - Using Ocean Gradient as Primary */
-            --accent-primary: var(--gradient-ocean);
-            --btn-primary: var(--gradient-ocean);
-            --accent-secondary: #3b82f6;
-            --login-bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);
-        }
-
-        /* Dark Theme */
-        [data-theme="dark"] {
-            --bg-primary: #1e293b;
-            --bg-secondary: #334155;
-            --bg-tertiary: #475569;
-            --text-primary: #f1f5f9;
-            --text-secondary: #cbd5e1;
-            --text-muted: #94a3b8;
-            --border-color: #475569;
-            --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-            --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-            --shadow-glow: 0 0 20px rgba(96, 165, 250, 0.4);
-            
-            /* Ocean Gradients for Dark Theme */
-            --gradient-ocean: linear-gradient(135deg, #1e40af 0%, #1e3a8a 50%, #312e81 100%);
-            --gradient-deep-blue: linear-gradient(135deg, #0c1e3f 0%, #1e293b 50%, #334155 100%);
-            --gradient-sky: linear-gradient(135deg, #1e40af 0%, #3730a3 50%, #4338ca 100%);
-            
-            /* Standard Colors - Using Ocean Gradient as Primary */
-            --accent-primary: var(--gradient-ocean);
-            --btn-primary: var(--gradient-ocean);
-            --accent-secondary: #3b82f6;
-            --login-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-        }
-
-        /* Auto Theme - follows system preference */
-        @media (prefers-color-scheme: dark) {
-            [data-theme="auto"] {
-                --bg-primary: #1e293b;
-                --bg-secondary: #334155;
-                --bg-tertiary: #475569;
-                --text-primary: #f1f5f9;
-                --text-secondary: #cbd5e1;
-                --text-muted: #94a3b8;
-                --border-color: #475569;
-                --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-                --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-                --shadow-glow: 0 0 20px rgba(96, 165, 250, 0.4);
-                
-                /* Ocean Gradients for Auto Dark Mode */
-                --gradient-ocean: linear-gradient(135deg, #1e40af 0%, #1e3a8a 50%, #312e81 100%);
-                --gradient-deep-blue: linear-gradient(135deg, #0c1e3f 0%, #1e293b 50%, #334155 100%);
-                --gradient-sky: linear-gradient(135deg, #1e40af 0%, #3730a3 50%, #4338ca 100%);
-                
-                /* Standard Colors - Using Ocean Gradient as Primary */
-                --accent-primary: var(--gradient-ocean);
-                --btn-primary: var(--gradient-ocean);
-                --accent-secondary: #3b82f6;
-                --login-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
-            }
-        }
-        
-        ${loginCSS}
-    </style>
-</head>
-<body>
-    ${loginPageContent}
-    
-    <script>
-        ${loginJS}
-    </script>
-</body>
-</html>`);
-        });
+        // REMOVED: Login page inline code - now in routes/auth-pages.js (577 lines extracted)
 
         // Authentication endpoints
         app.post('/api/auth/login', async (req, res) => {
@@ -1785,7 +1285,14 @@ function setupRoutes() {
         app.use('/admin/api-keys', requireAuth, requireAdmin, require('./routes/admin/api-keys')(getPageTemplate, requireAuth));
         app.use('/admin/search-advanced', requireAuth, requireAdmin, require('./routes/admin/search-advanced'));
         app.use('/admin/ingestion', requireAuth, requireAdmin, require('./routes/admin/ingestion'));
-        app.use('/admin/tracing', requireAuth, requireAdmin, require('./routes/admin/tracing'));
+        // Instrumented mount for /admin/tracing to isolate Unexpected identifier error
+        try {
+            app.use('/admin/tracing', requireAuth, requireAdmin, require('./routes/admin/tracing'));
+            loggers.system.info('Mounted /admin/tracing route');
+        } catch (e) {
+            loggers.system.error('❌ Failed mounting /admin/tracing route: ' + e.message);
+            if (e && e.stack) loggers.system.error(e.stack);
+        }
     // Builder admin removed
     // app.use('/admin/dashboards', requireAuth, requireAdmin, require('./routes/admin/dashboards'));
 
@@ -1802,6 +1309,8 @@ function setupRoutes() {
     app.use('/api/logs', requireAuth, require('./routes/api/logs'));
     // Register analytics API (restored from monolithic feature set)
     app.use('/api/analytics', requireAuth, require('./routes/api/analytics'));
+    app.use('/api/notes', requireAuth, require('./routes/api/notes'));
+    app.use('/api/bookmarks', requireAuth, require('./routes/api/bookmarks'));
         app.use('/api/activity', requireAuth, require('./routes/api/activity'));
         app.use('/api/webhooks', requireAuth, require('./routes/api/webhooks'));
         app.use('/api/search', requireAuth, require('./routes/api/search'));
@@ -1809,22 +1318,23 @@ function setupRoutes() {
         // WebSocket clients inspection endpoint (REST) for parity with monolithic
         app.get('/api/websocket/clients', requireAuth, async (req, res) => {
             try {
-                if (!realTimeStreamingEngine || !realTimeStreamingEngine.wsServer) {
+                if (!wsServer) {
                     return res.json({ success: false, error: 'WebSocket server not initialized', clients: [] });
                 }
+                
                 const clients = [];
-                for (const [clientId, clientData] of realTimeStreamingEngine.clients.entries()) {
+                for (const [clientId, clientData] of wsClients.entries()) {
                     clients.push({
                         id: clientId,
-                        ip: clientData.ip,
-                        userAgent: clientData.userAgent,
+                        authenticated: clientData.authenticated,
+                        username: clientData.username || 'anonymous',
                         connectedAt: clientData.connectedAt,
-                        messagesSent: clientData.messagesSent,
-                        bytesSent: clientData.bytesSent,
+                        lastPing: new Date(clientData.lastPing).toISOString(),
                         subscriptions: Array.from(clientData.subscriptions || []),
-                        filters: clientData.filters || []
+                        status: clientData.ws.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
                     });
                 }
+                
                 res.json({ success: true, total: clients.length, clients });
             } catch (error) {
                 loggers.system.error('WebSocket clients endpoint error:', error);
@@ -1835,10 +1345,18 @@ function setupRoutes() {
         // Admin API routes
         app.use('/api/settings', requireAuth, require('./routes/api/settings'));
         // REMOVED DUPLICATE: app.use('/api/api-keys', requireAuth, require('./routes/api/settings')); // WRONG FILE!
-        app.use('/api/tracing', requireAuth, require('./routes/api/tracing'));
+        // Instrumented mount for /api/tracing to isolate Unexpected identifier error
+        try {
+            app.use('/api/tracing', requireAuth, require('./routes/api/tracing'));
+            loggers.system.info('Mounted /api/tracing route');
+        } catch (e) {
+            loggers.system.error('❌ Failed mounting /api/tracing route: ' + e.message);
+            if (e && e.stack) loggers.system.error(e.stack);
+        }
         app.use('/api/ingestion', requireAuth, require('./routes/api/ingestion'));
         app.use('/api/users', requireAuth, require('./routes/api/users'));
         app.use('/api/admin', requireAuth, require('./routes/api/admin'));
+        app.use('/api/admin', requireAuth, require('./routes/api/admin-tools'));
         app.use('/api/roles', requireAuth, require('./routes/api/users'));
         app.use('/api/log-analyzer', requireAuth, require('./api/log-analyzer'));
     app.use('/api', requireAuth, require('./routes/api/alerts'));
@@ -1850,6 +1368,7 @@ function setupRoutes() {
         app.use('/api', requireAuth, require('./routes/api/themes'));
         app.use('/api', requireAuth, require('./routes/api/saved-searches'));
         app.use('/api', requireAuth, require('./routes/api/integrations'));
+        app.use('/api', requireAuth, require('./routes/api/secrets'));
         app.use('/api', requireAuth, require('./routes/api/api-keys'));
         app.use('/api', requireAuth, require('./routes/api/security'));  // Contains /rate-limits, /audit-trail, /security/* routes
         // REMOVED DUPLICATES - security.js now handles these paths:
@@ -1901,8 +1420,14 @@ function setupRoutes() {
                     }
                 }
                 
-                await dal.createLogEntry(logEntry);
-                if (metricsManager) metricsManager.incrementLogs();
+                // Prefer batched ingestion for higher reliability under load
+                if (dal && typeof dal.enqueueLogEntry === 'function') {
+                    dal.enqueueLogEntry(logEntry);
+                    if (metricsManager) metricsManager.incrementLogs();
+                } else {
+                    await dal.createLogEntry(logEntry);
+                    if (metricsManager) metricsManager.incrementLogs();
+                }
                 
                 res.json({ success: true, message: 'Log received' });
             } catch (error) {
@@ -2346,7 +1871,7 @@ function setupRoutes() {
                     // Load analytics data with empty-state handling
                     async function loadAnalyticsData() {
                         try {
-                            const response = await fetch('/api/analytics/data');
+                            const response = await fetch('/api/analytics/data', { credentials: 'same-origin' });
                             const data = await response.json();
                             updateCards(data);
                             updateCharts(data);
@@ -2459,8 +1984,8 @@ function setupRoutes() {
                         
                         // Active connections from WebSocket if available
                         try {
-                            if (typeof wsServer !== 'undefined' && wsServer && wsServer.clients) {
-                                analyticsData.data.overview.activeConnections = wsServer.clients.size;
+                            if (wsServer) {
+                                analyticsData.data.overview.activeConnections = wsClients.size;
                             }
                         } catch (_) { /* wsServer not available */ }
                         
@@ -2673,9 +2198,266 @@ function setupRoutes() {
         loggers.system.info('✅ All routes configured successfully');
     } catch (error) {
         loggers.system.error('❌ Route setup failed:', error);
+        if (error && error.stack) {
+            loggers.system.error('❌ Route setup failed stack trace:', error.stack);
+        }
+    }
+    }
+// WebSocket server and client management
+const wsClients = new Map(); // Map of clientId -> { ws, subscriptions: Set(['logs', 'alerts', 'metrics', 'sessions']) }
+let wsServer = null;
+
+/**
+ * Initialize WebSocket server attached to HTTP/HTTPS server
+ * @param {http.Server|https.Server} httpServer - The HTTP/HTTPS server instance
+ * @returns {WebSocket.Server} The WebSocket server instance
+ */
+function initializeWebSocketServer(httpServer) {
+    try {
+        const wss = new WebSocket.Server({ 
+            server: httpServer,
+            path: '/ws',
+            clientTracking: true
+        });
+        
+        wsServer = wss; // Store reference for broadcast functions
+        
+        loggers.system.info('✅ WebSocket server initialized on path /ws');
+        
+        // Connection handler
+        wss.on('connection', (ws, req) => {
+            const clientId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+            const clientInfo = {
+                ws,
+                subscriptions: new Set(),
+                authenticated: false,
+                connectedAt: new Date(),
+                lastPing: Date.now()
+            };
+            
+            wsClients.set(clientId, clientInfo);
+            loggers.system.info(`WebSocket client connected: ${clientId} from ${req.socket.remoteAddress}`);
+            
+            // Send welcome message
+            ws.send(JSON.stringify({
+                event: 'connected',
+                clientId,
+                timestamp: new Date().toISOString()
+            }));
+            
+            // Message handler
+            ws.on('message', (message) => {
+                try {
+                    const data = JSON.parse(message.toString());
+                    handleWebSocketMessage(clientId, data);
+                } catch (error) {
+                    loggers.system.error(`WebSocket message parse error from ${clientId}:`, error);
+                    ws.send(JSON.stringify({
+                        event: 'error',
+                        error: 'Invalid JSON message'
+                    }));
+                }
+            });
+            
+            // Error handler
+            ws.on('error', (error) => {
+                loggers.system.error(`WebSocket error for ${clientId}:`, error);
+            });
+            
+            // Close handler
+            ws.on('close', () => {
+                wsClients.delete(clientId);
+                loggers.system.info(`WebSocket client disconnected: ${clientId}`);
+            });
+            
+            // Ping/pong heartbeat
+            ws.on('pong', () => {
+                if (wsClients.has(clientId)) {
+                    wsClients.get(clientId).lastPing = Date.now();
+                }
+            });
+        });
+        
+        // Heartbeat interval to detect dead connections
+        const heartbeatInterval = setInterval(() => {
+            const now = Date.now();
+            const staleClients = [];
+            
+            wsClients.forEach((client, clientId) => {
+                if (now - client.lastPing > 35000) { // 35s timeout (30s + 5s grace)
+                    loggers.system.warn(`WebSocket client ${clientId} timed out, terminating`);
+                    client.ws.terminate();
+                    staleClients.push(clientId);
+                } else if (client.ws.readyState === WebSocket.OPEN) {
+                    client.ws.ping();
+                } else if (client.ws.readyState === WebSocket.CLOSED || client.ws.readyState === WebSocket.CLOSING) {
+                    // Clean up clients in closed/closing state
+                    staleClients.push(clientId);
+                }
+            });
+            
+            // Remove stale clients after iteration to avoid concurrent modification
+            staleClients.forEach(id => wsClients.delete(id));
+            
+            // Limit total connections to prevent memory exhaustion (max 500)
+            if (wsClients.size > 500) {
+                const oldest = Array.from(wsClients.entries())
+                    .sort((a, b) => a[1].connectedAt - b[1].connectedAt)
+                    .slice(0, wsClients.size - 500);
+                oldest.forEach(([id, client]) => {
+                    loggers.system.warn(`Terminating oldest connection ${id} (limit exceeded)`);
+                    client.ws.terminate();
+                    wsClients.delete(id);
+                });
+            }
+        }, 30000); // Ping every 30s
+        
+        wss.on('close', () => {
+            clearInterval(heartbeatInterval);
+        });
+        
+        return wss;
+    } catch (error) {
+        loggers.system.error('❌ WebSocket server initialization failed:', error);
         throw error;
     }
 }
+
+/**
+ * Handle incoming WebSocket messages from clients
+ * @param {string} clientId - The client identifier
+ * @param {object} data - The parsed JSON message
+ */
+function handleWebSocketMessage(clientId, data) {
+    const client = wsClients.get(clientId);
+    if (!client) return;
+    
+    const { event, payload } = data;
+    
+    switch (event) {
+        case 'authenticate':
+            // Simple token-based authentication
+            if (payload && payload.token) {
+                // Verify JWT token (reuse existing auth logic)
+                try {
+                    const decoded = jwt.verify(payload.token, JWT_SECRET);
+                    client.authenticated = true;
+                    client.userId = decoded.userId;
+                    client.username = decoded.username;
+                    
+                    client.ws.send(JSON.stringify({
+                        event: 'authenticated',
+                        username: decoded.username,
+                        timestamp: new Date().toISOString()
+                    }));
+                    
+                    loggers.system.info(`WebSocket client ${clientId} authenticated as ${decoded.username}`);
+                } catch (error) {
+                    client.ws.send(JSON.stringify({
+                        event: 'error',
+                        error: 'Authentication failed'
+                    }));
+                }
+            }
+            break;
+            
+        case 'subscribe':
+            // Subscribe to event channels: logs, alerts, metrics, sessions
+            if (payload && payload.channels && Array.isArray(payload.channels)) {
+                payload.channels.forEach(channel => {
+                    client.subscriptions.add(channel);
+                });
+                
+                client.ws.send(JSON.stringify({
+                    event: 'subscribed',
+                    channels: Array.from(client.subscriptions),
+                    timestamp: new Date().toISOString()
+                }));
+                
+                loggers.system.info(`WebSocket client ${clientId} subscribed to: ${payload.channels.join(', ')}`);
+            }
+            break;
+            
+        case 'unsubscribe':
+            // Unsubscribe from event channels
+            if (payload && payload.channels && Array.isArray(payload.channels)) {
+                payload.channels.forEach(channel => {
+                    client.subscriptions.delete(channel);
+                });
+                
+                client.ws.send(JSON.stringify({
+                    event: 'unsubscribed',
+                    channels: payload.channels,
+                    remaining: Array.from(client.subscriptions),
+                    timestamp: new Date().toISOString()
+                }));
+            }
+            break;
+            
+        case 'ping':
+            // Manual ping/pong for application-level heartbeat
+            client.ws.send(JSON.stringify({
+                event: 'pong',
+                timestamp: new Date().toISOString()
+            }));
+            break;
+            
+        default:
+            client.ws.send(JSON.stringify({
+                event: 'error',
+                error: `Unknown event: ${event}`
+            }));
+    }
+}
+
+/**
+ * Broadcast message to all connected WebSocket clients
+ * @param {string} event - The event name
+ * @param {object} data - The event data
+ */
+function broadcastToAll(event, data) {
+    if (!wsServer) return;
+    
+    const message = JSON.stringify({
+        event,
+        data,
+        timestamp: new Date().toISOString()
+    });
+    
+    wsClients.forEach((client) => {
+        if (client.ws.readyState === WebSocket.OPEN) {
+            client.ws.send(message);
+        }
+    });
+}
+
+/**
+ * Broadcast message to clients subscribed to a specific channel
+ * @param {string} channel - The channel name (logs, alerts, metrics, sessions)
+ * @param {string} event - The event name
+ * @param {object} data - The event data
+ */
+function broadcastToSubscribers(channel, event, data) {
+    if (!wsServer) return;
+    
+    const message = JSON.stringify({
+        event,
+        channel,
+        data,
+        timestamp: new Date().toISOString()
+    });
+    
+    wsClients.forEach((client) => {
+        if (client.ws.readyState === WebSocket.OPEN && client.subscriptions.has(channel)) {
+            client.ws.send(message);
+        }
+    });
+}
+
+// Export WebSocket functions for use in routes
+global.wsClients = wsClients;
+global.broadcastToAll = broadcastToAll;
+global.broadcastToSubscribers = broadcastToSubscribers;
 
 // Server startup function
 async function startServer() {
@@ -2684,6 +2466,18 @@ async function startServer() {
         
         // Initialize database
         await initializeDatabase();
+        // Initialize resilience workers (failed operation retry + health snapshots)
+        let resilienceWorkers = { cleanup: () => {} }; // Default no-op cleanup
+        try {
+            const { setupResilienceWorkers } = require('./resilience-workers');
+            resilienceWorkers = setupResilienceWorkers({ app, dal, loggers }) || resilienceWorkers;
+            loggers.system.info('🛡️ Resilience workers scheduled');
+        } catch (resErr) {
+            loggers.system.error('⚠️ Could not initialize resilience workers:', resErr);
+        }
+        
+        // Store reference for graceful shutdown
+        app.resilienceWorkers = resilienceWorkers;
         
         // Initialize system components
         await initializeSystemComponents();
@@ -2693,6 +2487,7 @@ async function startServer() {
         
         // Start server
         let server;
+        let wss; // WebSocket server instance
         
     if (USE_HTTPS && fs.existsSync(SSL_KEY_PATH) && fs.existsSync(SSL_CERT_PATH)) {
             const httpsOptions = {
@@ -2703,6 +2498,12 @@ async function startServer() {
             server = https.createServer(httpsOptions, app);
             server.listen(PORT, '0.0.0.0', () => {
                 loggers.system.info(`🔒 HTTPS Server running on port ${PORT}`);
+                
+                // Initialize WebSocket server on HTTPS
+                if (config.integrations.websocket.enabled) {
+                    wss = initializeWebSocketServer(server);
+                }
+                
                 printStartupBanner(true);
             });
         } else {
@@ -2712,6 +2513,12 @@ async function startServer() {
             
             server = app.listen(PORT, '0.0.0.0', () => {
                 loggers.system.info(`🚀 HTTP Server running on port ${PORT} (bound to 0.0.0.0)`);
+                
+                // Initialize WebSocket server on HTTP
+                if (config.integrations.websocket.enabled) {
+                    wss = initializeWebSocketServer(server);
+                }
+                
                 printStartupBanner(false);
                 systemReady = true;
             });
@@ -2729,9 +2536,25 @@ async function startServer() {
         // Graceful shutdown
         process.on('SIGTERM', () => {
             loggers.system.info('SIGTERM received - shutting down gracefully...');
+            
+            // Cleanup resilience workers first
+            if (app.resilienceWorkers && typeof app.resilienceWorkers.cleanup === 'function') {
+                app.resilienceWorkers.cleanup();
+            }
+            
             server.close(() => {
                 loggers.system.info('Server shut down successfully');
-                if (db) {
+                
+                // Clean up DAL (includes batch timer and database connection)
+                if (dal && typeof dal.cleanup === 'function') {
+                    dal.cleanup().then(() => {
+                        loggers.system.info('Database connection closed');
+                        process.exit(0);
+                    }).catch((err) => {
+                        loggers.system.error('Database cleanup error:', err);
+                        process.exit(1);
+                    });
+                } else if (db) {
                     db.close((err) => {
                         if (err) loggers.system.error('Database close error:', err);
                         else loggers.system.info('Database connection closed');
@@ -2763,7 +2586,7 @@ function printStartupBanner(isHttps) {
     loggers?.system?.info(`🔒 ESP32 Endpoint: ${protocol}://localhost:${PORT}/log`);
     loggers?.system?.info(`💚 Health Check: ${protocol}://localhost:${PORT}/health`);
     if (config.integrations.websocket.enabled) {
-        loggers?.system?.info(`🔗 WebSocket Server: ws${isHttps ? 's' : ''}://localhost:${config.integrations.websocket.port}`);
+        loggers?.system?.info(`🔗 WebSocket Server: ws${isHttps ? 's' : ''}://localhost:${PORT}/ws`);
     }
     if (config.integrations.mqtt.enabled) {
         loggers?.system?.info(`📡 MQTT Integration: ${config.integrations.mqtt.broker}`);
@@ -2780,9 +2603,9 @@ if (require.main === module) {
 async function createTestApp() {
     // Avoid re-initializing if already set up
     if (!dal) {
-        // Provide a fallback AUTH_PASSWORD in test environments if not set
+        // Require AUTH_PASSWORD explicitly in test environments for security (no fallback)
         if (!process.env.AUTH_PASSWORD) {
-            process.env.AUTH_PASSWORD = 'testAdmin123!';
+            throw new Error('AUTH_PASSWORD environment variable must be set for tests');
         }
         // Mark test mode and disable networked components
         process.env.NODE_ENV = process.env.NODE_ENV || 'test';

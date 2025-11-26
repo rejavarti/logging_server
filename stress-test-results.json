@@ -1,0 +1,4507 @@
+{
+  "Summary": {
+    "PhasesExecuted": 5,
+    "TotalDuration": 4.744007475,
+    "TotalErrors": 337,
+    "OverallErrorRate": 11.9,
+    "TotalRequests": 2831
+  },
+  "EndTime": "2025-11-22T17:31:36.1450806-07:00",
+  "ServerUrl": "http://localhost:10180",
+  "Phases": [
+    {
+      "MinResponseTime": 9.0705,
+      "MaxResponseTime": 129.0969,
+      "AvgResponseTime": 22.54,
+      "TotalRequests": 871,
+      "Phase": 1,
+      "Success": 871,
+      "ErrorRate": 0.0,
+      "EndTime": "2025-11-22T17:27:51.8176592-07:00",
+      "Requests": [
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 103.5431
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 18.2896
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.0316
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 34.0781
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 17.6651
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 53.4012
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.3872
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.1788
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.819
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 19.3975
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 28.5204
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 17.7796
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 28.4973
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.2051
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.6043
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.5739
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.4397
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.3806
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.1933
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.0779
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.4424
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.2368
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.2234
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.6587
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.6533
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 34.391
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 32.8472
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.123
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.04
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 43.745
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.3963
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.4132
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.2228
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.2306
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.666
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 26.2083
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.2651
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.1424
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.1755
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.603
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.5612
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.8072
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 27.0459
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 33.7277
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5965
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.7688
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.2656
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.7757
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.2313
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.053
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.5591
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.2348
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.6219
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.2003
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.6101
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.9299
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.5912
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 62.4873
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.3443
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.2883
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.7642
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.4002
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.4159
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.6781
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.4003
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.8132
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.8482
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.4485
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.2224
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.8401
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.9732
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.0904
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.1864
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.629
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.1915
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.4901
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.6065
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.689
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.9468
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.3814
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.5918
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8885
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.4797
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 52.7387
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 29.631
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.4528
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.6434
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.4017
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.7704
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 20.326
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.0455
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.2234
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.0004
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.1098
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.8224
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.7422
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.1389
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.5185
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.149
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 52.3547
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.5449
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.8169
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.392
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.4052
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.9324
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.3059
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.0613
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7236
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.0112
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.5859
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.9439
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.2363
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.5845
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.2234
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.2304
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.3226
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.7137
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.888
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.0547
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.5786
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.7505
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.7778
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.5099
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.3965
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 16.0636
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.1937
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.0016
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.4983
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.5743
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.9047
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.1277
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.4352
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 11.9766
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.9622
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.6972
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.0274
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.1186
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.0317
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.5284
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7528
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.761
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.8058
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.3941
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.4962
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.767
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7749
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.7655
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 61.8365
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 18.4976
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.4896
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 18.9419
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.7845
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.5098
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 16.378
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.4856
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.1952
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.4401
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.6313
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.54
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.427
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.3587
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.2725
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.4876
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.4916
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.6605
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.2062
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.643
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.3141
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.8788
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.8632
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.1901
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.9443
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 27.8183
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.9739
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.9018
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.7119
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.5296
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 60.0803
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.6315
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.9212
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.0765
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.3762
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.7541
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 26.7799
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.3381
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 19.6561
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.2929
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 26.8602
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.5968
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.7381
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.31
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.1547
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.9744
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 14.6672
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.5613
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.1746
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.3567
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.4921
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.8644
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.6829
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.1535
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8648
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.8504
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.9777
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.8009
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.2139
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.2928
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 15.8616
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.9799
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.4071
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.4903
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.8101
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.0568
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.6931
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.003
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 26.1301
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7631
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.8092
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.3374
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.7135
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.0565
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.1814
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.6766
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.9258
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.2342
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 27.2491
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.0779
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.5509
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.0976
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 18.6138
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.1893
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.0969
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.7852
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.4957
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.1749
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.8852
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.9344
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.4129
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.19
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.8869
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.9339
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.4687
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.7603
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.0202
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 41.9764
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.6406
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.7184
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.7378
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.5095
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.6836
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.9764
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.8817
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.0555
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.0328
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.1109
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.7608
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.673
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.0999
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.1863
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.4526
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.5477
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.4314
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.4426
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.698
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.9704
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.5649
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5604
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 11.35
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.8434
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.6473
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.4656
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.1407
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.5399
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.0598
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1479
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.6779
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7859
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 61.9254
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.6107
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.9979
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.0094
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.3484
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.6894
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.8105
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.4733
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.8745
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.2046
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.1671
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.8351
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.7883
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.466
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.0117
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.7739
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.0938
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.919
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.8801
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.4062
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.6526
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.4752
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.3133
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 16.9794
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8558
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.7901
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.1645
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.8956
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.6726
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.9586
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.2784
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.0362
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.6914
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.81
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.2639
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.5011
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.3316
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.9109
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.5295
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.1629
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.4368
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.3983
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.579
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.95
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.76
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.5025
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.4592
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.7429
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.2752
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.1445
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5928
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.3458
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.695
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.1346
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.1898
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.5108
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.4482
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.923
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.2106
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.9261
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.4565
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.1776
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.4829
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.9424
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.5998
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 42.1666
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.5926
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.0463
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.5794
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.8082
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.9424
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.0715
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.5033
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.5875
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8621
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.5953
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.6394
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1599
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.3326
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 18.455
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.2256
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.3119
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.4135
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.7572
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.0784
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.6687
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.9552
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.325
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.0859
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.825
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.0705
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.8986
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.8966
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.0761
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.2669
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.4583
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.4561
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7098
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 20.3533
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.323
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3183
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.1082
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 27.4017
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.9152
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.4809
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.2362
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.3963
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.4015
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.6538
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.338
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.5162
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.4986
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 10.6189
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.7675
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3339
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.0715
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.5528
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.4367
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.1167
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.3495
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.0094
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.4409
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3774
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.9444
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.661
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.7436
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 20.7441
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.4696
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.454
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 26.1268
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1075
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.509
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.266
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.682
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.1497
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.2195
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.2593
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.0788
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.0845
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.6099
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.0848
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.2744
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.1413
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.2629
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.816
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.2409
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.5543
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.0586
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.5179
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.8183
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8181
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.6402
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.9251
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.2831
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.6676
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.9452
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.4442
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5523
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.5782
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.4647
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.6567
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.829
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5255
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.6853
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.9084
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.8368
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.2214
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.004
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 20.9622
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.5978
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.8973
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.5099
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.3355
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.4266
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 70.8789
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.3601
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.7504
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 35.7731
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 22.814
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 70.7676
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 10.3049
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.6394
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.2328
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.7936
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.7324
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8369
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.3091
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.7709
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.0445
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.289
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7694
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.2141
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.005
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.2914
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.731
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.0225
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.7211
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 28.6021
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.2972
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.31
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.2512
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.0429
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.7286
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.7328
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.9227
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.607
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.1201
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.9024
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.1849
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.6881
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.4047
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.5543
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.5575
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.1899
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.5745
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.0116
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.9137
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.2851
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 25.7784
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.6758
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.582
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.201
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7578
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.6394
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.0463
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 19.23
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.5466
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.2388
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 14.5608
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.4527
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.6986
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.9138
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.5547
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.1898
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.5469
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.2289
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.0624
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.5514
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.3103
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.8771
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.6944
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.9951
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.1125
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.2727
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.6637
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3888
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.3138
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.7025
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.4854
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.7975
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.7991
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.9874
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.0125
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.584
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.1618
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.4505
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.4106
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1383
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.4208
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.8868
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.5393
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.2755
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.4727
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.6275
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.2166
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 20.7745
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.3514
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.3246
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5841
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.8218
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.1707
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.2838
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.5017
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.9992
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.3533
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.1386
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.6506
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 17.1623
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 38.9117
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 11.6985
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 28.5524
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.0845
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 18.9515
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 17.4577
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.4104
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5357
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.309
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.3761
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.8176
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.6613
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.1721
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 20.2318
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.7605
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.4333
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.2614
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.0548
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.1
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.2207
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.227
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.2135
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.9128
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.2937
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 57.0089
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.9811
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.8275
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.6814
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.1321
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.7063
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.7314
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.3857
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.0367
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.4287
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.9657
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 10.6195
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.6243
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5083
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.5587
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.889
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 62.6969
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 54.3652
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.0382
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.454
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 31.5681
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 24.5044
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.7072
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 129.0969
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 29.3034
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.0216
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.2535
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 26.1248
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 23.5151
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 58.2415
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 18.569
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 35.306
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 65.324
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 75.4773
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 90.3913
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 32.763
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 15.5851
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 58.0962
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 27.7852
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.5208
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.7788
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.4468
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 54.9256
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.571
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.4851
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.0952
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.8032
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.4538
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.1474
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.4544
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.4342
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.8484
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1816
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.4503
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 43.9525
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1907
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.406
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.9895
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.0949
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.5483
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.7788
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.2305
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.3616
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.3337
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.6419
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.2513
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.9716
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.8335
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.434
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.1943
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1631
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.8381
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.8147
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.4461
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1068
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.6854
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.3383
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 11.8249
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 20.5361
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.4656
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.1799
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.7435
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.1976
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.6548
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.244
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.8182
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.5549
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.67
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.8474
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.9171
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.7578
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.4515
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.1449
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.8444
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.9492
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.5333
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.5351
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.8417
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.2562
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.6962
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.7594
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 30.3501
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.7805
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.6245
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.0063
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.5383
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.406
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.9967
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.7223
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 52.9092
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.7187
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.1734
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1352
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 44.2623
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.8125
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.9739
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.3238
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.0674
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.8459
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.5056
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 51.7584
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.7014
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 18.0537
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.2516
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.5069
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.0192
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.7363
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.057
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.6056
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.6071
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.7135
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.0444
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3522
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.0826
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.8088
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.1795
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 18.1645
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 14.0834
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.4789
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.8816
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.0789
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3891
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.0098
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.4333
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.5363
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.9476
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.3394
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 32.9612
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 15.5041
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3347
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 17.6528
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.809
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1712
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.9619
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.3292
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.4645
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.8906
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.0317
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.0598
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.1473
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.0219
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 24.7111
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.9111
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.0644
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.2994
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.2186
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.2649
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.2834
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.7306
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.5123
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.3234
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8076
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.448
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 11.6934
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.8957
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.8189
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.7985
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.8699
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 12.0597
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.6028
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.7697
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.0393
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.8053
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.271
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.2418
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.7756
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.84
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.4117
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.6337
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.665
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.1506
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.1832
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.5494
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.996
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.0339
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.4411
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 18.1125
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.8833
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.899
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.0967
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.4756
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.1191
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.3227
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.6736
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.3054
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.6281
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.9626
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.8726
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.0457
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.4097
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.0537
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.6798
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.171
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.5505
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.3685
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 16.0033
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.3433
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.8166
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.6641
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.697
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.2183
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.3477
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 23.7576
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.2358
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.9114
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.112
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.2559
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5935
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 13.5592
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.1214
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.2113
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.1666
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.2155
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.6927
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.1651
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.1492
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 66.2763
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 17.6002
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 9.3043
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 54.004
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.9379
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 57.7837
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.9702
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.1119
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.3151
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.3181
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 57.2561
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.1677
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.7474
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.7356
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.768
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.2001
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.3789
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 21.9153
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 20.2349
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.4913
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 18.5594
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 46.2641
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.8206
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.5125
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 22.5457
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.4171
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 19.0456
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 48.552
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.9566
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.6413
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.3514
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 50.1809
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 25.5293
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 13.8726
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.9027
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 23.5384
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 52.6874
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 14.992
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 18.4967
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 18.2382
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 49.9768
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 28.9085
+        },
+        {
+          "Endpoint": "/api/integrations",
+          "Status": "Success",
+          "ResponseTime": 21.4517
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 54.6979
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.8359
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 11.2562
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 47.1208
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 22.5031
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.616
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=source",
+          "Status": "Success",
+          "ResponseTime": 24.2424
+        },
+        {
+          "Endpoint": "/api/system/metrics",
+          "Status": "Success",
+          "ResponseTime": 45.6721
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 13.3989
+        },
+        {
+          "Endpoint": "/api/logs?limit=50",
+          "Status": "Success",
+          "ResponseTime": 12.7381
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.688
+        },
+        {
+          "Endpoint": "/api/dashboard/widgets",
+          "Status": "Success",
+          "ResponseTime": 10.4768
+        },
+        {
+          "Endpoint": "/api/logs/stats?groupBy=level",
+          "Status": "Success",
+          "ResponseTime": 12.5211
+        }
+      ],
+      "Name": "Sustained Load Test",
+      "TargetRPS": 30,
+      "ActualRPS": 14.44,
+      "Duration": 60,
+      "Failures": 0,
+      "StartTime": "2025-11-22T17:26:51.5097827-07:00"
+    },
+    {
+      "InitialDbSize": 12.86,
+      "AvgInsertTime": 9.1,
+      "Phase": 2,
+      "InitialMemory": 43.0,
+      "TargetLogs": 1000,
+      "EndTime": "2025-11-22T17:28:01.6208403-07:00",
+      "Duration": 9.705196,
+      "StartTime": "2025-11-22T17:27:51.9156443-07:00",
+      "MemoryGrowth": 4.0,
+      "Name": "Database Ingestion Stress",
+      "MinInsertTime": 5.8254,
+      "LogsCreated": 737,
+      "LogsPerSecond": 75.94,
+      "MaxInsertTime": 52.1346,
+      "DbGrowth": 0.33,
+      "FinalMemory": 47.0,
+      "Failures": 263,
+      "FinalDbSize": 13.19
+    },
+    {
+      "Duration": 120,
+      "Samples": [
+        {
+          "Memory": 41.0,
+          "Timestamp": "2025-11-22T17:28:14.129866-07:00",
+          "ElapsedSeconds": 10.1868488
+        },
+        {
+          "Memory": 42.0,
+          "Timestamp": "2025-11-22T17:28:24.2701972-07:00",
+          "ElapsedSeconds": 20.32718
+        },
+        {
+          "Memory": 33.0,
+          "Timestamp": "2025-11-22T17:28:34.4136119-07:00",
+          "ElapsedSeconds": 30.4705947
+        },
+        {
+          "Memory": 42.0,
+          "Timestamp": "2025-11-22T17:28:44.6400543-07:00",
+          "ElapsedSeconds": 40.6970371
+        },
+        {
+          "Memory": 42.0,
+          "Timestamp": "2025-11-22T17:28:54.6525566-07:00",
+          "ElapsedSeconds": 50.7095394
+        },
+        {
+          "Memory": 44.0,
+          "Timestamp": "2025-11-22T17:29:04.912604-07:00",
+          "ElapsedSeconds": 60.9695868
+        },
+        {
+          "Memory": 45.0,
+          "Timestamp": "2025-11-22T17:29:15.1276765-07:00",
+          "ElapsedSeconds": 71.1846593
+        },
+        {
+          "Memory": 42.0,
+          "Timestamp": "2025-11-22T17:29:25.2732742-07:00",
+          "ElapsedSeconds": 81.330257
+        },
+        {
+          "Memory": 42.0,
+          "Timestamp": "2025-11-22T17:29:35.8087649-07:00",
+          "ElapsedSeconds": 91.8657477
+        },
+        {
+          "Memory": 43.0,
+          "Timestamp": "2025-11-22T17:29:45.8712349-07:00",
+          "ElapsedSeconds": 101.9282177
+        },
+        {
+          "Memory": 46.0,
+          "Timestamp": "2025-11-22T17:29:56.3654389-07:00",
+          "ElapsedSeconds": 112.4224217
+        }
+      ],
+      "EndTime": "2025-11-22T17:30:04.347982-07:00",
+      "MemoryGrowth": 7.0,
+      "StartTime": "2025-11-22T17:28:03.7182786-07:00",
+      "PeakMemory": 46.0,
+      "Name": "Memory Leak Detection",
+      "Phase": 3,
+      "InitialMemory": 41.0,
+      "FinalMemory": 48.0,
+      "RequestCount": 217,
+      "LeakDetected": true,
+      "MemoryGrowthPerHour": 208.90
+    },
+    {
+      "EndTime": "2025-11-22T17:30:35.7122922-07:00",
+      "ConnectionsFailed": 0,
+      "ConnectionsEstablished": 100,
+      "AvgConnectionTime": 13.53,
+      "Success": true,
+      "Name": "WebSocket Connection Stress",
+      "Phase": 4,
+      "MessagesReceived": 100,
+      "TargetConnections": 100,
+      "StartTime": "2025-11-22T17:30:04.414655-07:00"
+    },
+    {
+      "Duration": 60,
+      "ApiRequests": 810,
+      "RequestsPerSecond": 13.42,
+      "MemoryGrowth": 0.0,
+      "StartTime": "2025-11-22T17:30:35.7238657-07:00",
+      "Name": "Combined Load Test",
+      "Phase": 5,
+      "InitialMemory": 47.0,
+      "Errors": 74,
+      "FinalMemory": 47.0,
+      "ErrorRate": 7.36,
+      "LogsCreated": 196,
+      "AvgResponseTime": 39.5,
+      "EndTime": "2025-11-22T17:31:36.0836877-07:00",
+      "ActualDuration": 60.359822
+    }
+  ],
+  "StartTime": "2025-11-22T17:26:51.5046321-07:00"
+}

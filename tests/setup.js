@@ -3,7 +3,9 @@
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
-process.env.AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'testAdmin123!';
+if (!process.env.AUTH_PASSWORD) {
+  throw new Error('AUTH_PASSWORD environment variable must be set for tests');
+}
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key';
 process.env.PORT = '3001'; // Different port for tests
 

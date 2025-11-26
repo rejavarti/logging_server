@@ -85,7 +85,7 @@ router.get('/', async (req, res) => {
                 <i class="fas fa-heartbeat"></i> Health Monitor
             </button>
             <button class="tab-btn" data-tab="custom-integrations" onclick="switchTab('custom-integrations')">
-                <i class="fas fa-plug"></i> Custom Integrations
+                <i class="fas fa-plug"></i> Add Integration
             </button>
         </div>
 
@@ -257,7 +257,7 @@ router.get('/', async (req, res) => {
                     </div>
                     ` : `
                     <div class="empty-state small">
-                        <p>Types appear here as you add integrations.</p>
+                        <p>No integration types configured yet.</p>
                     </div>
                     `}
                 </div>
@@ -888,8 +888,9 @@ router.get('/', async (req, res) => {
 
             if (healthIntegrations.length === 0) {
                 container.innerHTML = '<div style="text-align: center; padding: 3rem; color: var(--text-muted); grid-column: 1 / -1;">' +
-                    '<i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>' +
-                    '<p>No health data available. Click "Test All" to check integration status.</p>' +
+                    '<i class="fas fa-plug" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>' +
+                    '<p style="margin-bottom: 0.5rem;">No active integrations</p>' +
+                    '<p style="font-size: 0.875rem;">Enable an integration in the Configured Integrations section above to see health status.</p>' +
                     '</div>';
                 return;
             }
@@ -1478,7 +1479,7 @@ router.get('/', async (req, res) => {
                     try {
                         const cfgEl = document.getElementById('config-json');
                         if (cfgEl) cfgEl.value = JSON.stringify(integration.config || {}, null, 2);
-                    } catch(_) {}
+                    } catch(_) { /* Config stringify non-critical */ }
                     
                     openModal('integration-modal');
                 } else {
@@ -1763,28 +1764,341 @@ router.get('/', async (req, res) => {
 });
 
 /**
+ * Integration Logs View Route
+ * GET /integrations/logs/:id
+ * Shows filtered logs for a specific integration
+ */
+router.get('/logs/:id', async (req, res) => {
+    try {
+        const integrationId = req.params.id;
+        
+        // Get integration details
+        let integrationName = 'Unknown Integration';
+        let integrationSource = null;
+        
+        try {
+            const integration = await req.dal.get(
+                'SELECT * FROM integration_health WHERE id = ?',
+                [integrationId]
+            );
+            
+            if (integration) {
+                integrationName = integration.integration_name;
+                integrationSource = integration.integration_name.toLowerCase().replace(/\s+/g, '_');
+            }
+        } catch (e) {
+            req.app.locals?.loggers?.system?.warn('Could not load integration details:', e.message);
+        }
+
+        // Build the content body with filtered logs view
+        const contentBody = `
+            <div class="page-header">
+                <h2><i class="fas fa-list"></i> Logs for ${escapeHtml(integrationName)}</h2>
+                <p class="text-muted">Integration ID: ${escapeHtml(integrationId)}</p>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-filter"></i> Filters
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Date Range</label>
+                            <select class="form-select" id="dateRange">
+                                <option value="1h">Last Hour</option>
+                                <option value="24h" selected>Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Log Level</label>
+                            <select class="form-select" id="logLevel">
+                                <option value="">All Levels</option>
+                                <option value="debug">Debug</option>
+                                <option value="info">Info</option>
+                                <option value="warning">Warning</option>
+                                <option value="error">Error</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Search</label>
+                            <input type="text" class="form-control" id="searchQuery" placeholder="Search in messages...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-primary w-100" onclick="loadLogs()">
+                                <i class="fas fa-search"></i> Apply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-stream"></i> Log Entries
+                    </h5>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="exportLogs()">
+                            <i class="fas fa-download"></i> Export
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="loadLogs()">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="logsContainer">
+                        <div class="text-center py-5">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="text-muted mt-2">Loading logs...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const additionalCSS = `
+            .log-entry {
+                padding: 10px;
+                border-bottom: 1px solid #dee2e6;
+                font-family: 'Courier New', monospace;
+                font-size: 0.9rem;
+            }
+            .log-entry:hover {
+                background-color: #f8f9fa;
+            }
+            .log-timestamp {
+                color: #6c757d;
+                margin-right: 10px;
+            }
+            .log-level {
+                display: inline-block;
+                padding: 2px 8px;
+                border-radius: 3px;
+                font-weight: bold;
+                font-size: 0.75rem;
+                margin-right: 10px;
+            }
+            .log-level-debug { background-color: #6c757d; color: white; }
+            .log-level-info { background-color: #0dcaf0; color: white; }
+            .log-level-warning { background-color: #ffc107; color: black; }
+            .log-level-error { background-color: #dc3545; color: white; }
+            .log-level-critical { background-color: #6f42c1; color: white; }
+            .log-message {
+                word-wrap: break-word;
+            }
+            .no-logs {
+                text-align: center;
+                padding: 40px;
+                color: #6c757d;
+            }
+        `;
+
+        const additionalJS = `
+            const integrationId = ${integrationId};
+            const integrationSource = ${integrationSource ? `'${escapeHtml(integrationSource)}'` : 'null'};
+
+            // Load logs based on current filters
+            async function loadLogs() {
+                try {
+                    const container = document.getElementById('logsContainer');
+                    container.innerHTML = '<div class="text-center py-5"><div class="spinner-border"></div></div>';
+
+                    const dateRange = document.getElementById('dateRange').value;
+                    const logLevel = document.getElementById('logLevel').value;
+                    const searchQuery = document.getElementById('searchQuery').value;
+
+                    // Build query parameters
+                    const params = new URLSearchParams();
+                    if (integrationSource) params.append('source', integrationSource);
+                    if (logLevel) params.append('level', logLevel);
+                    if (searchQuery) params.append('search', searchQuery);
+                    params.append('limit', '100');
+
+                    // Calculate date range
+                    const now = new Date();
+                    let startDate;
+                    switch(dateRange) {
+                        case '1h':
+                            startDate = new Date(now.getTime() - 60 * 60 * 1000);
+                            break;
+                        case '24h':
+                            startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+                            break;
+                        case '7d':
+                            startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            break;
+                        case '30d':
+                            startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                            break;
+                    }
+                    if (startDate) {
+                        params.append('start_date', startDate.toISOString());
+                    }
+
+                    const response = await fetch('/api/logs?' + params.toString());
+                    if (!response.ok) throw new Error('Failed to load logs');
+
+                    const data = await response.json();
+                    displayLogs(data.logs || []);
+                } catch (error) {
+                    console.error('Load logs error:', error);
+                    document.getElementById('logsContainer').innerHTML = 
+                        '<div class="alert alert-danger">Failed to load logs</div>';
+                }
+            }
+
+            // Display logs in the container
+            function displayLogs(logs) {
+                const container = document.getElementById('logsContainer');
+                
+                if (!logs || logs.length === 0) {
+                    container.innerHTML = '<div class="no-logs"><i class="fas fa-inbox fa-3x mb-3"></i><p>No logs found</p></div>';
+                    return;
+                }
+
+                const logsHtml = logs.map(log => {
+                    const timestamp = new Date(log.timestamp).toLocaleString();
+                    const level = (log.level || 'info').toLowerCase();
+                    return \`
+                        <div class="log-entry">
+                            <span class="log-timestamp">\${timestamp}</span>
+                            <span class="log-level log-level-\${level}">\${level.toUpperCase()}</span>
+                            <span class="log-message">\${escapeHtml(log.message || '')}</span>
+                        </div>
+                    \`;
+                }).join('');
+
+                container.innerHTML = logsHtml;
+            }
+
+            // Export logs to CSV
+            function exportLogs() {
+                const dateRange = document.getElementById('dateRange').value;
+                const logLevel = document.getElementById('logLevel').value;
+                const searchQuery = document.getElementById('searchQuery').value;
+
+                const params = new URLSearchParams();
+                if (integrationSource) params.append('source', integrationSource);
+                if (logLevel) params.append('level', logLevel);
+                if (searchQuery) params.append('search', searchQuery);
+                params.append('format', 'csv');
+                params.append('limit', '10000');
+
+                window.location.href = '/api/logs/export?' + params.toString();
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // Load logs on page load
+            document.addEventListener('DOMContentLoaded', () => {
+                loadLogs();
+            });
+        `;
+
+        const html = getPageTemplate({
+            pageTitle: `Logs - ${integrationName}`,
+            pageIcon: 'fa-list',
+            activeNav: 'integrations',
+            contentBody,
+            additionalCSS,
+            additionalJS,
+            req,
+            SYSTEM_SETTINGS: req.systemSettings,
+            TIMEZONE: req.systemSettings.timezone
+        });
+
+        res.send(html);
+
+    } catch (error) {
+        req.app.locals?.loggers?.system?.error('Integration logs view error:', error);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+/**
  * API Routes for Integration Management
  */
 
-// Get integration health status (for built-in integrations)
+// Get integration health status - ONLY show enabled integrations from integrations table
 router.get('/api/health', async (req, res) => {
     try {
+        // Get list of enabled integrations from the integrations table
+        const enabledIntegrations = await req.dal.all(
+            'SELECT id, name, type, config, created_at, updated_at FROM integrations WHERE enabled = 1'
+        ) || [];
+        
+        // If no enabled integrations, return empty array
+        if (enabledIntegrations.length === 0) {
+            return res.json([]);
+        }
+        
+        // Get health data
         const healthData = await req.dal.all(
             'SELECT * FROM integration_health ORDER BY integration_name'
-        );
+        ) || [];
         
         // Format timestamps
         const moment = require('moment-timezone');
         const TIMEZONE = req.systemSettings?.timezone || 'America/Edmonton';
         
-        const processedIntegrations = (healthData || []).map(integration => ({
-            ...integration,
-            last_check_formatted: integration.last_check ? 
-                moment.utc(integration.last_check).tz(TIMEZONE).format('MM/DD/YYYY, hh:mm:ss A') : null,
-            last_success_formatted: integration.last_success ? 
-                moment.utc(integration.last_success).tz(TIMEZONE).format('MM/DD/YYYY, hh:mm:ss A') : null,
-            metadata: integration.metadata ? JSON.parse(integration.metadata) : null
-        }));
+        // Create a map of health data by integration_name
+        const healthMap = new Map();
+        healthData.forEach(h => {
+            healthMap.set((h.integration_name || '').toLowerCase(), h);
+        });
+        
+        // Build result based on ENABLED integrations, using health data if available
+        const processedIntegrations = enabledIntegrations.map(integration => {
+            const nameKey = (integration.name || '').toLowerCase().replace(/\\s+/g, '_');
+            const typeKey = (integration.type || '').toLowerCase();
+            
+            // Try to find matching health record by name or type
+            const health = healthMap.get(nameKey) || healthMap.get(typeKey) || null;
+            
+            const baseData = {
+                id: health?.id || integration.id,
+                integration_name: nameKey,
+                integration_display_name: integration.name,
+                integration_type: integration.type,
+                status: health?.status || 'unknown',
+                last_check: health?.last_check || integration.updated_at,
+                response_time: health?.response_time || 0,
+                error_count: health?.error_count || 0,
+                last_error: health?.last_error || null,
+                uptime_percentage: health?.uptime_percentage || 100,
+                last_success: health?.last_success || null,
+                metadata: {
+                    enabled: true,
+                    type: integration.type,
+                    description: integration.name + ' integration'
+                },
+                created_at: health?.created_at || integration.created_at,
+                updated_at: health?.updated_at || integration.updated_at
+            };
+            
+            return {
+                ...baseData,
+                last_check_formatted: baseData.last_check ? 
+                    moment.utc(baseData.last_check).tz(TIMEZONE).format('MM/DD/YYYY, hh:mm:ss A') : null,
+                last_success_formatted: baseData.last_success ? 
+                    moment.utc(baseData.last_success).tz(TIMEZONE).format('MM/DD/YYYY, hh:mm:ss A') : null
+            };
+        });
         
         res.json(processedIntegrations);
     } catch (error) {
@@ -1793,42 +2107,150 @@ router.get('/api/health', async (req, res) => {
     }
 });
 
-// Test all integrations health
+// Test all integrations health - ONLY test enabled integrations
 router.post('/api/test-all', async (req, res) => {
+    const start = Date.now();
     try {
-        // This is a placeholder for testing all integrations
-        // In a real implementation, this would check MQTT, WebSocket, Home Assistant, UniFi, etc.
-        const results = {
-            tested: 0,
-            message: 'Test all functionality not yet fully implemented'
-        };
+        // Only get enabled integrations
+        const allRows = await req.dal.getIntegrations();
+        const rows = (allRows || []).filter(r => r.enabled);
         
-        res.json(results);
+        if (rows.length === 0) {
+            return res.json({
+                success: true,
+                total: 0,
+                online: 0,
+                offline: 0,
+                unconfigured: 0,
+                errors: 0,
+                averageLatencyMs: 0,
+                durationMs: Date.now() - start,
+                results: [],
+                message: 'No active integrations to test'
+            });
+        }
+        
+        const tests = rows.map(r => performIntegrationTest(r, req));
+        const settled = await Promise.allSettled(tests);
+        const results = settled.map((s, idx) => {
+            const base = rows[idx];
+            if (s.status === 'fulfilled') return s.value;
+            return {
+                id: base.id,
+                name: base.name,
+                type: base.type,
+                status: 'error',
+                latencyMs: Date.now() - start,
+                testedAt: new Date().toISOString(),
+                message: 'Integration test failed',
+                error: s.reason?.message || String(s.reason)
+            };
+        });
+        const online = results.filter(r => r.status === 'online').length;
+        const offline = results.filter(r => r.status === 'offline').length;
+        const unconfigured = results.filter(r => r.status === 'unconfigured').length;
+        const errorCount = results.filter(r => r.status === 'error').length;
+        const avgLatency = results.length ? Math.round(results.reduce((a, r) => a + (r.latencyMs || 0), 0) / results.length) : 0;
+        res.json({
+            success: true,
+            total: results.length,
+            online,
+            offline,
+            unconfigured,
+            errors: errorCount,
+            averageLatencyMs: avgLatency,
+            durationMs: Date.now() - start,
+            results
+        });
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Test all integrations error:', error);
-        res.status(500).json({ error: 'Failed to test integrations' });
+        res.status(500).json({ success: false, error: 'Failed to test integrations' });
     }
 });
 
 // Test health integration by name (for built-in integrations)
 router.post('/api/health/:name/test', async (req, res) => {
+    const start = Date.now();
     try {
-        const integrationName = req.params.name;
-        
-        // Basic placeholder response
-        // In a real implementation, this would actually test the integration
-        const result = {
-            status: 'online',
-            message: `${integrationName} test completed`,
-            timestamp: new Date().toISOString()
-        };
-        
-        res.json(result);
+        const name = req.params.name.toLowerCase();
+        const rows = await req.dal.getIntegrations();
+        const target = (rows || []).find(r => (r.name || '').toLowerCase() === name);
+        if (!target) return res.status(404).json({ success: false, error: 'Integration not found' });
+        const result = await performIntegrationTest(target, req, start);
+        res.json({ success: true, result });
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Test health integration API error:', error);
-        res.status(500).json({ error: 'Failed to test integration' });
+        res.status(500).json({ success: false, error: 'Failed to test integration' });
     }
 });
+
+// ---- Helper Functions ----
+async function performIntegrationTest(integration, req, startOverride) {
+    const started = startOverride || Date.now();
+    const safeParse = (cfg) => { if (!cfg) return {}; try { return typeof cfg === 'string' ? JSON.parse(cfg) : cfg; } catch { return {}; } };
+    const config = safeParse(integration.config);
+    const type = (integration.type || '').toLowerCase();
+    const common = {
+        id: integration.id,
+        name: integration.name,
+        type: integration.type,
+        testedAt: new Date().toISOString()
+    };
+    if (integration.enabled === 0 || integration.status === 'disabled') {
+        return { ...common, status: 'offline', latencyMs: Date.now() - started, message: 'Integration disabled' };
+    }
+    // Determine test logic by type
+    try {
+        if (type === 'webhook' || config.url) {
+            const url = config.url || config.endpoint || config.target;
+            if (!url) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'No URL configured' };
+            const controller = new AbortController();
+            const to = setTimeout(() => controller.abort(), 3000);
+            let statusCode = null;
+            let ok = false;
+            try {
+                const resp = await fetch(url, { method: 'HEAD', signal: controller.signal }).catch(() => null);
+                if (resp) { statusCode = resp.status; ok = resp.ok; }
+                if (!resp) {
+                    // Fallback to GET if HEAD failed
+                    const resp2 = await fetch(url, { method: 'GET', signal: controller.signal }).catch(() => null);
+                    if (resp2) { statusCode = resp2.status; ok = resp2.ok; }
+                }
+            } finally { clearTimeout(to); }
+            return {
+                ...common,
+                status: ok ? 'online' : 'offline',
+                latencyMs: Date.now() - started,
+                message: ok ? `HTTP ${statusCode}` : `Unreachable (status ${statusCode ?? 'n/a'})`,
+                httpStatus: statusCode
+            };
+        }
+        if (type === 'mqtt') {
+            const client = req.app.locals?.mqttClient;
+            if (!client) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'MQTT client not initialised' };
+            return { ...common, status: client.connected ? 'online' : 'offline', latencyMs: Date.now() - started, message: client.connected ? 'MQTT connected' : 'MQTT disconnected' };
+        }
+        if (type === 'home_assistant' || type === 'homeassistant') {
+            const base = config.url;
+            if (!base) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'No Home Assistant base URL' };
+            const controller = new AbortController();
+            const to = setTimeout(() => controller.abort(), 3000);
+            let ok = false; let statusCode = null;
+            try {
+                const resp = await fetch(base.replace(/\/$/, '') + '/api/', {
+                    headers: config.token ? { Authorization: `Bearer ${config.token}` } : undefined,
+                    signal: controller.signal
+                }).catch(() => null);
+                if (resp) { statusCode = resp.status; ok = resp.ok; }
+            } finally { clearTimeout(to); }
+            return { ...common, status: ok ? 'online' : 'offline', latencyMs: Date.now() - started, message: ok ? `HTTP ${statusCode}` : `Unreachable (status ${statusCode ?? 'n/a'})`, httpStatus: statusCode };
+        }
+        // Default: No specific test logic
+        return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'No test logic for type' };
+    } catch (err) {
+        return { ...common, status: 'error', latencyMs: Date.now() - started, message: 'Test error', error: err.message };
+    }
+}
 
 // Get all integrations
 router.get('/api', async (req, res) => {
@@ -1991,11 +2413,29 @@ router.post('/api/test', async (req, res) => {
                 testResult = await testHelpers.testHTTPEndpoint(type, config);
                 break;
             default:
-                testResult = {
-                    success: false,
-                    message: `Testing not implemented for ${type} integration type`,
-                    details: { type }
-                };
+                // Generic integration test - attempt basic connectivity
+                try {
+                    if (config.url) {
+                        const response = await fetch(config.url, { method: 'HEAD', timeout: 5000 });
+                        testResult = {
+                            success: response.ok,
+                            message: response.ok ? 'Endpoint reachable' : `HTTP ${response.status}`,
+                            details: { type, status: response.status, url: config.url }
+                        };
+                    } else {
+                        testResult = {
+                            success: false,
+                            message: 'No test URL configured for this integration type',
+                            details: { type, note: 'Add "url" field to config for connectivity test' }
+                        };
+                    }
+                } catch (err) {
+                    testResult = {
+                        success: false,
+                        message: `Connection failed: ${err.message}`,
+                        details: { type, error: err.message }
+                    };
+                }
         }
         
         res.json(testResult);

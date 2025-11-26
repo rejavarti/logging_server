@@ -411,7 +411,7 @@ module.exports = (getPageTemplate, requireAuth) => {
 
         async function loadSessions() {
             try {
-                const response = await fetch('/api/admin/sessions');
+                const response = await fetch('/api/admin/sessions', { credentials: 'same-origin' });
                 if (!response.ok) throw new Error('Failed to fetch sessions');
                 
                 const data = await response.json();
@@ -485,7 +485,7 @@ module.exports = (getPageTemplate, requireAuth) => {
 
         async function loadUsers() {
             try {
-                const response = await fetch('/api/users');
+                const response = await fetch('/api/users', { credentials: 'same-origin' });
                 if (!response.ok) throw new Error('Failed to fetch users');
                 
                 const data = await response.json();
@@ -617,7 +617,7 @@ module.exports = (getPageTemplate, requireAuth) => {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(data)
-                    });
+                    , credentials: 'same-origin' });
                     
                     if (response.ok) {
                         showToast('User "' + data.username + '" created successfully', 'success');

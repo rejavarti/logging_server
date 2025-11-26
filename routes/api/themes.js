@@ -21,7 +21,7 @@ async function handleGetCurrentTheme(req, res) {
                     try {
                         const prefs = JSON.parse(user.preferences);
                         userThemeId = prefs.theme?.themeId;
-                    } catch (e) {}
+                    } catch (e) { /* Preferences parse non-critical, use default */ }
                 }
             } catch (e) {
                 req.app.locals?.loggers?.api?.warn('Failed to get user preferences:', e.message);
@@ -179,7 +179,7 @@ router.get('/themes/list', async (req, res) => {
             let themeData = {};
             try {
                 themeData = JSON.parse(theme.data);
-            } catch (e) {}
+            } catch (e) { /* Theme data parse non-critical */ }
             
             return {
                 id: theme.id.toString(),
@@ -224,7 +224,7 @@ router.get('/themes/:themeId', async (req, res) => {
         let themeData = {};
         try {
             themeData = JSON.parse(theme.data);
-        } catch (e) {}
+        } catch (e) { /* Theme data parse non-critical */ }
         
         res.json({
             success: true,
@@ -377,7 +377,7 @@ router.post('/themes/reset', async (req, res) => {
             if (user && user.preferences) {
                 try {
                     preferences = JSON.parse(user.preferences);
-                } catch (e) {}
+                } catch (e) { /* Preferences parse non-critical */ }
             }
             
             preferences.theme = { themeId: 1 }; // Default Light

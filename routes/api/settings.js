@@ -383,9 +383,17 @@ router.put('/settings/:key', async (req, res) => {
             });
         }
         
-        // Save to database
+        // Save to database (capture old value for audit diff)
+        let oldValue = undefined;
         if (req.dal) {
             try {
+                // Fetch existing value for diff recording
+                const existing = await req.dal.get(
+                    `SELECT setting_value FROM settings WHERE setting_key = ?`,
+                    [key]
+                );
+                oldValue = existing ? existing.setting_value : undefined;
+
                 const valueStr = typeof value === 'object' ? JSON.stringify(value) : value.toString();
                 const categoryStr = category || 'system';
                 
@@ -405,7 +413,7 @@ router.put('/settings/:key', async (req, res) => {
         
         req.app.locals?.loggers?.api?.info(`Setting ${key} updated to ${value} by ${req.user ? req.user.username : 'system'}`);
         
-        // Log individual setting update activity
+        // Log individual setting update activity with before/after diff
         if (req.dal && req.dal.logActivity && req.user) {
             try {
                 await req.dal.logActivity({
@@ -415,6 +423,7 @@ router.put('/settings/:key', async (req, res) => {
                     resource_id: key,
                     details: JSON.stringify({ 
                         setting_key: key,
+                        old_value: oldValue,
                         new_value: value
                     }),
                     ip_address: req.ip || req.connection.remoteAddress || 'unknown',

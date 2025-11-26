@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  logging-server:
+    build: .
+    image: rejavarti/logging-server:latest
+    container_name: Rejavarti-Logging-Server
+    network_mode: bridge
+    ports:
+      - "10180:10180"
+    environment:
+      NODE_ENV: "production"
+      # Testing default admin password per project policy
+      AUTH_PASSWORD: "ChangeMe123!"
+      # Provide a fixed (testing-only) JWT secret or override via .env
+      JWT_SECRET: "${JWT_SECRET:-testing-secret-change-me}"
+      TIMEZONE: "America/Edmonton"
+    volumes:
+      # Relative path ensures Windows Docker Desktop works reliably
+      - ./data:/app/data
+    restart: unless-stopped

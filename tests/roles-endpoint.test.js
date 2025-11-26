@@ -6,7 +6,7 @@ describe('Roles Endpoint', () => {
   let token;
 
   beforeAll(async () => {
-    process.env.AUTH_PASSWORD = 'testAdmin123!';
+    if (!process.env.AUTH_PASSWORD) throw new Error('AUTH_PASSWORD required');
     process.env.NODE_ENV = 'test';
     const srvPath = path.join(__dirname, '..', 'server.js');
     const exported = require(srvPath);

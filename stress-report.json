@@ -1,0 +1,283 @@
+{
+  "success": false,
+  "errors": [
+    {
+      "iteration": 36,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 35,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 34,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 33,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 39,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 38,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 37,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 32,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 29,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 28,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 27,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 30,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 26,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 25,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 31,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 24,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 21,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 22,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 18,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 17,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 20,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 19,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 23,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 16,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 12,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 11,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 10,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 9,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 15,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 13,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 14,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 8,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 5,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 4,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 3,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 7,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 6,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 2,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 1,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    },
+    {
+      "iteration": 0,
+      "endpoint": "rateLimitsBlockUnblock",
+      "error": "rateLimitsBlockUnblock HTTP undefined"
+    }
+  ],
+  "iterations": 40,
+  "concurrency": 8,
+  "baseUrl": "http://localhost:10180",
+  "summary": {
+    "rateLimitsConfig": {
+      "count": 40,
+      "min": 27.54419999999999,
+      "p50": 118.45420000000013,
+      "p90": 149.08039999999983,
+      "p99": 152.39589999999998,
+      "max": 152.39589999999998,
+      "avg": 114.38
+    },
+    "rateLimitsStats": {
+      "count": 40,
+      "min": 95.87660000000051,
+      "p50": 118.3868,
+      "p90": 129.91340000000037,
+      "p99": 141.3277,
+      "max": 141.3277,
+      "avg": 118.21
+    },
+    "auditStats": {
+      "count": 40,
+      "min": 91.34829999999965,
+      "p50": 111.77999999999975,
+      "p90": 138.06770000000006,
+      "p99": 187.13729999999987,
+      "max": 187.13729999999987,
+      "avg": 118.21
+    },
+    "auditSearch": {
+      "count": 40,
+      "min": 48.5,
+      "p50": 115.58479999999963,
+      "p90": 130.67579999999998,
+      "p99": 134.73779999999988,
+      "max": 134.73779999999988,
+      "avg": 109.51
+    },
+    "auditCompliance": {
+      "count": 40,
+      "min": 77.40079999999989,
+      "p50": 101.33609999999999,
+      "p90": 169.99350000000004,
+      "p99": 189.96169999999938,
+      "max": 189.96169999999938,
+      "avg": 109.03
+    },
+    "auditSecurityEvents": {
+      "count": 40,
+      "min": 87.82269999999971,
+      "p50": 118.25930000000017,
+      "p90": 137.79209999999966,
+      "p99": 169.91640000000007,
+      "max": 169.91640000000007,
+      "avg": 115.77
+    },
+    "rateLimitsBlockUnblock": {
+      "count": 40,
+      "min": 68.09740000000056,
+      "p50": 203.22690000000011,
+      "p90": 239.23280000000068,
+      "p99": 323.765,
+      "max": 323.765,
+      "avg": 193.09
+    },
+    "auditExport": {
+      "count": 40,
+      "min": 14.143999999999323,
+      "p50": 109.24109999999973,
+      "p90": 160.26020000000017,
+      "p99": 259.6388999999999,
+      "max": 259.6388999999999,
+      "avg": 111.73
+    }
+  },
+  "generatedAt": "2025-11-23T01:38:44.505Z"
+}

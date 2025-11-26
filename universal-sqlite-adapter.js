@@ -28,12 +28,24 @@ class UniversalSQLiteAdapter {
         this.options = options;
         this.db = null;
         this.dbType = null;
+        this.periodicSaveInterval = null; // Track interval for cleanup
         
         console.log('\n🔍 Universal SQLite Adapter - Environment Detection');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
-        // Initialize synchronously for compatibility
-        this.initializeDatabase();
+        // NOTE: Database initialization is deferred to init() method
+        // because sql.js requires async initialization
+    }
+
+    /**
+     * Initialize the database adapter (must be called after construction)
+     * This is async because sql.js requires async initialization
+     */
+    async init() {
+        if (this.db) {
+            return; // Already initialized
+        }
+        await this.initializeDatabase();
     }
 
     /**
@@ -41,6 +53,7 @@ class UniversalSQLiteAdapter {
      */
     static async createAsync(databasePath, options = {}) {
         const adapter = new UniversalSQLiteAdapter(databasePath, options);
+        await adapter.init();
         return adapter;
     }
 
@@ -69,20 +82,22 @@ class UniversalSQLiteAdapter {
         }
         
         if (isWindows) {
-            // Windows: Prefer sql.js for compatibility
+            // Windows: Prefer sql.js for compatibility (skip native bindings)
             if (this.tryDriver('sql.js')) {
                 console.log('✅ Using sql.js (WebAssembly Compatibility)');
                 return 'sql.js';
             }
+            // On Windows, skip sqlite3 if it requires compilation
+            console.log('⚠️  Skipping sqlite3 on Windows (requires native compilation)');
         }
         
-        // Universal fallback
-        if (this.tryDriver('sqlite3')) {
+        // Universal fallback (non-Windows only)
+        if (!isWindows && this.tryDriver('sqlite3')) {
             console.log('⚠️  Using sqlite3 (Legacy Callback Fallback)');
             return 'sqlite3';
         }
         
-        throw new Error('❌ No SQLite driver available! Install: npm install better-sqlite3 sql.js sqlite3');
+        throw new Error('❌ No SQLite driver available! Install: npm install sql.js (pure JavaScript, no compilation needed)');
     }
 
     /**
@@ -100,8 +115,9 @@ class UniversalSQLiteAdapter {
 
     /**
      * Initialize database with detected driver
+     * NOTE: This is async now because sql.js requires async initialization
      */
-    initializeDatabase() {
+    async initializeDatabase() {
         this.dbType = this.detectBestDriver();
         
         try {
@@ -110,11 +126,9 @@ class UniversalSQLiteAdapter {
                     this.initBetterSQLite3();
                     break;
                 case 'sql.js':
-                    // For synchronous initialization, skip sql.js (too complex)
-                    // Fall back to sqlite3
-                    console.log('⚠️  sql.js requires async init, falling back to sqlite3');
-                    this.dbType = 'sqlite3';
-                    this.initSQLite3();
+                    // sql.js requires async initialization
+                    console.log('⏳ Initializing sql.js (WebAssembly)...');
+                    await this.initSQLjsSync();
                     break;  
                 case 'sqlite3':
                     this.initSQLite3();
@@ -128,15 +142,7 @@ class UniversalSQLiteAdapter {
             
         } catch (error) {
             console.error(`❌ Failed to initialize ${this.dbType}:`, error.message);
-            // Try fallback to sqlite3 if not already tried
-            if (this.dbType !== 'sqlite3') {
-                console.log('🔄 Falling back to sqlite3...');
-                this.dbType = 'sqlite3';
-                this.initSQLite3();
-                console.log(`🚀 Database initialized with ${this.dbType} (fallback)`);
-            } else {
-                throw error;
-            }
+            throw error;
         }
     }
 
@@ -184,6 +190,27 @@ class UniversalSQLiteAdapter {
     }
 
     /**
+     * Initialize sql.js with proper async handling
+     * NOTE: This method is ASYNC and must be awaited!
+     */
+    async initSQLjsSync() {
+        const initSqlJs = require('sql.js');
+        
+        // Read existing database file if it exists
+        let dbData = null;
+        if (fs.existsSync(this.databasePath)) {
+            dbData = fs.readFileSync(this.databasePath);
+        }
+        
+        // Initialize sql.js database asynchronously (required for sql.js)
+        const SQL = await initSqlJs();
+        this.db = new SQL.Database(dbData);
+        
+        // Set up periodic saves for sql.js (in-memory database)
+        this.setupPeriodicSave();
+    }
+
+    /**
      * Initialize sqlite3 (legacy callback-based fallback)
      * NOTE: This is dynamically loaded only when needed for environment compatibility
      */
@@ -198,7 +225,7 @@ class UniversalSQLiteAdapter {
      */
     setupPeriodicSave() {
         if (this.dbType === 'sql.js') {
-            setInterval(() => {
+            this.periodicSaveInterval = setInterval(() => {
                 this.saveDatabase();
             }, 10000); // Save every 10 seconds
             
@@ -407,6 +434,12 @@ class UniversalSQLiteAdapter {
      * Close database connection
      */
     close() {
+        // Clear periodic save interval if exists
+        if (this.periodicSaveInterval) {
+            clearInterval(this.periodicSaveInterval);
+            this.periodicSaveInterval = null;
+        }
+        
         if (this.db) {
             if (this.dbType === 'sql.js') {
                 this.saveDatabase(); // Final save

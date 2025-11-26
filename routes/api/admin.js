@@ -51,6 +51,22 @@ router.get('/sessions', async (req, res) => {
         let sessions = [];
         
         try {
+            // Ensure user_sessions table exists
+            await req.dal.run(`
+                CREATE TABLE IF NOT EXISTS user_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_token TEXT UNIQUE NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    expires_at DATETIME NOT NULL,
+                    is_active INTEGER DEFAULT 1,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            `);
+            
             sessions = await req.dal.all(
                 `SELECT 
                     s.id, s.user_id as userId, u.username,
@@ -109,6 +125,15 @@ router.delete('/sessions/:id', async (req, res) => {
         }
         
         req.app.locals?.loggers?.api?.info(`Session ${id} terminated by admin ${req.user ? req.user.username : 'system'}`);
+        
+        // Broadcast session termination to WebSocket subscribers
+        if (typeof global.broadcastToSubscribers === 'function') {
+            global.broadcastToSubscribers('sessions', 'session:terminated', {
+                sessionId: id,
+                terminatedBy: req.user ? req.user.username : 'system',
+                timestamp: new Date().toISOString()
+            });
+        }
         
         res.json({
             success: true,

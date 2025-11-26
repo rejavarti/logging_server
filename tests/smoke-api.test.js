@@ -9,7 +9,7 @@ beforeAll(async () => {
   // Authenticate and get JWT token
   const loginRes = await request(app)
     .post('/api/auth/login')
-    .send({ username: 'admin', password: process.env.AUTH_PASSWORD || 'testAdmin123!' });
+    .send({ username: 'admin', password: process.env.AUTH_PASSWORD });
   token = loginRes.body.token;
 });
 
