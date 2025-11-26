@@ -882,19 +882,24 @@ async function initializeDefaultAdmin() {
             const bcrypt = require('bcrypt');
             const passwordHash = await bcrypt.hash(defaultPassword, config.auth.saltRounds);
             
+            // Use INSERT OR IGNORE to handle race conditions during parallel initialization
             await dal.run(
-                'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+                'INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
                 ['admin', 'admin@enterprise.local', passwordHash, 'admin']
             );
             
-            loggers.system.info('✅ Default admin user created', {
-                username: 'admin',
-                password: defaultPassword
-            });
-            loggers?.system?.info(`\n🔐 Default Admin Created:`);
-            loggers?.system?.info(`   Username: admin`);
-            loggers?.system?.info(`   Password: ${defaultPassword}`);
-            loggers?.system?.info(`   Please change this password after first login!\n`);
+            // Check if we actually inserted (or if another process beat us)
+            const adminCreated = await dal.get('SELECT id FROM users WHERE username = ?', ['admin']);
+            if (adminCreated) {
+                loggers.system.info('✅ Default admin user created', {
+                    username: 'admin',
+                    password: defaultPassword
+                });
+                loggers?.system?.info(`\n🔐 Default Admin Created:`);
+                loggers?.system?.info(`   Username: admin`);
+                loggers?.system?.info(`   Password: ${defaultPassword}`);
+                loggers?.system?.info(`   Please change this password after first login!\n`);
+            }
         }
     } catch (error) {
         loggers.system.error('Error creating default admin:', error);

@@ -166,10 +166,14 @@ class FileIngestionEngine {
         const lines = content.split(/\r?\n/).filter(l => l.trim().length > 0);
         if (!lines.length) return;
 
+        // Determine effective mode: use jsonl for .jsonl files even in auto mode
+        const isJsonlFile = filePath.toLowerCase().endsWith('.jsonl');
+        const effectiveMode = (this.mode === 'auto' && isJsonlFile) ? 'jsonl' : this.mode;
+
         let ingested = 0;
         let errors = 0;
         for (const line of lines) {
-            const { entry, errorReason } = this._parseLineDetailed(line);
+            const { entry, errorReason } = this._parseLineDetailed(line, effectiveMode);
             if (!entry) {
                 errors++;
                 // Record parse error non-blockingly; truncate snippet for safety
@@ -198,11 +202,13 @@ class FileIngestionEngine {
         }
     }
 
-    _parseLineDetailed(line) {
+    _parseLineDetailed(line, effectiveMode = null) {
+        const mode = effectiveMode || this.mode;
         // Try JSON lines first (unless mode explicitly regex)
         let jsonTried = false;
-        if (this.mode !== 'regex') {
-            if ((line.startsWith('{') && line.endsWith('}')) || this.mode === 'jsonl') {
+        if (mode !== 'regex') {
+            // In jsonl mode or if line looks like JSON, try to parse
+            if ((line.startsWith('{') && line.endsWith('}')) || mode === 'jsonl') {
                 jsonTried = true;
                 try {
                     const obj = JSON.parse(line);
@@ -219,8 +225,8 @@ class FileIngestionEngine {
                         }
                     };
                 } catch (e) {
-                    // In jsonl mode, don't fall through to regex
-                    if (this.mode === 'jsonl') {
+                    // In jsonl mode, don't fall through to regex - it's an invalid JSON error
+                    if (mode === 'jsonl') {
                         return { entry: null, errorReason: 'invalid-json' };
                     }
                     // Otherwise fall through to regex

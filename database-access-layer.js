@@ -461,10 +461,16 @@ class DatabaseAccessLayer extends EventEmitter {
 
     // User management methods
     async createUser(userData) {
-        const sql = `INSERT INTO users (username, password_hash, email, role, created_at, active) 
+        // Use INSERT OR IGNORE to handle race conditions during parallel initialization
+        const sql = `INSERT OR IGNORE INTO users (username, password_hash, email, role, created_at, active) 
                      VALUES (?, ?, ?, ?, datetime('now'), ?)`;
         const params = [userData.username, userData.password_hash, userData.email, userData.role || 'user', userData.active || 1];
-        return await this.run(sql, params);
+        const result = await this.run(sql, params);
+        // If no rows were affected (user already exists), return the existing user
+        if (result && result.changes === 0) {
+            return await this.getUserByUsername(userData.username);
+        }
+        return result;
     }
 
     async getUserById(userId) {
