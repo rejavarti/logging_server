@@ -42,6 +42,9 @@ describe('Notifications API', () => {
     // Get the DAL from the server
     dal = app.locals.dal();
     
+    // Wait for database to be fully initialized
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     // Create additional test user (non-admin) - skip if already exists
     const bcrypt = require('bcryptjs');
     const jwt = require('jsonwebtoken');
