@@ -749,7 +749,8 @@ class DatabaseAccessLayer extends EventEmitter {
     async getRecentParseErrors(limit = 10) {
         try {
             // Only return unacknowledged notifications - acknowledged ones are "cleared"
-            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors WHERE acknowledged = 0 ORDER BY created_at DESC LIMIT ?`;
+            // Order by created_at DESC, then id DESC for deterministic ordering when timestamps are equal
+            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors WHERE acknowledged = 0 ORDER BY created_at DESC, id DESC LIMIT ?`;
             return await this.all(sql, [limit]);
         } catch (error) {
             this.logger.warn('Failed to get recent parse errors:', error.message);

@@ -102,8 +102,9 @@ describe('Notifications API', () => {
     });
 
     test('should return recent parse errors', async () => {
-      // Create test errors
+      // Create test errors with small delay to ensure different timestamps
       await dal.recordParseError({ source: 'test', file_path: 'test.log', line_number: 10, line_snippet: 'Bad line', reason: 'invalid-json' });
+      await new Promise(resolve => setTimeout(resolve, 10));
       await dal.recordParseError({ source: 'test', file_path: 'test2.log', line_number: 20, line_snippet: 'Another bad line', reason: 'no-regex-match' });
       
       const res = await request(app)
