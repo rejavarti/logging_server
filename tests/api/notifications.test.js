@@ -77,8 +77,10 @@ describe('Notifications API', () => {
   });
 
   beforeEach(async () => {
-    // Clear parse_errors table
+    // Clear parse_errors table and wait for it to complete
     await dal.run('DELETE FROM parse_errors');
+    // Small delay to ensure database is ready
+    await new Promise(resolve => setTimeout(resolve, 50));
   });
 
   describe('GET /api/notifications/recent', () => {
@@ -94,7 +96,9 @@ describe('Notifications API', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ success: true, notifications: [] });
-    });    test('should return recent parse errors', async () => {
+    });
+
+    test('should return recent parse errors', async () => {
       // Create test errors
       await dal.recordParseError({ source: 'test', file_path: 'test.log', line_number: 10, line_snippet: 'Bad line', reason: 'invalid-json' });
       await dal.recordParseError({ source: 'test', file_path: 'test2.log', line_number: 20, line_snippet: 'Another bad line', reason: 'no-regex-match' });
