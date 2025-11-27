@@ -1281,6 +1281,146 @@ class DatabaseAccessLayer extends EventEmitter {
         }
     }
 
+    async testWebhook(webhookId) {
+        try {
+            const webhook = await this.getWebhookById(webhookId);
+            if (!webhook) {
+                return { success: false, error: 'Webhook not found', id: Number(webhookId) };
+            }
+
+            const startTime = Date.now();
+            const url = webhook.url;
+
+            if (!url) {
+                return { success: false, error: 'No URL configured', id: Number(webhookId) };
+            }
+
+            try {
+                // Try HEAD request first (lighter)
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 5000);
+                
+                let response = await fetch(url, {
+                    method: 'HEAD',
+                    signal: controller.signal
+                }).catch(() => null);
+                clearTimeout(timeout);
+
+                // If HEAD fails, try POST with test payload
+                if (!response || !response.ok) {
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            test: true,
+                            source: 'logging-server',
+                            timestamp: new Date().toISOString(),
+                            message: 'Webhook connectivity test'
+                        }),
+                        signal: AbortSignal.timeout(5000)
+                    }).catch(() => null);
+                }
+
+                const responseTime = Date.now() - startTime;
+
+                // Update last_tested
+                await this.run(
+                    `UPDATE webhooks SET last_tested = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+                    [webhookId]
+                );
+
+                if (response && (response.ok || response.status < 500)) {
+                    return {
+                        success: true,
+                        id: Number(webhookId),
+                        name: webhook.name,
+                        message: 'Webhook is reachable',
+                        status: response.status,
+                        responseTime: `${responseTime}ms`,
+                        testedAt: new Date().toISOString()
+                    };
+                }
+
+                return {
+                    success: false,
+                    id: Number(webhookId),
+                    name: webhook.name,
+                    error: `Webhook returned status ${response?.status || 'unknown'}`,
+                    responseTime: `${responseTime}ms`,
+                    testedAt: new Date().toISOString()
+                };
+            } catch (fetchError) {
+                return {
+                    success: false,
+                    id: Number(webhookId),
+                    name: webhook.name,
+                    error: `Connection failed: ${fetchError.message}`,
+                    testedAt: new Date().toISOString()
+                };
+            }
+        } catch (error) {
+            this.logger.error('Failed to test webhook:', error);
+            return { success: false, error: error.message, id: Number(webhookId) };
+        }
+    }
+
+    async testWebhookData(webhookData) {
+        try {
+            const url = webhookData.url;
+            if (!url) {
+                return { success: false, error: 'No URL provided' };
+            }
+
+            const startTime = Date.now();
+
+            try {
+                const response = await fetch(url, {
+                    method: webhookData.method || 'POST',
+                    headers: {
+                        'Content-Type': webhookData.content_type || 'application/json',
+                        ...(webhookData.headers || {})
+                    },
+                    body: JSON.stringify({
+                        test: true,
+                        source: 'logging-server',
+                        timestamp: new Date().toISOString(),
+                        message: 'Webhook configuration test'
+                    }),
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                const responseTime = Date.now() - startTime;
+
+                if (response.ok || response.status < 500) {
+                    return {
+                        success: true,
+                        message: 'Webhook URL is reachable',
+                        status: response.status,
+                        responseTime: `${responseTime}ms`,
+                        testedAt: new Date().toISOString()
+                    };
+                }
+
+                return {
+                    success: false,
+                    error: `Webhook returned status ${response.status}`,
+                    status: response.status,
+                    responseTime: `${responseTime}ms`,
+                    testedAt: new Date().toISOString()
+                };
+            } catch (fetchError) {
+                return {
+                    success: false,
+                    error: `Connection failed: ${fetchError.message}`,
+                    testedAt: new Date().toISOString()
+                };
+            }
+        } catch (error) {
+            this.logger.error('Failed to test webhook data:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     // Activity log methods
     async logActivity(activityData) {
         const sql = `INSERT INTO activity_log (user_id, action, resource_type, resource_id, 
@@ -1739,6 +1879,19 @@ class DatabaseAccessLayer extends EventEmitter {
         }
     }
 
+    async getSavedSearches(userId) {
+        try {
+            const sql = userId 
+                ? `SELECT * FROM saved_searches WHERE user_id = ? ORDER BY created_at DESC`
+                : `SELECT * FROM saved_searches ORDER BY created_at DESC`;
+            const params = userId ? [userId] : [];
+            return await this.db.all(sql, params);
+        } catch (error) {
+            this.logger.warn('Failed to get saved searches:', error.message);
+            return [];
+        }
+    }
+
     async deleteSavedSearch(searchId, userId) {
         try {
             const sql = `DELETE FROM saved_searches WHERE id = ? AND user_id = ?`;
@@ -1887,6 +2040,223 @@ class DatabaseAccessLayer extends EventEmitter {
         } catch (error) {
             this.logger.error('Failed to toggle integration:', error);
             return { success: false, error: error.message, id: Number(integrationId), enabled: false };
+        }
+    }
+
+    async testIntegration(integrationId) {
+        try {
+            // Fetch integration details
+            const integration = await this.getIntegration(integrationId);
+            if (!integration) {
+                return { success: false, error: 'Integration not found', id: Number(integrationId) };
+            }
+
+            // Parse config if stored as string
+            let config = integration.config;
+            if (typeof config === 'string') {
+                try {
+                    config = JSON.parse(config);
+                } catch (e) {
+                    config = {};
+                }
+            }
+
+            const type = (integration.type || '').toLowerCase();
+            const startTime = Date.now();
+            let testResult = { success: false, message: '', details: {} };
+
+            // Test based on integration type
+            switch (type) {
+                case 'webhook':
+                    testResult = await this._testWebhookIntegration(config);
+                    break;
+                case 'homeassistant':
+                case 'home_assistant':
+                    testResult = await this._testHomeAssistantIntegration(config);
+                    break;
+                case 'mqtt':
+                    testResult = await this._testMqttIntegration(config);
+                    break;
+                case 'slack':
+                case 'discord':
+                case 'teams':
+                case 'telegram':
+                case 'pushover':
+                    testResult = await this._testWebhookBasedIntegration(type, config);
+                    break;
+                case 'elasticsearch':
+                case 'influxdb':
+                case 'grafana':
+                case 'prometheus':
+                case 'splunk':
+                    testResult = await this._testDatabaseIntegration(type, config);
+                    break;
+                default:
+                    // Generic test - just verify config exists
+                    testResult = {
+                        success: true,
+                        message: `Integration '${integration.name}' configuration valid`,
+                        details: { type, hasConfig: Object.keys(config).length > 0 }
+                    };
+            }
+
+            const responseTime = Date.now() - startTime;
+
+            // Update last_tested timestamp
+            await this.run(
+                `UPDATE integrations SET last_tested = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+                [integrationId]
+            );
+
+            return {
+                success: testResult.success,
+                id: Number(integrationId),
+                name: integration.name,
+                type: integration.type,
+                message: testResult.message,
+                details: testResult.details,
+                responseTime: `${responseTime}ms`,
+                testedAt: new Date().toISOString()
+            };
+        } catch (error) {
+            this.logger.error('Failed to test integration:', error);
+            return { 
+                success: false, 
+                error: error.message, 
+                id: Number(integrationId) 
+            };
+        }
+    }
+
+    // Helper: Test webhook integration
+    async _testWebhookIntegration(config) {
+        const url = config.url || config.webhook_url;
+        if (!url) {
+            return { success: false, message: 'No webhook URL configured', details: {} };
+        }
+        try {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            const response = await fetch(url, {
+                method: 'HEAD',
+                signal: controller.signal
+            }).catch(() => null);
+            clearTimeout(timeout);
+            
+            if (response && response.ok) {
+                return { success: true, message: 'Webhook URL reachable', details: { status: response.status } };
+            }
+            // Try with GET if HEAD fails
+            const getResponse = await fetch(url, { 
+                method: 'GET',
+                signal: AbortSignal.timeout(5000)
+            }).catch(() => null);
+            
+            if (getResponse) {
+                return { 
+                    success: getResponse.ok || getResponse.status < 500, 
+                    message: getResponse.ok ? 'Webhook URL reachable' : `Webhook returned status ${getResponse.status}`,
+                    details: { status: getResponse.status } 
+                };
+            }
+            return { success: false, message: 'Webhook URL unreachable', details: {} };
+        } catch (error) {
+            return { success: false, message: `Connection failed: ${error.message}`, details: {} };
+        }
+    }
+
+    // Helper: Test Home Assistant integration
+    async _testHomeAssistantIntegration(config) {
+        const url = config.url || config.ha_url;
+        const token = config.token || config.access_token;
+        if (!url) {
+            return { success: false, message: 'No Home Assistant URL configured', details: {} };
+        }
+        try {
+            const apiUrl = url.replace(/\/$/, '') + '/api/';
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            const response = await fetch(apiUrl, {
+                method: 'GET',
+                headers,
+                signal: AbortSignal.timeout(5000)
+            });
+            if (response.ok) {
+                const data = await response.json().catch(() => ({}));
+                return { 
+                    success: true, 
+                    message: 'Connected to Home Assistant', 
+                    details: { version: data.version || 'unknown' } 
+                };
+            }
+            return { 
+                success: false, 
+                message: `Home Assistant returned ${response.status}`, 
+                details: { status: response.status } 
+            };
+        } catch (error) {
+            return { success: false, message: `Connection failed: ${error.message}`, details: {} };
+        }
+    }
+
+    // Helper: Test MQTT integration
+    async _testMqttIntegration(config) {
+        const host = config.host || config.broker || config.url;
+        if (!host) {
+            return { success: false, message: 'No MQTT broker configured', details: {} };
+        }
+        // Basic validation - actual MQTT connection would require mqtt library
+        return { 
+            success: true, 
+            message: 'MQTT configuration valid (broker connectivity requires runtime test)',
+            details: { host, port: config.port || 1883 }
+        };
+    }
+
+    // Helper: Test webhook-based notification services
+    async _testWebhookBasedIntegration(type, config) {
+        const url = config.url || config.webhook_url || config.webhook;
+        if (!url) {
+            return { success: false, message: `No ${type} webhook URL configured`, details: {} };
+        }
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: 'Test message from Logging Server' }),
+                signal: AbortSignal.timeout(5000)
+            }).catch(() => null);
+            
+            if (response && (response.ok || response.status < 500)) {
+                return { success: true, message: `${type} webhook reachable`, details: { status: response.status } };
+            }
+            return { success: false, message: `${type} webhook test failed`, details: { status: response?.status } };
+        } catch (error) {
+            return { success: false, message: `Connection failed: ${error.message}`, details: {} };
+        }
+    }
+
+    // Helper: Test database/metrics integrations
+    async _testDatabaseIntegration(type, config) {
+        const url = config.url || config.host || config.endpoint;
+        if (!url) {
+            return { success: false, message: `No ${type} URL configured`, details: {} };
+        }
+        try {
+            const testUrl = url.replace(/\/$/, '');
+            const response = await fetch(testUrl, {
+                method: 'GET',
+                signal: AbortSignal.timeout(5000)
+            }).catch(() => null);
+            
+            if (response && (response.ok || response.status < 500)) {
+                return { success: true, message: `${type} endpoint reachable`, details: { status: response.status } };
+            }
+            return { success: false, message: `${type} endpoint unreachable`, details: { status: response?.status } };
+        } catch (error) {
+            return { success: false, message: `Connection failed: ${error.message}`, details: {} };
         }
     }
 

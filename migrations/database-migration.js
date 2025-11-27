@@ -498,6 +498,18 @@ class DatabaseMigration {
             this.logger.info('✅ Created webhook_deliveries table');
         }
 
+        // Ensure 'last_tested' column exists on webhooks table for test functionality
+        try {
+            const webhookCols = await this.all("PRAGMA table_info(webhooks)");
+            const webhookColNames = new Set(webhookCols.map(c => c.name));
+            if (!webhookColNames.has('last_tested')) {
+                await this.run(`ALTER TABLE webhooks ADD COLUMN last_tested DATETIME`);
+                this.logger.info('✅ Added last_tested column to webhooks table');
+            }
+        } catch (error) {
+            this.logger.warn('⚠️ Could not add last_tested column to webhooks table:', error.message);
+        }
+
         // Integrations table - EXACT MATCH to monolithic
         if (!await this.tableExists('integrations')) {
             await this.run(`
@@ -531,6 +543,11 @@ class DatabaseMigration {
                 } catch (bfErr) {
                     this.logger.warn('⚠️ Failed to backfill integrations.enabled (non-fatal):', bfErr.message);
                 }
+            }
+            // Ensure 'last_tested' column exists for test functionality
+            if (!colNames.has('last_tested')) {
+                await this.run(`ALTER TABLE integrations ADD COLUMN last_tested DATETIME`);
+                this.logger.info('✅ Added last_tested column to integrations table');
             }
         } catch (error) {
             this.logger.warn('⚠️ Could not verify/alter integrations table for enabled column:', error.message);

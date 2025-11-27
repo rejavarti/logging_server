@@ -221,6 +221,43 @@ router.get('/:id/deliveries', async (req, res) => {
     }
 });
 
+// GET /api/webhooks/deliveries/:id - Get single delivery details
+router.get('/deliveries/:id', async (req, res) => {
+    try {
+        const delivery = await req.dal.get(`
+            SELECT 
+                d.id,
+                d.webhook_id as webhookId,
+                w.name as webhookName,
+                w.url,
+                d.response_code as statusCode,
+                d.delivery_status as status,
+                CASE WHEN d.delivery_status = 'success' THEN 1 ELSE 0 END as success,
+                d.attempted_at as timestamp,
+                d.delivered_at,
+                d.retry_count as attempt,
+                d.response_time_ms as responseTime,
+                d.request_payload as requestPayload,
+                d.request_headers as requestHeaders,
+                d.response_body as responseBody,
+                d.error_message as error,
+                d.event_type as event
+            FROM webhook_deliveries d
+            LEFT JOIN webhooks w ON d.webhook_id = w.id
+            WHERE d.id = ?
+        `, [req.params.id]);
+
+        if (!delivery) {
+            return res.status(404).json({ success: false, error: 'Webhook delivery not found' });
+        }
+
+        res.json(delivery);
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('API webhook delivery details error:', error);
+        res.status(500).json({ success: false, error: 'Failed to get delivery details' });
+    }
+});
+
 // POST /api/webhooks/deliveries/:id/retry - Retry failed webhook delivery
 router.post('/deliveries/:id/retry', async (req, res) => {
     try {
