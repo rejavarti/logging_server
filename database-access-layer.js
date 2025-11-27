@@ -1200,7 +1200,16 @@ class DatabaseAccessLayer extends EventEmitter {
             webhookData.headers ? JSON.stringify(webhookData.headers) : null,
             webhookData.active !== undefined ? webhookData.active : 1
         ];
-        return await this.run(sql, params);
+        const result = await this.run(sql, params);
+        // Return the created webhook object
+        return {
+            id: result.lastID,
+            name: webhookData.name,
+            url: webhookData.url,
+            method: webhookData.method || 'POST',
+            headers: webhookData.headers || null,
+            active: webhookData.active !== undefined ? webhookData.active : 1
+        };
     }
 
     async updateWebhook(webhookId, updates) {

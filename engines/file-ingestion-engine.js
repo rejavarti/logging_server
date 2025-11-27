@@ -93,16 +93,24 @@ class FileIngestionEngine {
 
     async _startWatcher() {
         await this._loadExistingOffsets();
-        const watcher = chokidar.watch(this.filePattern, {
+        this.watcher = chokidar.watch(this.filePattern, {
             cwd: this.directory,
             persistent: true,
             ignoreInitial: false,
             awaitWriteFinish: { stabilityThreshold: 500, pollInterval: 100 }
         });
 
-        watcher.on('add', file => this._processFile(file, true));
-        watcher.on('change', file => this._processFile(file, false));
-        watcher.on('error', error => this.loggers.system.error('File watcher error:', error));
+        this.watcher.on('add', file => this._processFile(file, true));
+        this.watcher.on('change', file => this._processFile(file, false));
+        this.watcher.on('error', error => this.loggers.system.error('File watcher error:', error));
+    }
+
+    async shutdown() {
+        if (this.watcher) {
+            await this.watcher.close();
+            this.watcher = null;
+        }
+        this.initialized = false;
     }
 
     _resolveFilePath(rel) {

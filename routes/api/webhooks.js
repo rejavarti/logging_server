@@ -24,16 +24,8 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ success: false, error: 'invalid webhook url' });
         }
 
-        const result = await req.dal.createWebhook(req.body);
-        const createdId = result.lastID;
-
-        let webhook = null;
-        try {
-            webhook = await req.dal.getWebhookById(createdId);
-        } catch (fetchErr) {
-            // Fallback to minimal object if direct fetch isn't available
-            webhook = { id: createdId, name: req.body.name, url: req.body.url, method: req.body.method || 'POST', active: req.body.active ?? 1 };
-        }
+        // createWebhook now returns the created webhook object directly
+        const webhook = await req.dal.createWebhook(req.body);
         
         // Log the activity
         if (req.dal && req.dal.logUserActivity) {
@@ -41,7 +33,7 @@ router.post('/', async (req, res) => {
                 await req.dal.logUserActivity(
                     req.user?.id || null,
                     'webhook_create',
-                    `webhook_${createdId}`,
+                    `webhook_${webhook.id}`,
                     { name: req.body.name, url: req.body.url },
                     req.ip,
                     req.get('User-Agent')
@@ -61,44 +53,64 @@ router.post('/', async (req, res) => {
 // PUT /api/webhooks/:id - Update webhook
 router.put('/:id', async (req, res) => {
     try {
-        const webhook = await req.dal.updateWebhook(req.params.id, req.body);
+        // Check if webhook exists first
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'Webhook not found' });
+        }
+        
+        const result = await req.dal.updateWebhook(req.params.id, req.body);
         
         // Log the activity
-        await req.dal.logUserActivity(
-            req.user.id,
-            'webhook_update',
-            `webhook_${req.params.id}`,
-            req.body,
-            req.ip,
-            req.get('User-Agent')
-        );
+        try {
+            await req.dal.logUserActivity(
+                req.user?.id,
+                'webhook_update',
+                `webhook_${req.params.id}`,
+                req.body,
+                req.ip,
+                req.get('User-Agent')
+            );
+        } catch (logErr) {
+            req.app.locals?.loggers?.api?.warn('Failed to log webhook update activity:', logErr.message);
+        }
         
-        res.json({ webhook });
+        res.json({ success: true, changes: result.changes });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API update webhook error:', error);
-        res.status(500).json({ error: 'Failed to update webhook' });
+        res.status(500).json({ success: false, error: 'Failed to update webhook' });
     }
 });
 
 // DELETE /api/webhooks/:id - Delete webhook
 router.delete('/:id', async (req, res) => {
     try {
+        // Check if webhook exists first
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'Webhook not found' });
+        }
+        
         await req.dal.deleteWebhook(req.params.id);
         
         // Log the activity
-        await req.dal.logUserActivity(
-            req.user.id,
-            'webhook_delete',
-            `webhook_${req.params.id}`,
-            null,
-            req.ip,
-            req.get('User-Agent')
-        );
+        try {
+            await req.dal.logUserActivity(
+                req.user?.id,
+                'webhook_delete',
+                `webhook_${req.params.id}`,
+                null,
+                req.ip,
+                req.get('User-Agent')
+            );
+        } catch (logErr) {
+            req.app.locals?.loggers?.api?.warn('Failed to log webhook delete activity:', logErr.message);
+        }
         
         res.json({ success: true });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API delete webhook error:', error);
-        res.status(500).json({ error: 'Failed to delete webhook' });
+        res.status(500).json({ success: false, error: 'Failed to delete webhook' });
     }
 });
 
@@ -107,20 +119,29 @@ router.post('/:id/toggle', async (req, res) => {
     try {
         const result = await req.dal.toggleWebhook(req.params.id);
         
+        // Check if webhook was not found
+        if (!result.success && result.error === 'Webhook not found') {
+            return res.status(404).json(result);
+        }
+        
         // Log the activity
-        await req.dal.logUserActivity(
-            req.user.id,
-            'webhook_toggle',
-            `webhook_${req.params.id}`,
-            { enabled: result.enabled },
-            req.ip,
-            req.get('User-Agent')
-        );
+        try {
+            await req.dal.logUserActivity(
+                req.user?.id,
+                'webhook_toggle',
+                `webhook_${req.params.id}`,
+                { enabled: result.enabled },
+                req.ip,
+                req.get('User-Agent')
+            );
+        } catch (logErr) {
+            req.app.locals?.loggers?.api?.warn('Failed to log webhook toggle activity:', logErr.message);
+        }
         
         res.json(result);
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API toggle webhook error:', error);
-        res.status(500).json({ error: 'Failed to toggle webhook' });
+        res.status(500).json({ success: false, error: 'Failed to toggle webhook' });
     }
 });
 

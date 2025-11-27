@@ -274,11 +274,18 @@ class UniversalSQLiteAdapter {
                     
                 case 'sql.js':
                     try {
-                        const result = this.db.run(sql, params);
+                        this.db.run(sql, params);
+                        // Get changes count BEFORE saveDatabase (which might clear state)
+                        const changesCount = this.db.getRowsModified ? this.db.getRowsModified() : 0;
+                        // Get last inserted row ID
+                        const lastIdResult = this.db.exec('SELECT last_insert_rowid() as lastID');
+                        const lastID = lastIdResult && lastIdResult[0] && lastIdResult[0].values && lastIdResult[0].values[0] 
+                            ? lastIdResult[0].values[0][0] 
+                            : null;
                         this.saveDatabase(); // Auto-save on changes
                         const out = { 
-                            lastID: null, // sql.js doesn't provide lastID easily
-                            changes: result ? 1 : 0 
+                            lastID: lastID,
+                            changes: changesCount
                         };
                         if (typeof cb === 'function') cb(null);
                         resolve(out);

@@ -1195,43 +1195,56 @@ router.get('/api/:id', async (req, res) => {
 router.post('/api', async (req, res) => {
     try {
         const webhook = await req.dal.createWebhook(req.body);
-        res.json(webhook);
+        res.status(201).json({ success: true, webhook });
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Create webhook API error:', error);
-        res.status(500).json({ error: 'Failed to create webhook' });
+        res.status(500).json({ success: false, error: 'Failed to create webhook' });
     }
 });
 
 // Update webhook
 router.put('/api/:id', async (req, res) => {
     try {
-        const webhook = await req.dal.updateWebhook(req.params.id, req.body);
-        res.json(webhook);
+        // Check if webhook exists first
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'Webhook not found' });
+        }
+        const result = await req.dal.updateWebhook(req.params.id, req.body);
+        res.json({ success: true, changes: result.changes });
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Update webhook API error:', error);
-        res.status(500).json({ error: 'Failed to update webhook' });
+        res.status(500).json({ success: false, error: 'Failed to update webhook' });
     }
 });
 
 // Delete webhook
 router.delete('/api/:id', async (req, res) => {
     try {
+        // Check if webhook exists first
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        if (!existing) {
+            return res.status(404).json({ success: false, error: 'Webhook not found' });
+        }
         await req.dal.deleteWebhook(req.params.id);
         res.json({ success: true });
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Delete webhook API error:', error);
-        res.status(500).json({ error: 'Failed to delete webhook' });
+        res.status(500).json({ success: false, error: 'Failed to delete webhook' });
     }
 });
 
 // Toggle webhook active status
 router.post('/api/:id/toggle', async (req, res) => {
     try {
-        await req.dal.toggleWebhook(req.params.id);
-        res.json({ success: true });
+        const result = await req.dal.toggleWebhook(req.params.id);
+        if (!result.success && result.error === 'Webhook not found') {
+            return res.status(404).json(result);
+        }
+        res.json(result);
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Toggle webhook API error:', error);
-        res.status(500).json({ error: 'Failed to toggle webhook' });
+        res.status(500).json({ success: false, error: 'Failed to toggle webhook' });
     }
 });
 
