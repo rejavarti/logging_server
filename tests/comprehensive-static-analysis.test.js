@@ -37,7 +37,7 @@ describe('🔬 COMPREHENSIVE STATIC ANALYSIS - FILE STRUCTURE', () => {
     });
 
     test('database migration file exists', () => {
-      const migrationPath = path.join(__dirname, '../archive/migrations/database-migration.js');
+      const migrationPath = path.join(__dirname, '../migrations/database-migration.js');
       expect(fs.existsSync(migrationPath)).toBe(true);
     });
   });
@@ -225,7 +225,7 @@ describe('🔬 COMPREHENSIVE STATIC ANALYSIS - CODE PATTERNS', () => {
     let migrationCode;
 
     beforeAll(() => {
-      const migrationPath = path.join(__dirname, '../archive/migrations/database-migration.js');
+      const migrationPath = path.join(__dirname, '../migrations/database-migration.js');
       migrationCode = fs.readFileSync(migrationPath, 'utf8');
     });
 

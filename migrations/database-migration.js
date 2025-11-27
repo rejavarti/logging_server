@@ -1,5 +1,5 @@
 // Using UniversalSQLiteAdapter for cross-platform compatibility (sql.js on Windows)
-const UniversalSQLiteAdapter = require('../../universal-sqlite-adapter');
+const UniversalSQLiteAdapter = require('../universal-sqlite-adapter');
 const fs = require('fs');
 const path = require('path');
 
@@ -57,7 +57,7 @@ class DatabaseMigration {
 
     async tableExists(tableName) {
         const result = await this.get(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", 
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
             [tableName]
         );
         return !!result;

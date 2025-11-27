@@ -34,7 +34,7 @@ describe('FileIngestionEngine - Parser Tests', () => {
     dbPath = path.join(tempDir, 'test.db');
     
     // Run migration FIRST to create tables and save the database file
-    const DatabaseMigration = require('../archive/migrations/database-migration');
+    const DatabaseMigration = require('../migrations/database-migration');
     const migration = new DatabaseMigration(dbPath, testLogger);
     await migration.runMigration();
     

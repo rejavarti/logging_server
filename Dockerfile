@@ -43,8 +43,8 @@ COPY middleware/ ./middleware/
 COPY configs/ ./configs/
 COPY scripts/ ./scripts/
 COPY public/ ./public/
-COPY archive/ ./archive/
 COPY utils/ ./utils/
+COPY migrations/ ./migrations/
 
 # Remove development files
 RUN rm -rf .git .gitignore README.md *.md 2>/dev/null || true

@@ -802,7 +802,7 @@ async function initializeDatabase() {
         
         // Run database migration first to ensure all tables exist
         loggers.system.info('🔧 Running database migration...');
-        const DatabaseMigration = require('./archive/migrations/database-migration');
+        const DatabaseMigration = require('./migrations/database-migration');
         const migration = new DatabaseMigration(dbPath, loggers.system);
         await migration.runMigration();
         loggers.system.info('✅ Database migration completed successfully');
