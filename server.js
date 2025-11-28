@@ -1388,18 +1388,82 @@ function setupRoutes() {
         // Enhanced log ingestion endpoint with geographic and user-agent analysis
         app.post('/log', legacyAuth, async (req, res) => {
             try {
-                const { message, level = 'info', category = 'esp32' } = req.body;
+                const { 
+                    message, 
+                    level,
+                    severity, // Node-RED uses 'severity' instead of 'level'
+                    category = 'esp32',
+                    // Additional context fields that may be sent by integrations
+                    source: explicitSource,
+                    entity_id: topLevelEntityId,
+                    automation_name: topLevelAutomationName,
+                    automation_id,
+                    trigger,
+                    context,
+                    node_id,
+                    flow_id,
+                    hostname,
+                    tags,
+                    metadata: incomingMetadata
+                } = req.body;
+                
+                // Parse metadata if it's a string (could be JSON stringified)
+                let parsedMetadata = {};
+                if (typeof incomingMetadata === 'string') {
+                    try { parsedMetadata = JSON.parse(incomingMetadata); } catch (_) {}
+                } else if (typeof incomingMetadata === 'object' && incomingMetadata !== null) {
+                    parsedMetadata = incomingMetadata;
+                }
+                
+                // Extract entity_id from metadata if not at top level (Node-RED pattern)
+                const entity_id = topLevelEntityId || parsedMetadata.entity_id;
+                const automation_name = topLevelAutomationName || parsedMetadata.automation_name;
+                const domain = parsedMetadata.domain;
+                const service = parsedMetadata.service;
+                
+                // Support both 'level' and 'severity' field names
+                const effectiveLevel = level || severity || 'info';
+                
                 const clientIp = req.ip || req.connection.remoteAddress || 'unknown';
                 const userAgent = req.headers['user-agent'] || 'unknown';
                 
+                // Build a more descriptive source from available context
+                // Priority: automation_name > entity_id > domain.service > explicit source > category
+                let effectiveSource = explicitSource || category;
+                if (automation_name) {
+                    effectiveSource = automation_name;
+                } else if (entity_id && entity_id !== 'none') {
+                    effectiveSource = entity_id;
+                } else if (domain && service) {
+                    effectiveSource = `${domain}.${service}`;
+                } else if (node_id && flow_id) {
+                    effectiveSource = `node-red:${flow_id}/${node_id}`;
+                }
+                
+                // Compile metadata from all context fields
+                const compiledMetadata = {
+                    ...parsedMetadata,
+                    ...(entity_id && { entity_id }),
+                    ...(automation_name && { automation_name }),
+                    ...(automation_id && { automation_id }),
+                    ...(trigger && { trigger }),
+                    ...(context && { context }),
+                    ...(node_id && { node_id }),
+                    ...(flow_id && { flow_id }),
+                    original_category: category
+                };
+                
                 // Enhanced log entry with geographic and user-agent data
                 const logEntry = {
-                    level,
+                    level: effectiveLevel,
                     message,
-                    source: category,
+                    source: effectiveSource,
                     ip: clientIp,
                     timestamp: new Date().toISOString(),
-                    user_agent: userAgent
+                    user_agent: userAgent,
+                    hostname: hostname || null,
+                    tags: Array.isArray(tags) ? tags.join(',') : (tags || null),
+                    metadata: Object.keys(compiledMetadata).length > 1 ? JSON.stringify(compiledMetadata) : null
                 };
 
                 // Add geographic data if geoip is available

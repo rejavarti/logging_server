@@ -20,6 +20,16 @@ const router = express.Router();
  */
 router.get('/', async (req, res) => {
     try {
+        // Get IntegrationManager status for live connection info
+        let managerStatus = {};
+        try {
+            if (req.integrationManager && typeof req.integrationManager.getStatus === 'function') {
+                managerStatus = req.integrationManager.getStatus();
+            }
+        } catch (e) {
+            req.app.locals?.loggers?.system?.warn('Integrations page: failed to get manager status:', e.message);
+        }
+
         // Fetch real integrations from DAL when available
         let integrations = [];
         try {
@@ -28,11 +38,23 @@ router.get('/', async (req, res) => {
                 integrations = (rows || []).map(r => {
                     let cfg = {};
                     if (r.config) { try { cfg = JSON.parse(r.config); } catch (_) { cfg = {}; } }
+                    
+                    // Determine connected status from IntegrationManager
+                    let connected = false;
+                    const intType = (r.type || '').toLowerCase();
+                    if (intType === 'homeassistant' && managerStatus.homeAssistant) {
+                        connected = managerStatus.homeAssistant.connected === true;
+                    } else if (intType === 'mqtt' && managerStatus.mqtt) {
+                        connected = managerStatus.mqtt.connected === true;
+                    } else if (intType === 'websocket' && managerStatus.websocket) {
+                        connected = managerStatus.websocket.connected === true;
+                    }
+                    
                     return {
                         ...r,
                         config: cfg,
                         enabled: r.enabled ? true : false,
-                        connected: false // no live connector yet
+                        connected: connected
                     };
                 });
             }
@@ -985,12 +1007,17 @@ router.get('/', async (req, res) => {
             
             try {
                 const response = await fetch('/integrations/api/health/' + name + '/test', { method: 'POST' });
-                const result = await response.json();
+                const data = await response.json();
                 
-                showToast(name + ': ' + result.status, result.status === 'online' ? 'success' : 'error');
+                // API returns { success: true, result: { status: '...', message: '...' } }
+                const testResult = data.result || data;
+                const status = testResult.status || 'unknown';
+                const message = testResult.message || status;
+                
+                showToast(name + ': ' + message, status === 'online' ? 'success' : 'error');
                 loadHealthIntegrations();
             } catch (error) {
-                req.app.locals?.loggers?.system?.error('Failed to test integration:', error);
+                console.error('Failed to test integration:', error);
                 showToast('Failed to test integration', 'error');
             }
         }
@@ -2037,6 +2064,16 @@ router.get('/logs/:id', async (req, res) => {
 // Get integration health status - ONLY show enabled integrations from integrations table
 router.get('/api/health', async (req, res) => {
     try {
+        // Get IntegrationManager status for live connection info
+        let managerStatus = {};
+        try {
+            if (req.integrationManager && typeof req.integrationManager.getStatus === 'function') {
+                managerStatus = req.integrationManager.getStatus();
+            }
+        } catch (e) {
+            req.app.locals?.loggers?.system?.warn('Health API: failed to get manager status:', e.message);
+        }
+
         // Get list of enabled integrations from the integrations table
         const enabledIntegrations = await req.dal.all(
             'SELECT id, name, type, config, created_at, updated_at FROM integrations WHERE enabled = 1'
@@ -2070,12 +2107,22 @@ router.get('/api/health', async (req, res) => {
             // Try to find matching health record by name or type
             const health = healthMap.get(nameKey) || healthMap.get(typeKey) || null;
             
+            // Get live status from IntegrationManager if available
+            let liveStatus = null;
+            if (typeKey === 'homeassistant' && managerStatus.homeAssistant) {
+                liveStatus = managerStatus.homeAssistant.connected ? 'online' : 'offline';
+            } else if (typeKey === 'mqtt' && managerStatus.mqtt) {
+                liveStatus = managerStatus.mqtt.connected ? 'online' : 'offline';
+            } else if (typeKey === 'websocket' && managerStatus.websocket) {
+                liveStatus = managerStatus.websocket.connected ? 'online' : 'offline';
+            }
+            
             const baseData = {
                 id: health?.id || integration.id,
                 integration_name: nameKey,
                 integration_display_name: integration.name,
                 integration_type: integration.type,
-                status: health?.status || 'unknown',
+                status: liveStatus || health?.status || 'unknown',
                 last_check: health?.last_check || integration.updated_at,
                 response_time: health?.response_time || 0,
                 error_count: health?.error_count || 0,
@@ -2184,6 +2231,90 @@ router.post('/api/health/:name/test', async (req, res) => {
     }
 });
 
+// Test integration from form data (STATIC - must be before /api/:id routes)
+router.post('/api/test', async (req, res) => {
+    try {
+        const { type, config } = req.body;
+        
+        if (!type) {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Integration type is required' 
+            });
+        }
+        
+        // Load test helpers
+        const testHelpers = require('../integration-test-helpers');
+        
+        // Perform actual integration testing based on type
+        let testResult = { success: false, message: '', details: {} };
+        
+        switch (type.toLowerCase()) {
+            case 'webhook':
+                testResult = await testHelpers.testWebhook(config);
+                break;
+            case 'homeassistant':
+            case 'home_assistant':
+                testResult = await testHelpers.testHomeAssistant(config);
+                break;
+            case 'mqtt':
+                testResult = await testHelpers.testMQTT(config);
+                break;
+            case 'unifi':
+                testResult = await testHelpers.testUniFi(config);
+                break;
+            case 'slack':
+            case 'discord':
+            case 'teams':
+            case 'telegram':
+            case 'pushover':
+                testResult = await testHelpers.testWebhookBased(type, config);
+                break;
+            case 'elasticsearch':
+            case 'influxdb':
+            case 'grafana':
+            case 'prometheus':
+            case 'splunk':
+            case 'datadog':
+            case 'newrelic':
+                testResult = await testHelpers.testHTTPEndpoint(type, config);
+                break;
+            default:
+                // Generic integration test - attempt basic connectivity
+                try {
+                    if (config.url) {
+                        const response = await fetch(config.url, { method: 'HEAD', timeout: 5000 });
+                        testResult = {
+                            success: response.ok,
+                            message: response.ok ? 'Endpoint reachable' : `HTTP ${response.status}`,
+                            details: { type, status: response.status, url: config.url }
+                        };
+                    } else {
+                        testResult = {
+                            success: false,
+                            message: 'No test URL configured for this integration type',
+                            details: { type, note: 'Add "url" field to config for connectivity test' }
+                        };
+                    }
+                } catch (err) {
+                    testResult = {
+                        success: false,
+                        message: `Connection failed: ${err.message}`,
+                        details: { type, error: err.message }
+                    };
+                }
+        }
+        
+        res.json(testResult);
+    } catch (error) {
+        req.app.locals?.loggers?.system?.error('Test integration data API error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: `Failed to test integration: ${error.message}` 
+        });
+    }
+});
+
 // ---- Helper Functions ----
 async function performIntegrationTest(integration, req, startOverride) {
     const started = startOverride || Date.now();
@@ -2201,6 +2332,46 @@ async function performIntegrationTest(integration, req, startOverride) {
     }
     // Determine test logic by type
     try {
+        // Check specific integration types FIRST, before generic URL check
+        if (type === 'home_assistant' || type === 'homeassistant') {
+            // Check IntegrationManager status first for live status
+            let managerStatus = null;
+            try {
+                if (req.integrationManager && typeof req.integrationManager.getStatus === 'function') {
+                    managerStatus = req.integrationManager.getStatus()?.homeAssistant;
+                }
+            } catch (e) { /* ignore */ }
+            
+            if (managerStatus && managerStatus.connected === true) {
+                return { 
+                    ...common, 
+                    status: 'online', 
+                    latencyMs: Date.now() - started, 
+                    message: 'Connected to Home Assistant'
+                };
+            }
+            
+            // Fallback to HTTP test if IntegrationManager not available
+            const base = config.url;
+            if (!base) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'No Home Assistant base URL' };
+            const controller = new AbortController();
+            const to = setTimeout(() => controller.abort(), 3000);
+            let ok = false; let statusCode = null;
+            try {
+                const resp = await fetch(base.replace(/\/$/, '') + '/api/config', {
+                    headers: config.token ? { Authorization: `Bearer ${config.token}` } : undefined,
+                    signal: controller.signal
+                }).catch(() => null);
+                if (resp) { statusCode = resp.status; ok = resp.ok; }
+            } finally { clearTimeout(to); }
+            return { ...common, status: ok ? 'online' : 'offline', latencyMs: Date.now() - started, message: ok ? 'Connected to Home Assistant' : `Unreachable (status ${statusCode ?? 'n/a'})`, httpStatus: statusCode };
+        }
+        if (type === 'mqtt') {
+            const client = req.app.locals?.mqttClient;
+            if (!client) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'MQTT client not initialised' };
+            return { ...common, status: client.connected ? 'online' : 'offline', latencyMs: Date.now() - started, message: client.connected ? 'MQTT connected' : 'MQTT disconnected' };
+        }
+        // Generic webhook/URL-based integrations (check after specific types)
         if (type === 'webhook' || config.url) {
             const url = config.url || config.endpoint || config.target;
             if (!url) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'No URL configured' };
@@ -2224,26 +2395,6 @@ async function performIntegrationTest(integration, req, startOverride) {
                 message: ok ? `HTTP ${statusCode}` : `Unreachable (status ${statusCode ?? 'n/a'})`,
                 httpStatus: statusCode
             };
-        }
-        if (type === 'mqtt') {
-            const client = req.app.locals?.mqttClient;
-            if (!client) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'MQTT client not initialised' };
-            return { ...common, status: client.connected ? 'online' : 'offline', latencyMs: Date.now() - started, message: client.connected ? 'MQTT connected' : 'MQTT disconnected' };
-        }
-        if (type === 'home_assistant' || type === 'homeassistant') {
-            const base = config.url;
-            if (!base) return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'No Home Assistant base URL' };
-            const controller = new AbortController();
-            const to = setTimeout(() => controller.abort(), 3000);
-            let ok = false; let statusCode = null;
-            try {
-                const resp = await fetch(base.replace(/\/$/, '') + '/api/', {
-                    headers: config.token ? { Authorization: `Bearer ${config.token}` } : undefined,
-                    signal: controller.signal
-                }).catch(() => null);
-                if (resp) { statusCode = resp.status; ok = resp.ok; }
-            } finally { clearTimeout(to); }
-            return { ...common, status: ok ? 'online' : 'offline', latencyMs: Date.now() - started, message: ok ? `HTTP ${statusCode}` : `Unreachable (status ${statusCode ?? 'n/a'})`, httpStatus: statusCode };
         }
         // Default: No specific test logic
         return { ...common, status: 'unconfigured', latencyMs: Date.now() - started, message: 'No test logic for type' };
@@ -2353,7 +2504,7 @@ router.post('/api/:id/toggle', async (req, res) => {
     }
 });
 
-// Test integration
+// Test integration by ID
 router.post('/api/:id/test', async (req, res) => {
     try {
         const result = await req.dal.testIntegration(req.params.id);
@@ -2361,90 +2512,6 @@ router.post('/api/:id/test', async (req, res) => {
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Test integration API error:', error);
         res.status(500).json({ error: 'Failed to test integration' });
-    }
-});
-
-// Test integration from form data
-router.post('/api/test', async (req, res) => {
-    try {
-        const { type, config } = req.body;
-        
-        if (!type) {
-            return res.status(400).json({ 
-                success: false, 
-                error: 'Integration type is required' 
-            });
-        }
-        
-        // Load test helpers
-        const testHelpers = require('../integration-test-helpers');
-        
-        // Perform actual integration testing based on type
-        let testResult = { success: false, message: '', details: {} };
-        
-        switch (type.toLowerCase()) {
-            case 'webhook':
-                testResult = await testHelpers.testWebhook(config);
-                break;
-            case 'homeassistant':
-            case 'home_assistant':
-                testResult = await testHelpers.testHomeAssistant(config);
-                break;
-            case 'mqtt':
-                testResult = await testHelpers.testMQTT(config);
-                break;
-            case 'unifi':
-                testResult = await testHelpers.testUniFi(config);
-                break;
-            case 'slack':
-            case 'discord':
-            case 'teams':
-            case 'telegram':
-            case 'pushover':
-                testResult = await testHelpers.testWebhookBased(type, config);
-                break;
-            case 'elasticsearch':
-            case 'influxdb':
-            case 'grafana':
-            case 'prometheus':
-            case 'splunk':
-            case 'datadog':
-            case 'newrelic':
-                testResult = await testHelpers.testHTTPEndpoint(type, config);
-                break;
-            default:
-                // Generic integration test - attempt basic connectivity
-                try {
-                    if (config.url) {
-                        const response = await fetch(config.url, { method: 'HEAD', timeout: 5000 });
-                        testResult = {
-                            success: response.ok,
-                            message: response.ok ? 'Endpoint reachable' : `HTTP ${response.status}`,
-                            details: { type, status: response.status, url: config.url }
-                        };
-                    } else {
-                        testResult = {
-                            success: false,
-                            message: 'No test URL configured for this integration type',
-                            details: { type, note: 'Add "url" field to config for connectivity test' }
-                        };
-                    }
-                } catch (err) {
-                    testResult = {
-                        success: false,
-                        message: `Connection failed: ${err.message}`,
-                        details: { type, error: err.message }
-                    };
-                }
-        }
-        
-        res.json(testResult);
-    } catch (error) {
-        req.app.locals?.loggers?.system?.error('Test integration data API error:', error);
-        res.status(500).json({ 
-            success: false,
-            error: `Failed to test integration: ${error.message}` 
-        });
     }
 });
 

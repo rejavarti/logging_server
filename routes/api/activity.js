@@ -39,6 +39,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/activity/latest - Get latest activities for real-time updates
+// NOTE: Static routes MUST come before /:id parameterized route
 router.get('/latest', async (req, res) => {
     try {
         let { since } = req.query;
@@ -66,23 +67,8 @@ router.get('/latest', async (req, res) => {
     }
 });
 
-// GET /api/activity/:id - Get specific activity
-router.get('/:id', async (req, res) => {
-    try {
-        const activity = await req.dal.getActivityById(req.params.id);
-        
-        if (!activity) {
-            return res.status(404).json({ error: 'Activity not found' });
-        }
-        
-        res.json({ activity });
-    } catch (error) {
-        req.app.locals?.loggers?.api?.error('API activity by ID error:', error);
-        res.status(500).json({ error: 'Failed to fetch activity' });
-    }
-});
-
 // GET /api/activity/export - Export activities
+// NOTE: Static route MUST come before /:id parameterized route
 router.get('/export', async (req, res) => {
     try {
         const filters = { ...req.query };
@@ -107,6 +93,23 @@ router.get('/export', async (req, res) => {
     } catch (error) {
         req.app.locals?.loggers?.api?.error('API activity export error:', error);
         res.status(500).json({ error: 'Failed to export activities' });
+    }
+});
+
+// GET /api/activity/:id - Get specific activity
+// NOTE: Parameterized route MUST come AFTER all static routes (/latest, /export)
+router.get('/:id', async (req, res) => {
+    try {
+        const activity = await req.dal.getActivityById(req.params.id);
+        
+        if (!activity) {
+            return res.status(404).json({ error: 'Activity not found' });
+        }
+        
+        res.json({ activity });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('API activity by ID error:', error);
+        res.status(500).json({ error: 'Failed to fetch activity' });
     }
 });
 

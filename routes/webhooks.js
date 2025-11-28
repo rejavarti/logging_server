@@ -1177,6 +1177,32 @@ router.get('/api', async (req, res) => {
     }
 });
 
+// Create webhook
+router.post('/api', async (req, res) => {
+    try {
+        const webhook = await req.dal.createWebhook(req.body);
+        res.status(201).json({ success: true, webhook });
+    } catch (error) {
+        req.app.locals?.loggers?.system?.error('Create webhook API error:', error);
+        res.status(500).json({ success: false, error: 'Failed to create webhook' });
+    }
+});
+
+// Test webhook from form data (STATIC - must be before /api/:id routes)
+router.post('/api/test', async (req, res) => {
+    try {
+        const result = await req.dal.testWebhookData(req.body);
+        res.json(result);
+        } catch (error) {
+        req.app.locals?.loggers?.system?.error('Test webhook data API error:', error);
+        res.status(500).json({ error: 'Failed to test webhook' });
+    }
+});
+
+// ==========================================
+// PARAMETERIZED ROUTES - MUST COME AFTER STATIC ROUTES
+// ==========================================
+
 // Get single webhook
 router.get('/api/:id', async (req, res) => {
     try {
@@ -1188,17 +1214,6 @@ router.get('/api/:id', async (req, res) => {
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Get webhook API error:', error);
         res.status(500).json({ error: 'Failed to get webhook' });
-    }
-});
-
-// Create webhook
-router.post('/api', async (req, res) => {
-    try {
-        const webhook = await req.dal.createWebhook(req.body);
-        res.status(201).json({ success: true, webhook });
-    } catch (error) {
-        req.app.locals?.loggers?.system?.error('Create webhook API error:', error);
-        res.status(500).json({ success: false, error: 'Failed to create webhook' });
     }
 });
 
@@ -1248,24 +1263,13 @@ router.post('/api/:id/toggle', async (req, res) => {
     }
 });
 
-// Test webhook
+// Test webhook by ID
 router.post('/api/:id/test', async (req, res) => {
     try {
         const result = await req.dal.testWebhook(req.params.id);
         res.json(result);
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Test webhook API error:', error);
-        res.status(500).json({ error: 'Failed to test webhook' });
-    }
-});
-
-// Test webhook from form data
-router.post('/api/test', async (req, res) => {
-    try {
-        const result = await req.dal.testWebhookData(req.body);
-        res.json(result);
-        } catch (error) {
-        req.app.locals?.loggers?.system?.error('Test webhook data API error:', error);
         res.status(500).json({ error: 'Failed to test webhook' });
     }
 });

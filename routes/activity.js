@@ -1036,25 +1036,9 @@ router.get('/api/latest', async (req, res) => {
 });
 
 /**
- * API Route - Get single activity details
- * GET /api/activity/:id
- */
-router.get('/api/:id', async (req, res) => {
-    try {
-        const activity = await req.dal.getActivityById(req.params.id);
-        if (!activity) {
-            return res.status(404).json({ error: 'Activity not found' });
-        }
-        res.json(activity);
-    } catch (error) {
-        req.app.locals?.loggers?.system?.error('Activity details API error:', error);
-        res.status(500).json({ error: 'Failed to get activity details' });
-    }
-});
-
-/**
  * API Route - Export activities
  * GET /api/activity/export
+ * NOTE: MUST be defined BEFORE /api/:id to avoid shadowing
  */
 router.get('/api/export', async (req, res) => {
     try {
@@ -1092,6 +1076,24 @@ router.get('/api/export', async (req, res) => {
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Export activities API error:', error);
         res.status(500).json({ error: 'Failed to export activities' });
+    }
+});
+
+/**
+ * API Route - Get single activity details
+ * GET /api/activity/:id
+ * NOTE: Parameterized route MUST come AFTER static routes like /api/export
+ */
+router.get('/api/:id', async (req, res) => {
+    try {
+        const activity = await req.dal.getActivityById(req.params.id);
+        if (!activity) {
+            return res.status(404).json({ error: 'Activity not found' });
+        }
+        res.json(activity);
+    } catch (error) {
+        req.app.locals?.loggers?.system?.error('Activity details API error:', error);
+        res.status(500).json({ error: 'Failed to get activity details' });
     }
 });
 

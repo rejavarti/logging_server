@@ -115,110 +115,9 @@ router.post('/alerts', async (req, res) => {
     }
 });
 
-// Acknowledge alert
-router.post('/alerts/:id/acknowledge', async (req, res) => {
-    try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isFinite(id) || id <= 0) {
-            return res.status(400).json({ success: false, error: 'Invalid alert id' });
-        }
-        const dal = req.dal;
-        if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
-            return res.status(400).json({ success: false, error: 'Database not available' });
-        }
-
-        const result = await dal.run(
-            `UPDATE alerts SET acknowledged = 1, status = CASE WHEN resolved = 1 THEN status ELSE 'acknowledged' END WHERE id = ?`,
-            [id]
-        );
-        if (!result || !result.changes) {
-            return res.status(404).json({ success: false, error: 'Alert not found' });
-        }
-        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
-        if (alert && alert.data) {
-            try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
-        }
-        
-        // Broadcast alert acknowledgement to WebSocket subscribers
-        if (typeof global.broadcastToSubscribers === 'function' && alert) {
-            global.broadcastToSubscribers('alerts', 'alert:acknowledged', {
-                id: alert.id,
-                name: alert.name,
-                status: alert.status,
-                acknowledged: alert.acknowledged
-            });
-        }
-        
-        return res.json({ success: true, alert });
-    } catch (error) {
-        req.app.locals?.loggers?.api?.error('Error acknowledging alert:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Resolve alert
-router.post('/alerts/:id/resolve', async (req, res) => {
-    try {
-        const id = parseInt(req.params.id, 10);
-        if (!Number.isFinite(id) || id <= 0) {
-            return res.status(400).json({ success: false, error: 'Invalid alert id' });
-        }
-        const dal = req.dal;
-        if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
-            return res.status(400).json({ success: false, error: 'Database not available' });
-        }
-
-        const result = await dal.run(
-            `UPDATE alerts SET resolved = 1, status = 'resolved' WHERE id = ?`,
-            [id]
-        );
-        if (!result || !result.changes) {
-            return res.status(404).json({ success: false, error: 'Alert not found' });
-        }
-        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
-        if (alert && alert.data) {
-            try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
-        }
-        
-        // Broadcast alert resolution to WebSocket subscribers
-        if (typeof global.broadcastToSubscribers === 'function' && alert) {
-            global.broadcastToSubscribers('alerts', 'alert:resolved', {
-                id: alert.id,
-                name: alert.name,
-                status: alert.status,
-                resolved: alert.resolved
-            });
-        }
-        
-        return res.json({ success: true, alert });
-    } catch (error) {
-        req.app.locals?.loggers?.api?.error('Error resolving alert:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// Delete alert
-router.delete('/alerts/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const dal = req.dal;
-        
-        if (!dal || typeof dal.run !== 'function') {
-            return res.status(503).json({ success: false, error: 'Database unavailable' });
-        }
-        
-        const result = await dal.run('DELETE FROM alerts WHERE id = ?', [id]);
-        
-        if (result.changes === 0) {
-            return res.status(404).json({ success: false, error: 'Alert not found' });
-        }
-        
-        res.json({ success: true, message: 'Alert deleted successfully' });
-    } catch (error) {
-        req.app.locals?.loggers?.api?.error('Error deleting alert:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
-});
+// ==========================================
+// STATIC ROUTES - MUST COME BEFORE /:id ROUTES
+// ==========================================
 
 // Get alert rules
 router.get('/alerts/rules', async (req, res) => {
@@ -496,6 +395,115 @@ router.post('/alerts/channels/:id/test', async (req, res) => {
         res.json(testResult);
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error testing alert channel:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
+// PARAMETERIZED ROUTES - MUST COME AFTER STATIC ROUTES
+// ==========================================
+
+// Acknowledge alert
+router.post('/alerts/:id/acknowledge', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid alert id' });
+        }
+        const dal = req.dal;
+        if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
+            return res.status(400).json({ success: false, error: 'Database not available' });
+        }
+
+        const result = await dal.run(
+            `UPDATE alerts SET acknowledged = 1, status = CASE WHEN resolved = 1 THEN status ELSE 'acknowledged' END WHERE id = ?`,
+            [id]
+        );
+        if (!result || !result.changes) {
+            return res.status(404).json({ success: false, error: 'Alert not found' });
+        }
+        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
+        if (alert && alert.data) {
+            try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
+        }
+        
+        // Broadcast alert acknowledgement to WebSocket subscribers
+        if (typeof global.broadcastToSubscribers === 'function' && alert) {
+            global.broadcastToSubscribers('alerts', 'alert:acknowledged', {
+                id: alert.id,
+                name: alert.name,
+                status: alert.status,
+                acknowledged: alert.acknowledged
+            });
+        }
+        
+        return res.json({ success: true, alert });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error acknowledging alert:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Resolve alert
+router.post('/alerts/:id/resolve', async (req, res) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (!Number.isFinite(id) || id <= 0) {
+            return res.status(400).json({ success: false, error: 'Invalid alert id' });
+        }
+        const dal = req.dal;
+        if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
+            return res.status(400).json({ success: false, error: 'Database not available' });
+        }
+
+        const result = await dal.run(
+            `UPDATE alerts SET resolved = 1, status = 'resolved' WHERE id = ?`,
+            [id]
+        );
+        if (!result || !result.changes) {
+            return res.status(404).json({ success: false, error: 'Alert not found' });
+        }
+        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
+        if (alert && alert.data) {
+            try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
+        }
+        
+        // Broadcast alert resolution to WebSocket subscribers
+        if (typeof global.broadcastToSubscribers === 'function' && alert) {
+            global.broadcastToSubscribers('alerts', 'alert:resolved', {
+                id: alert.id,
+                name: alert.name,
+                status: alert.status,
+                resolved: alert.resolved
+            });
+        }
+        
+        return res.json({ success: true, alert });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error resolving alert:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// Delete alert
+router.delete('/alerts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const dal = req.dal;
+        
+        if (!dal || typeof dal.run !== 'function') {
+            return res.status(503).json({ success: false, error: 'Database unavailable' });
+        }
+        
+        const result = await dal.run('DELETE FROM alerts WHERE id = ?', [id]);
+        
+        if (result.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Alert not found' });
+        }
+        
+        res.json({ success: true, message: 'Alert deleted successfully' });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error deleting alert:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });
