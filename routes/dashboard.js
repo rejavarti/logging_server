@@ -3611,7 +3611,7 @@ router.get('/', async (req, res) => {
                 if (errorRate > 0.2 && errorCount > 10) { // More than 20% errors
                     patterns.push({
                         type: '📈 Error Spike',
-                        description: `High error rate detected: ${(errorRate * 100).toFixed(1)}% of recent logs`,
+                        description: 'High error rate detected: ' + (errorRate * 100).toFixed(1) + '% of recent logs',
                         count: errorCount,
                         confidence: Math.min(errorRate * 2, 1),
                         severity: errorRate > 0.5 ? 'high' : errorRate > 0.3 ? 'medium' : 'low'
@@ -3628,7 +3628,7 @@ router.get('/', async (req, res) => {
                     if (count >= 5) {
                         patterns.push({
                             type: '🎯 Source Issue',
-                            description: `"${source}" is producing frequent errors`,
+                            description: '"' + source + '" is producing frequent errors',
                             count: count,
                             confidence: Math.min(count / 15, 1),
                             severity: count >= 20 ? 'high' : count >= 10 ? 'medium' : 'low'
@@ -3641,7 +3641,7 @@ router.get('/', async (req, res) => {
                 if (warningCount > 30 && warningCount > errorCount * 3) {
                     patterns.push({
                         type: '⚠️ Warning Escalation',
-                        description: `High warning volume (${warningCount}) may indicate emerging issues`,
+                        description: 'High warning volume (' + warningCount + ') may indicate emerging issues',
                         count: warningCount,
                         confidence: 0.7,
                         severity: 'medium'
@@ -3663,7 +3663,7 @@ router.get('/', async (req, res) => {
                         if (count > avgErrorsPerHour * 2 && count >= 5) {
                             patterns.push({
                                 type: '⏰ Time Pattern',
-                                description: `Errors peak around ${hour}:00 (${count} errors)`,
+                                description: 'Errors peak around ' + hour + ':00 (' + count + ' errors)',
                                 count: count,
                                 confidence: 0.8,
                                 severity: 'low'
