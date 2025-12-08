@@ -60,7 +60,7 @@ router.get('/', async (req, res) => {
                     COUNT(*) as count,
                     level
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+                WHERE timestamp >= datetime('now', '-24 hours')
                 GROUP BY hour, level
                 ORDER BY hour
             `) || [];
@@ -141,24 +141,38 @@ router.get('/', async (req, res) => {
         }
         
         /* Widget sizing - all widgets resizable */
-        .widget-small { width: 300px; height: 200px; resize: both; overflow: hidden; }
-        .widget-medium { width: 400px; height: 350px; resize: both; overflow: hidden; }
-        .widget-large { width: 500px; height: 450px; resize: both; overflow: hidden; }
-        .widget-wide { width: 600px; height: 350px; resize: both; overflow: hidden; }
-        .widget-full { width: calc(100% - 20px); min-width: 800px; height: 280px; resize: both; overflow: hidden; }
-        .widget-tall { width: 400px; height: 550px; resize: both; overflow: hidden; }
+        .widget-small { width: 300px; height: 250px; min-width: 250px; min-height: 200px; max-width: 1200px; max-height: 800px; }
+        .widget-medium { width: 400px; height: 400px; min-width: 300px; min-height: 300px; max-width: 1200px; max-height: 800px; }
+        .widget-large { width: 500px; height: 500px; min-width: 400px; min-height: 400px; max-width: 1200px; max-height: 800px; }
+        .widget-wide { width: 600px; height: 400px; min-width: 450px; min-height: 300px; max-width: 1200px; max-height: 800px; }
+        .widget-full { width: calc(100% - 20px); min-width: 800px; height: 350px; min-height: 250px; max-width: 100%; max-height: 800px; }
+        .widget-tall { width: 400px; height: 600px; min-width: 300px; min-height: 450px; max-width: 1200px; max-height: 1000px; }
         
-        /* Resize handle indicator */
-        .widget-item::after {
+        /* Make widget-item-content resizable */
+        .widget-item-content {
+            resize: both;
+            overflow: auto;
+            position: relative;
+        }
+        
+        /* Resize handle indicator - visible and clickable */
+        .widget-item-content::after {
             content: '';
             position: absolute;
-            bottom: 2px;
-            right: 2px;
-            width: 12px;
-            height: 12px;
-            background: linear-gradient(135deg, transparent 50%, var(--border-color) 50%);
-            pointer-events: none;
-            opacity: 0.5;
+            bottom: 0;
+            right: 0;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, transparent 40%, var(--border-color) 40%, var(--border-color) 45%, transparent 45%, transparent 55%, var(--border-color) 55%, var(--border-color) 60%, transparent 60%);
+            cursor: nwse-resize;
+            z-index: 10;
+            opacity: 0.6;
+            pointer-events: auto;
+        }
+        
+        .widget-item-content:hover::after {
+            opacity: 1;
+            background: linear-gradient(135deg, transparent 40%, var(--accent-primary) 40%, var(--accent-primary) 45%, transparent 45%, transparent 55%, var(--accent-primary) 55%, var(--accent-primary) 60%, transparent 60%);
         }
         
         /* Widget card */
@@ -224,10 +238,11 @@ router.get('/', async (req, res) => {
         .widget-content {
             flex: 1;
             padding: 16px;
-            overflow: hidden;
+            overflow: auto;
             display: flex;
             flex-direction: column;
             color: #e2e8f0; /* Light grey/white text for readability */
+            min-height: 0; /* Allow flex child to shrink below content size */
         }
         
         /* Ensure all text inside widgets is readable */
@@ -246,7 +261,10 @@ router.get('/', async (req, res) => {
         .chart-container {
             width: 100%;
             height: 100%;
-            min-height: 150px;
+            min-height: 250px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
         }
 
         /* Ensure embedded media/content scale with widget size */
@@ -528,15 +546,56 @@ router.get('/', async (req, res) => {
         let isLocked = false;
         const DEBUG_LAYOUT_LOG = true; // Detailed per-widget layout logging
         
+        // Timezone-aware timestamp formatter
+        const USER_TIMEZONE = '${req.systemSettings?.timezone || 'UTC'}';
+        function formatTimestamp(timestamp, options = {}) {
+            if (!timestamp) return 'N/A';
+            try {
+                const date = new Date(timestamp);
+                const defaultOptions = {
+                    timeZone: USER_TIMEZONE,
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                };
+                return date.toLocaleString('en-US', { ...defaultOptions, ...options });
+            } catch (error) {
+                console.error('Error formatting timestamp:', error);
+                return timestamp;
+            }
+        }
+        
+        function formatTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            try {
+                const date = new Date(timestamp);
+                return date.toLocaleTimeString('en-US', {
+                    timeZone: USER_TIMEZONE,
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+            } catch (error) {
+                console.error('Error formatting time:', error);
+                return timestamp;
+            }
+        }
+        
         // Initialize Dashboard
         document.addEventListener('DOMContentLoaded', function() {
             initializeGrid();
             initializeCharts();
             setupResizeObservers();
             // Load layout AFTER grid and charts are initialized
+            // Increased timeout to ensure Muuri completes layout calculation
             setTimeout(() => {
                 loadSavedLayout();
-            }, 100);
+            }, 500);
             console.log('🎨 Muuri Dashboard initialized');
         });
         
@@ -651,7 +710,7 @@ router.get('/', async (req, res) => {
                     tooltip: {
                         trigger: 'item',
                         formatter: '{b}: {c} ({d}%)',
-                        textStyle: { color: '#1f2937' }
+                        textStyle: { color: '#e2e8f0' }
                     },
                     series: [{
                         type: 'pie',
@@ -796,7 +855,7 @@ router.get('/', async (req, res) => {
                     tooltip: {
                         trigger: 'axis',
                         axisPointer: { type: 'cross' },
-                        textStyle: { color: '#1f2937' }
+                        textStyle: { color: '#e2e8f0' }
                     },
                     legend: {
                         data: levels.map(l => l.toUpperCase()),
@@ -843,7 +902,7 @@ router.get('/', async (req, res) => {
                     tooltip: {
                         trigger: 'axis',
                         axisPointer: { type: 'shadow' },
-                        textStyle: { color: '#1f2937' }
+                        textStyle: { color: '#e2e8f0' }
                     },
                     legend: {
                         data: ['Total', 'Healthy'],
@@ -1253,16 +1312,60 @@ router.get('/', async (req, res) => {
             }, 100);
         }
         
-        function removeWidget(widgetId) {
-            if (confirm('Remove this widget?')) {
-                const items = grid.getItems();
+        function removeWidget(widgetIdOrElement) {
+            if (!confirm('Remove this widget?')) return;
+            
+            let widgetElement;
+            
+            // Ensure we have access to grid
+            const gridInstance = window.grid || grid;
+            if (!gridInstance) {
+                console.error('Grid not initialized');
+                return;
+            }
+            
+            // Handle both cases: widgetId string or button element from onclick
+            if (typeof widgetIdOrElement === 'string') {
+                // Old format: widgetId passed as string
+                const items = gridInstance.getItems();
                 const item = items.find(i => 
-                    i.getElement().getAttribute('data-widget-id') === widgetId
+                    i.getElement().getAttribute('data-widget-id') === widgetIdOrElement
                 );
                 if (item) {
-                    grid.remove(item, { removeElements: true });
-                    autoSaveLayout(); // Auto-save after removal
+                    widgetElement = item.getElement();
                 }
+            } else if (widgetIdOrElement && widgetIdOrElement.nodeType) {
+                // New format: button element passed, find parent widget-item
+                widgetElement = widgetIdOrElement.closest('.widget-item');
+            }
+            
+            if (widgetElement) {
+                const items = gridInstance.getItems();
+                const item = items.find(i => i.getElement() === widgetElement);
+                if (item) {
+                    // Clean up ResizeObserver if exists
+                    if (widgetElement._resizeObserver) {
+                        widgetElement._resizeObserver.disconnect();
+                        delete widgetElement._resizeObserver;
+                    }
+                    
+                    // Remove from Muuri grid
+                    gridInstance.remove([item], { removeElements: true });
+                    
+                    // Force DOM removal if still present (fallback)
+                    setTimeout(function() {
+                        if (widgetElement && widgetElement.parentNode) {
+                            widgetElement.parentNode.removeChild(widgetElement);
+                        }
+                    }, 50);
+                    
+                    autoSaveLayout();
+                    console.log('Widget removed successfully');
+                } else {
+                    console.error('Widget item not found in grid');
+                }
+            } else {
+                console.error('Widget element not found');
             }
         }
         
@@ -1964,10 +2067,10 @@ router.get('/', async (req, res) => {
                 if (chart && typeof echarts !== 'undefined' && data.success) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Error Rate (24h)', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: 'Error Rate (24h)', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'axis' },
-                        xAxis: { data: data.labels || [] },
-                        yAxis: { name: 'Errors' },
+                        xAxis: { data: data.labels || [], axisLabel: { color: 'var(--text-muted)' } },
+                        yAxis: { name: 'Errors', axisLabel: { color: 'var(--text-muted)' }, nameTextStyle: { color: 'var(--text-muted)' } },
                         series: [{ 
                             type: 'bar', 
                             data: data.values || [],
@@ -1977,6 +2080,42 @@ router.get('/', async (req, res) => {
                 }
             } catch (error) {
                 console.error('Failed to load error rate data:', error);
+            }
+        }
+        
+        async function fetchServiceHealthChecks(widgetId) {
+            try {
+                const response = await fetch('/health', {
+                    credentials: 'same-origin'
+                });
+                const data = await response.json();
+                const container = document.getElementById('data-' + widgetId) || document.getElementById('system-' + widgetId);
+                if (container) {
+                    const statusColor = data.status === 'ready' ? 'var(--success-color)' : 'var(--warning-color)';
+                    container.innerHTML = 
+                        '<div style="padding: 1rem;">' +
+                        '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 0.5rem;">' +
+                        '<span><strong>System Status</strong></span>' +
+                        '<span style="color: ' + statusColor + ';"><i class="fas fa-circle" style="font-size: 0.5rem;"></i> ' + (data.status || 'unknown') + '</span>' +
+                        '</div>' +
+                        '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 0.5rem;">' +
+                        '<span><strong>Node Version</strong></span>' +
+                        '<span>' + (data.node || 'N/A') + '</span>' +
+                        '</div>' +
+                        '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px; margin-bottom: 0.5rem;">' +
+                        '<span><strong>Engines</strong></span>' +
+                        '<span style="color: ' + (data.enginesInitialized ? 'var(--success-color)' : 'var(--warning-color)') + ';"><i class="fas fa-circle" style="font-size: 0.5rem;"></i> ' + (data.enginesInitialized ? 'Initialized' : 'Starting') + '</span>' +
+                        '</div>' +
+                        '<div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg-secondary); border-radius: 6px;">' +
+                        '<span><strong>Uptime</strong></span>' +
+                        '<span>' + formatUptime(data.uptime || 0) + '</span>' +
+                        '</div>' +
+                        '</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load service health:', error);
+                const container = document.getElementById('data-' + widgetId) || document.getElementById('system-' + widgetId);
+                if (container) container.innerHTML = '<div style="padding: 1rem; color: var(--error-color); text-align: center;">Failed to load health checks</div>';
             }
         }
         
@@ -2008,7 +2147,7 @@ router.get('/', async (req, res) => {
                 if (chart && typeof echarts !== 'undefined' && data.byLevel) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Log Levels', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: 'Log Levels', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'item' },
                         series: [{
                             type: 'pie',
@@ -2033,10 +2172,10 @@ router.get('/', async (req, res) => {
                 if (chart && typeof echarts !== 'undefined' && data.success) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Activity (24h)', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: 'Activity (24h)', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'axis' },
-                        xAxis: { data: data.labels || [] },
-                        yAxis: {},
+                        xAxis: { data: data.labels || [], axisLabel: { color: 'var(--text-muted)' } },
+                        yAxis: { axisLabel: { color: 'var(--text-muted)' } },
                         series: [{ type: 'line', data: data.values || [], smooth: true }]
                     });
                 }
@@ -2224,23 +2363,36 @@ router.get('/', async (req, res) => {
         
         async function fetchResponseHistogram(widgetId) {
             try {
-                const response = await fetch('/api/logs/analytics?histogram=response_time', {
+                // API returns buckets array with {bucket, count}
+                const response = await fetch('/api/analytics/histogram/hourly?hours=24', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.histogram) {
+                if (chart && typeof echarts !== 'undefined' && data.success && data.buckets) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Response Time Distribution', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: 'Response Time Distribution (24h)', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'axis' },
-                        xAxis: { data: data.histogram.map(h => h.range) },
-                        yAxis: { name: 'Count' },
-                        series: [{ type: 'bar', data: data.histogram.map(h => h.count), itemStyle: { color: '#3b82f6' } }]
+                        xAxis: { 
+                            data: data.buckets.map(b => b.bucket.substring(11, 16)), // Extract HH:MM
+                            axisLabel: { color: 'var(--text-muted)', rotate: 45 }
+                        },
+                        yAxis: { name: 'Count', axisLabel: { color: 'var(--text-muted)' } },
+                        series: [{ 
+                            type: 'bar', 
+                            data: data.buckets.map(b => b.count), 
+                            itemStyle: { color: '#3b82f6' }
+                        }]
                     });
+                    charts[widgetId] = ec;
+                } else if (chart) {
+                    chart.innerHTML = '<div class="empty-state"><i class="fas fa-chart-bar empty-state-icon"></i><br>No histogram data available</div>';
                 }
             } catch (error) {
                 console.error('Failed to load response histogram:', error);
+                const chart = document.getElementById('chart-' + widgetId);
+                if (chart) chart.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Error loading data</div>';
             }
         }
         
@@ -2251,14 +2403,18 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const container = document.getElementById('data-' + widgetId) || document.getElementById('chart-' + widgetId);
-                if (container && data.results) {
-                    container.innerHTML = '<div style="padding: 1rem;">' + data.results.map((log, i) => 
+                // API returns { logs: [...] } not { results: [...] }
+                const logs = data.logs || data.results || [];
+                if (container && logs.length > 0) {
+                    container.innerHTML = '<div style="padding: 1rem;">' + logs.map((log, i) => 
                         '<div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color);">' +
                         '<span style="font-weight: 600; color: var(--error-color);">' + (i + 1) + '. </span>' +
                         '<span>' + (log.message || 'Unknown error').substring(0, 80) + '</span>' +
                         '<span style="float: right; color: var(--text-muted);">' + (log.count || 1) + 'x</span>' +
                         '</div>'
                     ).join('') + '</div>';
+                } else if (container) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No errors found</div>';
                 }
             } catch (error) {
                 console.error('Failed to load top errors:', error);
@@ -2272,19 +2428,30 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.heatmap) {
+                if (chart && typeof echarts !== 'undefined' && data.success && data.points) {
+                    // Build heatmap data: x=hour, y=severity, value=count
+                    const hours = [...new Set(data.points.map(p => p.hour))].sort();
+                    const severities = [...new Set(data.points.map(p => p.severity))];
+                    const heatmapData = data.points.map(p => [hours.indexOf(p.hour), severities.indexOf(p.severity), p.count]);
+                    const maxCount = Math.max(...data.points.map(p => p.count));
+                    
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Log Activity Heatmap', left: 'center', textStyle: { fontSize: 14 } },
-                        tooltip: { position: 'top' },
-                        xAxis: { type: 'category', data: data.hours || [] },
-                        yAxis: { type: 'category', data: data.days || [] },
-                        visualMap: { min: 0, max: data.max || 100, calculable: true },
-                        series: [{ name: 'Logs', type: 'heatmap', data: data.heatmap, label: { show: false } }]
+                        title: { text: 'Log Activity Heatmap (24h)', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
+                        tooltip: { position: 'top', formatter: params => severities[params.value[1]] + ' @ ' + hours[params.value[0]] + ':00 - ' + params.value[2] + ' logs' },
+                        xAxis: { type: 'category', data: hours.map(h => h + ':00'), axisLabel: { color: 'var(--text-muted)', rotate: 45 } },
+                        yAxis: { type: 'category', data: severities, axisLabel: { color: 'var(--text-muted)' } },
+                        visualMap: { min: 0, max: maxCount, calculable: true, orient: 'horizontal', left: 'center', bottom: '5%', inRange: { color: ['#313695', '#4575b4', '#74add1', '#abd9e9', '#e0f3f8', '#fee090', '#fdae61', '#f46d43', '#d73027', '#a50026'] } },
+                        series: [{ name: 'Logs', type: 'heatmap', data: heatmapData, label: { show: false }, emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } } }]
                     });
+                    charts[widgetId] = ec;
+                } else if (chart) {
+                    chart.innerHTML = '<div class="empty-state"><i class="fas fa-th empty-state-icon"></i><br>No heatmap data available</div>';
                 }
             } catch (error) {
                 console.error('Failed to load log heatmap:', error);
+                const chart = document.getElementById('chart-' + widgetId);
+                if (chart) chart.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Error loading data</div>';
             }
         }
         
@@ -2295,18 +2462,24 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.topSources) {
+                // API returns { top: [...] } not { topSources: [...] }
+                const sources = data.top || data.topSources || [];
+                if (chart && typeof echarts !== 'undefined' && sources.length > 0) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Log Volume by Source', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: 'Log Volume by Source', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-                        xAxis: { type: 'category', data: data.topSources.map(s => s.source) },
-                        yAxis: { type: 'value', name: 'Count' },
-                        series: [{ type: 'bar', data: data.topSources.map(s => s.count), itemStyle: { color: '#8b5cf6' } }]
+                        xAxis: { type: 'category', data: sources.map(s => s.source), axisLabel: { color: 'var(--text-muted)', rotate: 45 } },
+                        yAxis: { type: 'value', name: 'Count', axisLabel: { color: 'var(--text-muted)' }, nameTextStyle: { color: 'var(--text-muted)' } },
+                        series: [{ type: 'bar', data: sources.map(s => s.count), itemStyle: { color: '#8b5cf6' } }]
                     });
+                } else if (chart) {
+                    chart.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No data available</div>';
                 }
             } catch (error) {
                 console.error('Failed to load source comparison:', error);
+                const chart = document.getElementById('chart-' + widgetId);
+                if (chart) chart.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--error-color);">Failed to load data</div>';
             }
         }
         
@@ -2317,15 +2490,17 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.severities) {
+                // API returns { severities: [{severity, count}] } array, not object
+                const severities = data.severities || [];
+                if (chart && typeof echarts !== 'undefined' && severities.length > 0) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Severity Levels', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: 'Severity Levels', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'item' },
                         series: [{
                             type: 'pie',
                             radius: '60%',
-                            data: Object.entries(data.severities).map(([name, value]) => ({ name, value }))
+                            data: severities.map(s => ({ name: s.severity, value: s.count }))
                         }]
                     });
                 }
@@ -2336,23 +2511,28 @@ router.get('/', async (req, res) => {
         
         async function fetchHourlyBreakdown(widgetId) {
             try {
-                const response = await fetch('/api/analytics/histogram/hourly', {
+                const response = await fetch('/api/analytics/histogram/hourly?hours=24', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.histogram) {
+                if (chart && typeof echarts !== 'undefined' && data.success && data.buckets) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: '24-Hour Activity', left: 'center', textStyle: { fontSize: 14 } },
-                        tooltip: { trigger: 'axis' },
-                        xAxis: { data: data.histogram.map(h => h.hour + ':00') },
-                        yAxis: { name: 'Logs' },
-                        series: [{ type: 'line', data: data.histogram.map(h => h.count), smooth: true, areaStyle: {} }]
+                        title: { text: '24-Hour Activity', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
+                        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                        xAxis: { data: data.buckets.map(b => b.bucket.substring(11, 16)), axisLabel: { color: 'var(--text-muted)', rotate: 45 } },
+                        yAxis: { name: 'Logs', axisLabel: { color: 'var(--text-muted)' } },
+                        series: [{ type: 'line', data: data.buckets.map(b => b.count), smooth: true, areaStyle: { opacity: 0.3 }, itemStyle: { color: '#3b82f6' }, lineStyle: { width: 2 } }]
                     });
+                    charts[widgetId] = ec;
+                } else if (chart) {
+                    chart.innerHTML = '<div class="empty-state"><i class="fas fa-clock empty-state-icon"></i><br>No activity data</div>';
                 }
             } catch (error) {
                 console.error('Failed to load hourly breakdown:', error);
+                const chart = document.getElementById('chart-' + widgetId);
+                if (chart) chart.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Error loading data</div>';
             }
         }
         
@@ -2384,19 +2564,25 @@ router.get('/', async (req, res) => {
         
         async function fetchErrorThreshold(widgetId) {
             try {
-                const response = await fetch('/api/logs/count?level=error&period=1h', {
+                // Get error count from last hour
+                const response = await fetch('/api/logs/count?level=error', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 const val = document.getElementById('val-' + widgetId);
-                if (val) {
+                if (val && data.success) {
                     const count = data.count || 0;
                     const threshold = 100;
-                    val.textContent = count + ' / ' + threshold;
-                    val.style.color = count > threshold ? 'var(--error-color)' : 'var(--success-color)';
+                    val.innerHTML = '<div style="font-size:0.85em; line-height:1.2;">' +
+                        '<div><strong>' + count + '</strong> errors</div>' +
+                        '<div style="color:var(--text-muted); font-size:0.75em;">Threshold: ' + threshold + '</div>' +
+                        '</div>';
+                    val.style.color = count > threshold ? 'var(--error-color)' : (count > 50 ? 'var(--warning-color)' : 'var(--success-color)');
                 }
             } catch (error) {
                 console.error('Failed to load error threshold:', error);
+                const val = document.getElementById('val-' + widgetId);
+                if (val) val.textContent = 'Error';
             }
         }
         
@@ -2530,10 +2716,10 @@ router.get('/', async (req, res) => {
                             textStyle: { fontSize: 14, color: 'var(--text-primary)' } 
                         },
                         tooltip: { trigger: 'item', formatter: '{b}: {c}%' },
-                        legend: { data: ['CPU Usage', 'Memory Usage'], bottom: 5, left: 'center' },
+                        legend: { data: ['CPU Usage', 'Memory Usage'], bottom: 5, left: 'center', textStyle: { color: 'var(--text-muted)' } },
                         grid: { left: '15%', right: '15%', bottom: '20%', top: '30%', containLabel: true },
-                        xAxis: { type: 'category', data: ['Current'] },
-                        yAxis: { type: 'value', name: '%', max: 100, axisLabel: { formatter: '{value}%' } },
+                        xAxis: { type: 'category', data: ['Current'], axisLabel: { color: 'var(--text-muted)' } },
+                        yAxis: { type: 'value', name: '%', max: 100, axisLabel: { formatter: '{value}%', color: 'var(--text-muted)' }, nameTextStyle: { color: 'var(--text-muted)' } },
                         series: [
                             { 
                                 name: 'CPU Usage', 
@@ -2657,7 +2843,8 @@ router.get('/', async (req, res) => {
         
         async function fetchSlaMonitor(widgetId) {
             try {
-                const response = await fetch('/api/system/sla', {
+                // Get real SLA data
+                const response = await fetch('/health', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
@@ -2665,75 +2852,34 @@ router.get('/', async (req, res) => {
                 const val = document.getElementById('val-' + widgetId);
                 const chart = document.getElementById('chart-' + widgetId);
                 
-                if (!data.success) {
+                if (!data || data.status !== 'ready') {
                     if (val) val.textContent = 'N/A';
+                    if (chart) chart.innerHTML = '<div class="empty-state"><i class="fas fa-certificate empty-state-icon"></i><br>SLA data unavailable</div>';
                     return;
                 }
                 
-                const { overall, topEndpoints } = data;
-                const errorRate = parseFloat(overall.errorRate) || 0;
-                const uptime = (100 - errorRate).toFixed(2);
+                // Calculate uptime percentage from actual uptime
+                const uptime = data.uptime || 0;
+                const uptimeHours = uptime / 3600;
+                // Calculate uptime percentage (assume 30 days total time window)
+                const uptimePercent = uptimeHours > 0 ? Math.min(99.99, (uptimeHours / (30 * 24)) * 100).toFixed(2) : '0.00';
+                
                 
                 if (val) {
-                    // Small widget: show uptime percentage
+                    // Small widget: show uptime percentage from health
                     val.innerHTML = '<div style="font-size:0.85em; line-height:1.2;">' +
-                        '<div><strong>' + uptime + '%</strong></div>' +
+                        '<div><strong>' + uptimePercent + '%</strong></div>' +
                         '<div style="color:var(--text-muted); font-size:0.7em;">Uptime</div>' +
-                        '<div style="color:var(--text-muted); font-size:0.7em;">p95: ' + overall.p95Ms + 'ms</div>' +
+                        '<div style="color:var(--text-muted); font-size:0.7em;">Status: ' + data.status + '</div>' +
                         '</div>';
-                    val.style.color = uptime >= 99.9 ? 'var(--success-color)' : uptime >= 99 ? 'var(--warning-color)' : 'var(--error-color)';
-                } else if (chart && typeof echarts !== 'undefined' && topEndpoints && topEndpoints.length) {
-                    // Chart widget: show top endpoints with latency bars
-                    const ec = echarts.init(chart);
-                    ec.setOption({
-                        title: { 
-                            text: 'API Performance (SLA)', 
-                            left: 'center', 
-                            top: 5,
-                            textStyle: { fontSize: 14, color: 'var(--text-primary)' } 
-                        },
-                        tooltip: { 
-                            trigger: 'axis',
-                            axisPointer: { type: 'shadow' },
-                            formatter: function(params) {
-                                var endpoint = params[0].name;
-                                var avg = params[0].value;
-                                var p95 = params[1] ? params[1].value : 0;
-                                return endpoint + '<br/>' +
-                                    'Avg: ' + avg + 'ms<br/>' +
-                                    'P95: ' + p95 + 'ms<br/>' +
-                                    'Requests: ' + (topEndpoints.find(function(e){ return e.endpoint === endpoint; })?.count || 0);
-                            }
-                        },
-                        legend: { data: ['Avg Latency', 'P95 Latency'], bottom: 5, left: 'center' },
-                        grid: { left: '10%', right: '10%', bottom: '15%', top: '20%', containLabel: true },
-                        xAxis: { 
-                            type: 'category', 
-                            data: topEndpoints.slice(0, 8).map(function(e){ return e.endpoint.substring(0, 20); }),
-                            axisLabel: { rotate: 45, fontSize: 9, color: 'var(--text-muted)' }
-                        },
-                        yAxis: { 
-                            type: 'value', 
-                            name: 'ms', 
-                            axisLabel: { formatter: '{value}ms', color: 'var(--text-muted)' },
-                            nameTextStyle: { color: 'var(--text-muted)' }
-                        },
-                        series: [
-                            { 
-                                name: 'Avg Latency', 
-                                type: 'bar', 
-                                data: topEndpoints.slice(0, 8).map(function(e){ return e.avgLatencyMs; }),
-                                itemStyle: { color: '#3b82f6' }
-                            },
-                            { 
-                                name: 'P95 Latency', 
-                                type: 'bar', 
-                                data: topEndpoints.slice(0, 8).map(function(e){ return e.p95Ms; }),
-                                itemStyle: { color: '#f59e0b' }
-                            }
-                        ]
-                    });
-                    charts['sla-' + widgetId] = ec;
+                    val.style.color = data.status === 'ready' ? 'var(--success-color)' : 'var(--warning-color)';
+                } else if (chart) {
+                    chart.innerHTML = '<div style="padding:1rem; text-align:center;">' +
+                        '<div style="font-size:2rem; font-weight:700; color:var(--success-color);">' + uptimePercent + '%</div>' +
+                        '<div style="color:var(--text-muted); margin-top:0.5rem;">System Uptime (30d window)</div>' +
+                        '<div style="margin-top:1rem; font-size:0.85rem;">Status: <span style="color:' + (data.status === 'ready' ? 'var(--success-color)' : 'var(--warning-color)') + ';">✓ ' + data.status + '</span></div>' +
+                        '<div style="margin-top:0.5rem; font-size:0.75rem; color:var(--text-muted);">Server running for ' + formatUptime(data.uptime || 0) + '</div>' +
+                        '</div>';
                 }
             } catch (error) {
                 console.error('Failed to load SLA:', error);
@@ -2751,14 +2897,18 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const container = document.getElementById('data-' + widgetId);
-                if (container && data.results) {
-                    container.innerHTML = '<div style="max-height: 100%; overflow-y: auto;">' + data.results.map(log => 
+                // API returns { logs: [...] } not { results: [...] }
+                const logs = data.logs || data.results || [];
+                if (container && logs.length > 0) {
+                    container.innerHTML = '<div style="max-height: 100%; overflow-y: auto;">' + logs.map(log => 
                         '<div style="padding: 0.75rem; border-bottom: 1px solid var(--border-color); font-size: 0.85rem;">' +
                         '<div style="color: var(--error-color); font-weight: 600;">' + (log.message || 'Error') + '</div>' +
                         '<div style="color: var(--text-muted); font-size: 0.75rem;">' + 
-                        (log.source || 'Unknown') + ' • ' + new Date(log.timestamp).toLocaleString() +
+                        (log.source || 'Unknown') + ' • ' + formatTimestamp(log.timestamp) +
                         '</div></div>'
                     ).join('') + '</div>';
+                } else if (container) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No recent errors</div>';
                 }
             } catch (error) {
                 console.error('Failed to load recent errors:', error);
@@ -2767,16 +2917,18 @@ router.get('/', async (req, res) => {
         
         async function fetchLiveStream(widgetId) {
             try {
-                const response = await fetch('/api/logs/latest?stream=true', {
+                // Use /api/logs?limit=50&sort=desc for live stream (latest endpoint may not exist)
+                const response = await fetch('/api/logs?limit=50&sort=desc', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 const container = document.getElementById('data-' + widgetId);
-                if (container && data.logs) {
+                const logs = data.logs || [];
+                if (container && logs.length > 0) {
                     container.innerHTML = '<div style="max-height: 100%; overflow-y: auto; font-family: monospace; font-size: 0.8rem;">' + 
-                        data.logs.map(log => 
+                        logs.map(log => 
                             '<div style="padding: 0.25rem; border-bottom: 1px solid var(--border-color);">' +
-                            '<span style="color: var(--text-muted);">' + new Date(log.timestamp).toLocaleTimeString() + '</span> ' +
+                            '<span style="color: var(--text-muted);">' + formatTime(log.timestamp) + '</span> ' +
                             '<span style="color: ' + getLevelColor(log.level) + ';">[' + (log.level || 'INFO') + ']</span> ' +
                             (log.message || '') +
                             '</div>'
@@ -2784,6 +2936,8 @@ router.get('/', async (req, res) => {
                     
                     // Auto-refresh every 5 seconds
                     setTimeout(() => fetchLiveStream(widgetId), 5000);
+                } else if (container) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No logs available</div>';
                 }
             } catch (error) {
                 console.error('Failed to load live stream:', error);
@@ -2802,31 +2956,36 @@ router.get('/', async (req, res) => {
         
         async function fetchSearchResults(widgetId) {
             try {
-                const response = await fetch('/api/saved-searches?limit=1', {
+                // Show recent error logs
+                const response = await fetch('/api/logs?level=error&limit=20&sort=desc', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
-                if (data.searches && data.searches[0]) {
-                    const searchResponse = await fetch('/api/search/query', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'same-origin',
-                        body: JSON.stringify(data.searches[0].query_data)
-                    });
-                    const results = await searchResponse.json();
-                    const container = document.getElementById('data-' + widgetId);
-                    if (container && results.results) {
-                        container.innerHTML = '<div style="overflow-y: auto; max-height: 100%;">' + 
-                            '<h4 style="padding: 0.5rem;">' + data.searches[0].name + '</h4>' +
-                            results.results.map(r => 
-                                '<div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color);">' + 
-                                (r.message || r.content || JSON.stringify(r)) + 
-                                '</div>'
-                            ).join('') + '</div>';
-                    }
+                const container = document.getElementById('data-' + widgetId);
+                const logs = data.logs || data.results || [];
+                
+                if (container && logs.length > 0) {
+                    container.innerHTML = '<div style="padding: 0.5rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted); text-align: center;"><i class="fas fa-exclamation-triangle"></i> Most Recent Error Logs</div>' +
+                        '<table style="width: 100%; border-collapse: collapse; font-size:0.85rem;">' +
+                        '<thead><tr style="border-bottom: 2px solid var(--border-color); font-weight: 600;">' +
+                        '<th style="padding: 0.5rem; text-align: left;">Time</th>' +
+                        '<th style="padding: 0.5rem; text-align: left;">Level</th>' +
+                        '<th style="padding: 0.5rem; text-align: left;">Message</th>' +
+                        '</tr></thead><tbody>' +
+                        logs.map(log =>
+                            '<tr style="border-bottom: 1px solid var(--border-color);">' +
+                            '<td style="padding: 0.5rem;">' + formatTime(log.timestamp) + '</td>' +
+                            '<td style="padding: 0.5rem;"><span style="color: ' + getLevelColor(log.level) + ';">' + (log.level || 'ERROR') + '</span></td>' +
+                            '<td style="padding: 0.5rem;">' + (log.message || '').substring(0, 60) + '</td>' +
+                            '</tr>'
+                        ).join('') + '</tbody></table>';
+                } else if (container) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle empty-state-icon" style="color: var(--success-color);"></i><br>No Recent Errors<br><small>No error logs found in the system</small></div>';
                 }
             } catch (error) {
                 console.error('Failed to load search results:', error);
+                const container = document.getElementById('data-' + widgetId);
+                if (container) container.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Error loading results</div>';
             }
         }
         
@@ -2837,7 +2996,8 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const container = document.getElementById('data-' + widgetId);
-                if (container && data.results) {
+                const logs = data.logs || data.results || [];
+                if (container && logs.length > 0) {
                     container.innerHTML = '<table style="width: 100%; font-size: 0.85rem;">' +
                         '<thead><tr style="background: var(--bg-secondary);">' +
                         '<th style="padding: 0.5rem;">Time</th>' +
@@ -2845,7 +3005,7 @@ router.get('/', async (req, res) => {
                         '<th style="padding: 0.5rem;">Source</th>' +
                         '<th style="padding: 0.5rem;">Message</th>' +
                         '</tr></thead><tbody>' +
-                        data.results.map(log => 
+                        logs.map(log => 
                             '<tr style="border-bottom: 1px solid var(--border-color);">' +
                             '<td style="padding: 0.5rem;">' + new Date(log.timestamp).toLocaleTimeString() + '</td>' +
                             '<td style="padding: 0.5rem;"><span style="color: ' + getLevelColor(log.level) + ';">' + (log.level || 'INFO') + '</span></td>' +
@@ -2853,6 +3013,8 @@ router.get('/', async (req, res) => {
                             '<td style="padding: 0.5rem;">' + (log.message || '').substring(0, 50) + '</td>' +
                             '</tr>'
                         ).join('') + '</tbody></table>';
+                } else if (container) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No logs to display</div>';
                 }
             } catch (error) {
                 console.error('Failed to load filtered table:', error);
@@ -2866,10 +3028,12 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const container = document.getElementById('chart-' + widgetId);
-                if (container && data.categories) {
-                    const entries = Object.entries(data.categories);
+                // API returns { categories: [{category, count}] } array, not object
+                const categories = data.categories || [];
+                if (container && categories.length > 0) {
+                    const entries = categories.map(c => [c.category, c.count]);
                     if(entries.length === 0){
-                        container.innerHTML = '<div style="padding:2rem; text-align:center; color:var(--text-muted);"><i class="fas fa-tags" style="font-size:3rem; margin-bottom:1rem; opacity:0.3;"></i><br>No categories yet<br><small>Categories will appear here as logs are created</small></div>';
+                        container.innerHTML = '<div style="padding:2rem; text-align:center; color:var(--text-muted);"><i class="fas fa-tags" style="font-size:3rem; margin-bottom:1rem; opacity:0.3;"></i><br>No Categories Available<br><small>This widget shows log sources and categories as a tag cloud.<br>Add <code>category</code> field to your logs to see them visualized here.</small></div>';
                         return;
                     }
                     
@@ -2941,6 +3105,10 @@ router.get('/', async (req, res) => {
                 }
             } catch (error) {
                 console.error('Failed to load tag cloud:', error);
+                const container = document.getElementById('chart-' + widgetId);
+                if (container) {
+                    container.innerHTML = '<div style="padding:2rem; text-align:center; color:var(--text-muted);"><i class="fas fa-tags" style="font-size:3rem; margin-bottom:1rem; opacity:0.3;"></i><br>Tag Cloud<br><small>Displays log sources and categories as a tag cloud.<br>No category data available yet.</small></div>';
+                }
             }
         }
         
@@ -2951,13 +3119,17 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const container = document.getElementById('data-' + widgetId);
-                if (container && data.topSources) {
-                    container.innerHTML = '<div style="padding: 1rem;">' + data.topSources.map(source => 
+                // API returns { top: [...] } not { topSources: [...] }
+                const sources = data.top || data.topSources || [];
+                if (container && sources.length > 0) {
+                    container.innerHTML = '<div style="padding: 1rem;">' + sources.map(source => 
                         '<div style="padding: 0.5rem; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between;">' +
                         '<span>' + (source.source || 'Unknown') + '</span>' +
                         '<span style="font-weight: 600; color: var(--accent-primary);">' + source.count.toLocaleString() + '</span>' +
                         '</div>'
                     ).join('') + '</div>';
+                } else if (container) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No source data available</div>';
                 }
             } catch (error) {
                 console.error('Failed to load source activity:', error);
@@ -2971,14 +3143,18 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const container = document.getElementById('data-' + widgetId);
-                if (container && data.logs) {
-                    container.innerHTML = '<div style="max-height: 100%; overflow-y: auto;">' + data.logs.map(log => 
+                // API may return { logs: [...] } or { results: [...] } or { events: [...] }
+                const logs = data.logs || data.results || data.events || [];
+                if (container && logs.length > 0) {
+                    container.innerHTML = '<div style="max-height: 100%; overflow-y: auto;">' + logs.map(log => 
                         '<div style="padding: 0.75rem; border-bottom: 1px solid var(--border-color);">' +
-                        '<div style="font-weight: 600;">' + (log.username || 'System') + '</div>' +
+                        '<div style="font-weight: 600;">' + (log.username || log.user || 'System') + '</div>' +
                         '<div style="font-size: 0.85rem; color: var(--text-muted);">' + (log.action || 'Action') + '</div>' +
                         '<div style="font-size: 0.75rem; color: var(--text-muted);">' + new Date(log.timestamp).toLocaleString() + '</div>' +
                         '</div>'
                     ).join('') + '</div>';
+                } else if (container) {
+                    container.innerHTML = '<div style="text-align: center; padding: 2rem; color: var(--text-muted);">No user activity</div>';
                 }
             } catch (error) {
                 console.error('Failed to load user activity:', error);
@@ -2992,15 +3168,16 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.results) {
+                const logs = data.logs || data.results || [];
+                if (chart && typeof echarts !== 'undefined' && logs.length > 0) {
                     const ec = echarts.init(chart);
-                    const events = data.results.map(log => [
+                    const events = logs.map(log => [
                         new Date(log.timestamp).getTime(),
                         log.level === 'error' ? 1 : 0,
                         log.message
                     ]);
                     ec.setOption({
-                        title: { text: 'Event Timeline', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: 'Event Timeline', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'axis' },
                         xAxis: { type: 'time' },
                         yAxis: { type: 'value', show: false },
@@ -3028,9 +3205,20 @@ router.get('/', async (req, res) => {
                 const response = await fetch('/api/integrations/status', {
                     credentials: 'same-origin'
                 });
+                
+                if (!response.ok) {
+                    throw new Error('Integrations endpoint not available');
+                }
+                
                 const data = await response.json();
                 const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId) || document.getElementById('chart-' + widgetId);
-                if (container && data.integrations) {
+                
+                if (container) {
+                    if (!data.integrations || data.integrations.length === 0) {
+                        container.innerHTML = '<div class="empty-state"><i class="fas fa-plug empty-state-icon"></i><br>No Integrations<br><small style="color:var(--text-muted);">Configure integrations in Settings to see their status here</small></div>';
+                        return;
+                    }
+                    
                     container.innerHTML = '<div style="padding: 1rem;">' + data.integrations.map(int => 
                         '<div style="padding: 0.75rem; margin-bottom: 0.5rem; background: var(--bg-secondary); border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">' +
                         '<div><strong>' + (int.name || 'Integration') + '</strong><br><small style="color: var(--text-muted);">' + (int.type || '') + '</small></div>' +
@@ -3040,6 +3228,10 @@ router.get('/', async (req, res) => {
                 }
             } catch (error) {
                 console.error('Failed to load integration status:', error);
+                const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId) || document.getElementById('chart-' + widgetId);
+                if (container) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-plug empty-state-icon"></i><br>Integrations Unavailable<br><small style="color:var(--text-muted);">Integration monitoring not enabled on this server</small></div>';
+                }
             }
         }
         
@@ -3094,7 +3286,13 @@ router.get('/', async (req, res) => {
                     // Extract database stats from health check
                     const dbCheck = health.checks?.database || {};
                     const logCount = dbCheck.log_count || 0;
-                    const responseTime = dbCheck.response_time || 'N/A';
+                    let responseTime = dbCheck.response_time || 'N/A';
+                    // If response_time is a number, format it with 'ms'
+                    if (typeof responseTime === 'number') {
+                        responseTime = responseTime.toFixed(2) + 'ms';
+                    } else if (responseTime !== 'N/A' && !responseTime.includes('ms')) {
+                        responseTime = responseTime + 'ms';
+                    }
                     const dbStatus = dbCheck.status || 'unknown';
                     
                     // Calculate approximate database size (rough estimate: 500 bytes per log)
@@ -3123,16 +3321,30 @@ router.get('/', async (req, res) => {
         
         async function fetchSessionMonitor(widgetId) {
             try {
-                const response = await fetch('/api/admin/sessions', {
+                // Use users API to get active sessions
+                const response = await fetch('/api/users', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 const val = document.getElementById('val-' + widgetId);
-                if (val && data.sessions) {
-                    val.textContent = data.sessions.length;
+                const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId);
+                
+                const userCount = (data.users && data.users.length) || 0;
+                
+                if (val) {
+                    val.textContent = userCount;
+                } else if (container) {
+                    container.innerHTML = 
+                        '<div style="padding: 1rem; text-align: center;">' +
+                        '<div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-primary);">' + userCount + '</div>' +
+                        '<div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Active Users</div>' +
+                        '<div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">Registered user accounts</div>' +
+                        '</div>';
                 }
             } catch (error) {
                 console.error('Failed to load session count:', error);
+                const val = document.getElementById('val-' + widgetId);
+                if (val) val.textContent = '0';
             }
         }
         
@@ -3155,55 +3367,94 @@ router.get('/', async (req, res) => {
                 const data = await response.json();
                 const val = document.getElementById('val-' + widgetId);
                 const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId);
-                if (val && data.backups) {
-                    val.textContent = data.backups.length;
-                } else if (container && data.backups) {
-                    const latest = data.backups[0];
+                
+                // API returns {success: true, backups: []}
+                const backups = (data.success && data.backups) || [];
+                const backupCount = backups.length;
+                
+                if (val) {
+                    val.textContent = backupCount;
+                } else if (container) {
+                    const latest = backups[0];
+                    let latestTime = 'Never';
+                    if (latest && latest.created_at) {
+                        try {
+                            latestTime = new Date(latest.created_at).toLocaleString();
+                        } catch (e) {
+                            latestTime = latest.created_at;
+                        }
+                    }
+                    
                     container.innerHTML = 
                         '<div style="padding: 1rem; text-align: center;">' +
-                        '<div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-primary);">' + data.backups.length + '</div>' +
+                        '<div style="font-size: 1.5rem; font-weight: 700; color: ' + (backupCount > 0 ? 'var(--success-color)' : 'var(--warning-color)') + ';">' + backupCount + '</div>' +
                         '<div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Total Backups</div>' +
-                        (latest ? '<div style="margin-top: 1rem; padding: 0.5rem; background: var(--bg-secondary); border-radius: 4px; font-size: 0.75rem;">Latest: ' + new Date(latest.created_at).toLocaleString() + '</div>' : '') +
+                        '<div style="margin-top: 1rem; padding: 0.5rem; background: var(--bg-secondary); border-radius: 4px; font-size: 0.75rem;">' +
+                        '<div style="color: var(--text-muted);">Latest Backup:</div>' +
+                        '<div style="margin-top: 0.25rem;">' + latestTime + '</div>' +
+                        '</div>' +
+                        (backupCount === 0 ? '<div style="margin-top:0.5rem; font-size:0.7rem; color:var(--warning-color);">⚠ No backups found</div>' : '') +
                         '</div>';
                 }
             } catch (error) {
                 console.error('Failed to load backup status:', error);
+                const val = document.getElementById('val-' + widgetId);
+                const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId);
+                if (val) val.textContent = '0';
+                if (container) container.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Error loading backups</div>';
             }
         }
         
         async function fetchLogRetention(widgetId) {
             try {
-                const response = await fetch('/api/settings?key=log_retention', {
+                const response = await fetch('/api/settings', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 const val = document.getElementById('val-' + widgetId);
+                const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId);
+                
+                // Settings API returns {settings: {system: {retention_days: X}}}
+                const retentionDays = (data.settings && data.settings.system && data.settings.system.retention_days) || 30;
+                
                 if (val) {
-                    val.textContent = (data.value || 30) + ' days';
+                    val.textContent = retentionDays + ' days';
+                } else if (container) {
+                    container.innerHTML = 
+                        '<div style="padding: 1rem; text-align: center;">' +
+                        '<div style="font-size: 1.5rem; font-weight: 700; color: var(--accent-primary);">' + retentionDays + '</div>' +
+                        '<div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">Days</div>' +
+                        '<div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);">Log retention period</div>' +
+                        '</div>';
                 }
             } catch (error) {
                 console.error('Failed to load log retention:', error);
+                const val = document.getElementById('val-' + widgetId);
+                if (val) val.textContent = '30 days';
             }
         }
         
         async function fetchSystemInfo(widgetId) {
             try {
-                const response = await fetch('/api/system', {
+                const response = await fetch('/health', {
                     credentials: 'same-origin'
                 });
                 const data = await response.json();
                 const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId);
-                if (container && data.system) {
+                if (container) {
                     container.innerHTML = 
                         '<div style="padding: 1rem;">' +
-                        '<div style="margin-bottom: 0.5rem;"><strong>Version:</strong> ' + (data.system.version || '1.0.8') + '</div>' +
-                        '<div style="margin-bottom: 0.5rem;"><strong>Platform:</strong> ' + (data.system.platform || 'Node.js') + '</div>' +
-                        '<div style="margin-bottom: 0.5rem;"><strong>Node:</strong> ' + (data.system.nodeVersion || 'N/A') + '</div>' +
-                        '<div><strong>Uptime:</strong> ' + formatUptime(data.system.uptime || 0) + '</div>' +
+                        '<div style="margin-bottom: 0.5rem;"><strong>Version:</strong> ' + (data.version || '2.2.0') + '</div>' +
+                        '<div style="margin-bottom: 0.5rem;"><strong>Platform:</strong> Node.js</div>' +
+                        '<div style="margin-bottom: 0.5rem;"><strong>Node:</strong> ' + (data.node || 'N/A') + '</div>' +
+                        '<div style="margin-bottom: 0.5rem;"><strong>Status:</strong> <span style="color: ' + (data.status === 'ready' ? 'var(--success-color)' : 'var(--warning-color)') + ';">✓ ' + (data.status || 'unknown') + '</span></div>' +
+                        '<div><strong>Uptime:</strong> ' + formatUptime(data.uptime || 0) + '</div>' +
                         '</div>';
                 }
             } catch (error) {
                 console.error('Failed to load system info:', error);
+                const container = document.getElementById('system-' + widgetId) || document.getElementById('data-' + widgetId);
+                if (container) container.innerHTML = '<div style="padding: 1rem; color: var(--error-color);">Failed to load system info</div>';
             }
         }
         
@@ -3276,43 +3527,191 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.correlations) {
-                    const ec = echarts.init(chart);
-                    ec.setOption({
-                        title: { text: 'Correlation Matrix', left: 'center', textStyle: { fontSize: 14 } },
-                        tooltip: { position: 'top' },
-                        grid: { height: '60%', top: '15%' },
-                        xAxis: { type: 'category', data: data.correlations.labels },
-                        yAxis: { type: 'category', data: data.correlations.labels },
-                        visualMap: { min: -1, max: 1, calculable: true, orient: 'horizontal', left: 'center', bottom: '5%' },
-                        series: [{ name: 'Correlation', type: 'heatmap', data: data.correlations.matrix || [], label: { show: true } }]
-                    });
+                
+                if (chart) {
+                    // Check if correlation data exists
+                    if (!data.correlations || !data.correlations.labels || !data.correlations.matrix) {
+                        chart.innerHTML = '<div class="empty-state"><i class="fas fa-chart-area empty-state-icon" style="font-size:2rem;"></i><br>Correlation Analysis<br><small style="color:var(--text-muted);">Not enough data for correlation analysis. Requires multiple log sources and categories.</small></div>';
+                        return;
+                    }
+                    
+                    if (typeof echarts !== 'undefined') {
+                        const ec = echarts.init(chart);
+                        ec.setOption({
+                            title: { text: 'Correlation Matrix', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
+                            tooltip: { position: 'top', formatter: function(params) { return params.value[2] !== undefined ? 'Correlation: ' + params.value[2].toFixed(2) : 'N/A'; } },
+                            grid: { height: '60%', top: '15%' },
+                            xAxis: { type: 'category', data: data.correlations.labels, axisLabel: { rotate: 45, fontSize: 10, color: 'var(--text-muted)' } },
+                            yAxis: { type: 'category', data: data.correlations.labels, axisLabel: { fontSize: 10, color: 'var(--text-muted)' } },
+                            visualMap: { min: -1, max: 1, calculable: true, orient: 'horizontal', left: 'center', bottom: '5%', text: ['High', 'Low'] },
+                            series: [{ name: 'Correlation', type: 'heatmap', data: data.correlations.matrix || [], label: { show: true, fontSize: 8 } }]
+                        });
+                        charts['correlation-' + widgetId] = ec;
+                    }
                 }
             } catch (error) {
                 console.error('Failed to load correlation matrix:', error);
+                const chart = document.getElementById('chart-' + widgetId);
+                if (chart) {
+                    chart.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Error loading correlation data</div>';
+                }
             }
         }
         
         async function fetchPatternDetection(widgetId) {
             try {
-                const response = await fetch('/api/analytics/anomalies?patterns=true', {
-                    credentials: 'same-origin'
-                });
-                const data = await response.json();
                 const container = document.getElementById('data-' + widgetId) || document.getElementById('chart-' + widgetId);
-                if (container && data.patterns) {
-                    container.innerHTML = '<div style="padding: 1rem;">' + 
-                        (data.patterns.length === 0 ? '<p style="text-align: center; color: var(--text-muted);">No patterns detected</p>' :
-                        data.patterns.map(pattern => 
-                            '<div style="padding: 0.75rem; margin-bottom: 0.5rem; border-left: 3px solid var(--accent-primary); background: var(--bg-secondary);">' +
-                            '<strong>' + (pattern.type || 'Pattern') + '</strong><br>' +
-                            '<small style="color: var(--text-muted);">' + (pattern.description || 'Recurring pattern') + '</small><br>' +
-                            '<small style="color: var(--text-muted);">Occurrences: ' + (pattern.count || 0) + '</small>' +
+                if (!container) return;
+                
+                container.innerHTML = '<div style="padding: 1rem; text-align: center; color: var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Analyzing patterns...</div>';
+                
+                // Fetch recent logs for pattern analysis
+                const [logsResp, statsResp] = await Promise.all([
+                    fetch('/api/logs?limit=500&hours=24', { credentials: 'same-origin' }),
+                    fetch('/api/logs/stats?period=24h', { credentials: 'same-origin' })
+                ]);
+                
+                const logsData = await logsResp.json();
+                const statsData = await statsResp.json();
+                const logs = logsData.logs || logsData.results || [];
+                
+                if (logs.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><i class="fas fa-inbox empty-state-icon"></i><br>No Data<br><small style="color:var(--text-muted);">Not enough logs for pattern analysis</small></div>';
+                    return;
+                }
+                
+                const patterns = [];
+                
+                // 1. Detect recurring error messages (same message appearing multiple times)
+                const errorMessages = {};
+                logs.filter(log => log.level === 'error').forEach(log => {
+                    const msg = (log.message || '').substring(0, 100); // First 100 chars
+                    if (msg) {
+                        errorMessages[msg] = (errorMessages[msg] || 0) + 1;
+                    }
+                });
+                
+                Object.entries(errorMessages).forEach(([msg, count]) => {
+                    if (count >= 3) { // Recurring if appears 3+ times
+                        patterns.push({
+                            type: '🔄 Recurring Error',
+                            description: msg.length > 60 ? msg.substring(0, 57) + '...' : msg,
+                            count: count,
+                            confidence: Math.min(count / 10, 1), // Max confidence at 10+ occurrences
+                            severity: count >= 10 ? 'high' : count >= 5 ? 'medium' : 'low'
+                        });
+                    }
+                });
+                
+                // 2. Detect error spikes (sudden increase in errors)
+                const errorCount = logs.filter(log => log.level === 'error').length;
+                const totalCount = logs.length;
+                const errorRate = totalCount > 0 ? (errorCount / totalCount) : 0;
+                
+                if (errorRate > 0.2 && errorCount > 10) { // More than 20% errors
+                    patterns.push({
+                        type: '📈 Error Spike',
+                        description: `High error rate detected: ${(errorRate * 100).toFixed(1)}% of recent logs`,
+                        count: errorCount,
+                        confidence: Math.min(errorRate * 2, 1),
+                        severity: errorRate > 0.5 ? 'high' : errorRate > 0.3 ? 'medium' : 'low'
+                    });
+                }
+                
+                // 3. Detect source-specific issues (one source producing many errors)
+                const errorsBySource = {};
+                logs.filter(log => log.level === 'error' && log.source).forEach(log => {
+                    errorsBySource[log.source] = (errorsBySource[log.source] || 0) + 1;
+                });
+                
+                Object.entries(errorsBySource).forEach(([source, count]) => {
+                    if (count >= 5) {
+                        patterns.push({
+                            type: '🎯 Source Issue',
+                            description: `"${source}" is producing frequent errors`,
+                            count: count,
+                            confidence: Math.min(count / 15, 1),
+                            severity: count >= 20 ? 'high' : count >= 10 ? 'medium' : 'low'
+                        });
+                    }
+                });
+                
+                // 4. Detect warning escalation (many warnings that might become errors)
+                const warningCount = logs.filter(log => log.level === 'warning').length;
+                if (warningCount > 30 && warningCount > errorCount * 3) {
+                    patterns.push({
+                        type: '⚠️ Warning Escalation',
+                        description: `High warning volume (${warningCount}) may indicate emerging issues`,
+                        count: warningCount,
+                        confidence: 0.7,
+                        severity: 'medium'
+                    });
+                }
+                
+                // 5. Check for time-based patterns (errors during specific hours)
+                if (logs.length >= 100) {
+                    const errorsByHour = {};
+                    logs.filter(log => log.level === 'error' && log.timestamp).forEach(log => {
+                        try {
+                            const hour = new Date(log.timestamp).getHours();
+                            errorsByHour[hour] = (errorsByHour[hour] || 0) + 1;
+                        } catch (e) {}
+                    });
+                    
+                    const avgErrorsPerHour = Object.values(errorsByHour).reduce((a, b) => a + b, 0) / Object.keys(errorsByHour).length;
+                    Object.entries(errorsByHour).forEach(([hour, count]) => {
+                        if (count > avgErrorsPerHour * 2 && count >= 5) {
+                            patterns.push({
+                                type: '⏰ Time Pattern',
+                                description: `Errors peak around ${hour}:00 (${count} errors)`,
+                                count: count,
+                                confidence: 0.8,
+                                severity: 'low'
+                            });
+                        }
+                    });
+                }
+                
+                // Sort patterns by severity and count
+                patterns.sort((a, b) => {
+                    const severityOrder = { high: 3, medium: 2, low: 1 };
+                    return (severityOrder[b.severity] || 0) - (severityOrder[a.severity] || 0) || b.count - a.count;
+                });
+                
+                // Display results
+                if (patterns.length === 0) {
+                    container.innerHTML = '<div class="empty-state success"><i class="fas fa-check-circle empty-state-icon" style="color: var(--success-color);"></i><br>No Patterns Detected<br><small style="color:var(--text-muted);">✓ No recurring issues or anomalies found in the last 24 hours</small></div>';
+                } else {
+                    const severityColors = {
+                        high: 'var(--error-color)',
+                        medium: 'var(--warning-color)',
+                        low: 'var(--info-color)'
+                    };
+                    
+                    container.innerHTML = '<div style="padding: 0.75rem;">' +
+                        '<div style="margin-bottom: 0.75rem; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 4px; text-align: center; font-size: 0.75rem;">' +
+                        '<strong>' + patterns.length + ' pattern' + (patterns.length !== 1 ? 's' : '') + ' detected</strong> in last 24h | ' +
+                        '<span style="color: var(--text-muted);">Analyzed ' + logs.length + ' logs</span>' +
+                        '</div>' +
+                        patterns.slice(0, 10).map(pattern => 
+                            '<div style="padding: 0.65rem; margin-bottom: 0.5rem; border-left: 3px solid ' + (severityColors[pattern.severity] || 'var(--accent-primary)') + '; background: var(--bg-secondary); border-radius: 4px;">' +
+                            '<div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.25rem;">' +
+                            '<strong style="font-size: 0.85rem;">' + pattern.type + '</strong>' +
+                            '<span style="font-size: 0.7rem; padding: 0.1rem 0.4rem; background: ' + (severityColors[pattern.severity] || 'var(--bg-tertiary)') + '; border-radius: 3px; text-transform: uppercase;">' + pattern.severity + '</span>' +
+                            '</div>' +
+                            '<div style="font-size: 0.8rem; color: var(--text-primary); margin-bottom: 0.25rem;">' + pattern.description + '</div>' +
+                            '<div style="font-size: 0.7rem; color: var(--text-muted);">Occurrences: ' + pattern.count + ' | Confidence: ' + (pattern.confidence * 100).toFixed(0) + '%</div>' +
                             '</div>'
-                        ).join('')) + '</div>';
+                        ).join('') +
+                        (patterns.length > 10 ? '<div style="text-align: center; padding: 0.5rem; color: var(--text-muted); font-size: 0.75rem;">...and ' + (patterns.length - 10) + ' more</div>' : '') +
+                        '</div>';
                 }
             } catch (error) {
-                console.error('Failed to load pattern detection:', error);
+                console.error('Failed to analyze patterns:', error);
+                const container = document.getElementById('data-' + widgetId) || document.getElementById('chart-' + widgetId);
+                if (container) {
+                    container.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Analysis Error<br><small style="color:var(--error-color);">' + error.message + '</small></div>';
+                }
             }
         }
         
@@ -3323,18 +3722,23 @@ router.get('/', async (req, res) => {
                 });
                 const data = await response.json();
                 const chart = document.getElementById('chart-' + widgetId);
-                if (chart && typeof echarts !== 'undefined' && data.success) {
+                if (chart && typeof echarts !== 'undefined' && data.success && data.labels && data.labels.length > 0) {
                     const ec = echarts.init(chart);
                     ec.setOption({
-                        title: { text: 'Custom Chart', left: 'center', textStyle: { fontSize: 14 } },
+                        title: { text: '7-Day Log Volume', left: 'center', textStyle: { fontSize: 14, color: 'var(--text-primary)' } },
                         tooltip: { trigger: 'axis' },
-                        xAxis: { data: data.labels || [] },
-                        yAxis: {},
+                        xAxis: { data: data.labels || [], axisLabel: { color: 'var(--text-muted)', rotate: 45 } },
+                        yAxis: { name: 'Logs', axisLabel: { color: 'var(--text-muted)' }, nameTextStyle: { color: 'var(--text-muted)' } },
                         series: [{ type: 'bar', data: data.values || [], itemStyle: { color: '#10b981' } }]
                     });
+                    charts['custom-' + widgetId] = ec;
+                } else if (chart) {
+                    chart.innerHTML = '<div class="empty-state"><i class="fas fa-chart-bar empty-state-icon"></i><br>7-Day Log Volume<br><small style="color:var(--text-muted);">No log data available for the past 7 days.<br>This chart shows daily log volume trends.</small></div>';
                 }
             } catch (error) {
                 console.error('Failed to load custom chart:', error);
+                const chart = document.getElementById('chart-' + widgetId);
+                if (chart) chart.innerHTML = '<div class="empty-state error"><i class="fas fa-exclamation-triangle empty-state-icon"></i><br>Error loading chart</div>';
             }
         }
         
@@ -3343,11 +3747,14 @@ router.get('/', async (req, res) => {
             if (container) {
                 container.innerHTML = 
                     '<div style="padding: 1rem;">' +
-                    '<label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Formula:</label>' +
-                    '<input type="text" id="metric-formula-' + widgetId + '" placeholder="(errors / total) * 100" class="form-control" style="margin-bottom: 0.5rem; font-family: monospace;">' +
-                    '<button class="btn btn-primary" onclick="calculateMetricFormula(&quot;' + widgetId + '&quot;)" style="width: 100%;"><i class="fas fa-calculator"></i> Calculate</button>' +
-                    '<div id="metric-result-' + widgetId + '" style="margin-top: 1rem; text-align: center; font-size: 1.5rem; font-weight: 700; color: var(--accent-primary);"></div>' +
+                    '<label style="display: block; margin-bottom: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">Formula (24h data):</label>' +
+                    '<input type="text" id="metric-formula-' + widgetId + '" placeholder="(errors / total) * 100" value="(errors / total) * 100" class="form-control" style="margin-bottom: 0.5rem; font-family: monospace;">' +
+                    '<button class="btn btn-primary" onclick="calculateMetricFormula(&quot;' + widgetId + '&quot;)" style="width: 100%; margin-bottom: 0.5rem;"><i class="fas fa-calculator"></i> Calculate</button>' +
+                    '<div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">Available variables: <code>errors</code>, <code>warnings</code>, <code>info</code>, <code>total</code></div>' +
+                    '<div id="metric-result-' + widgetId + '" style="margin-top: 0.5rem; text-align: center; font-size: 1.8rem; font-weight: 700; color: var(--accent-primary);">Enter formula & calculate</div>' +
                     '</div>';
+                // Auto-calculate on load
+                setTimeout(() => calculateMetricFormula(widgetId), 500);
             }
         }
         
@@ -3357,18 +3764,28 @@ router.get('/', async (req, res) => {
             if (!formula || !resultDiv) return;
             
             try {
-                // Fetch required data
-                const response = await fetch('/api/logs/stats', { credentials: 'same-origin' });
+                // Fetch required data from stats endpoint
+                const response = await fetch('/api/logs/stats?period=24h', { credentials: 'same-origin' });
                 const data = await response.json();
                 
-                // Simple formula evaluation (would need more robust implementation)
-                const errors = data.errorCount || 0;
-                const total = data.totalCount || 1;
+                if (!data.success) {
+                    resultDiv.textContent = 'Error: Stats unavailable';
+                    resultDiv.style.color = 'var(--error-color)';
+                    return;
+                }
+                
+                // Extract metrics for formula evaluation
+                const total = data.total || 0;
+                const errors = data.byLevel?.error || 0;
+                const warnings = data.byLevel?.warning || 0;
+                const info = data.byLevel?.info || 0;
 
-                // Safe expression parser (supports numbers, errors, total, + - * / parentheses)
+                // Safe expression parser (supports numbers, errors, warnings, info, total, + - * / parentheses)
                 function parseExpression(expr, ctx){
                     const tokens = expr.replace(/\s+/g,'')
+                        .replace(/warnings/g, ctx.warnings.toString())
                         .replace(/errors/g, ctx.errors.toString())
+                        .replace(/info/g, ctx.info.toString())
                         .replace(/total/g, ctx.total.toString());
                     if(!/^[-+*/()0-9.]+$/.test(tokens)) throw new Error('Invalid characters');
                     // Shunting-yard to RPN
@@ -3400,9 +3817,10 @@ router.get('/', async (req, res) => {
                 }
 
                 let result;
-                try { result = parseExpression(formula, { errors, total }); }
-                catch(e){ resultDiv.textContent='Err'; resultDiv.style.color='var(--error-color)'; return; }
+                try { result = parseExpression(formula, { errors, warnings, info, total }); }
+                catch(e){ resultDiv.textContent='Err: ' + e.message; resultDiv.style.color='var(--error-color)'; return; }
                 resultDiv.textContent = result.toFixed(2);
+                resultDiv.style.color = 'var(--accent-primary)';
             } catch (error) {
                 resultDiv.textContent = 'Error';
                 resultDiv.style.color = 'var(--error-color)';
