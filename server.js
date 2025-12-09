@@ -1384,7 +1384,8 @@ function setupRoutes() {
         // app.use('/api', requireAuth, require('./routes/api/audit-trail'));
 
         // Enhanced log ingestion endpoint with geographic and user-agent analysis
-        app.post('/log', legacyAuth, async (req, res) => {
+        // NOTE: No authentication required to allow Home Assistant and ESP32 devices to send logs
+        app.post('/log', async (req, res) => {
             try {
                 const { 
                     message, 
