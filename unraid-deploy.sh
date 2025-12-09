@@ -22,9 +22,9 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-CONTAINER_NAME="enterprise-logging-server"
+CONTAINER_NAME="logging-server"
 IMAGE_NAME="rejavarti/logging-server:latest"
-APPDATA_PATH="/mnt/user/appdata/logging-server"
+APPDATA_PATH="/mnt/user/appdata/Rejavarti-Logging-Server"
 WEB_PORT=10180
 WS_PORT=8081
 STREAM_PORT=8082
@@ -83,10 +83,11 @@ fi
 
 # Step 3: Create appdata directories
 log_info "Creating appdata directories..."
-mkdir -p "${APPDATA_PATH}/data/databases"
-mkdir -p "${APPDATA_PATH}/data/backups"
-mkdir -p "${APPDATA_PATH}/data/sessions"
-mkdir -p "${APPDATA_PATH}/data/config"
+mkdir -p "${APPDATA_PATH}/databases"
+mkdir -p "${APPDATA_PATH}/backups"
+mkdir -p "${APPDATA_PATH}/sessions"
+mkdir -p "${APPDATA_PATH}/archives"
+mkdir -p "${APPDATA_PATH}/config"
 mkdir -p "${APPDATA_PATH}/logs"
 log_success "Directories created"
 
@@ -138,55 +139,32 @@ if [ -n "$PORTS_IN_USE" ]; then
 fi
 log_success "Port check complete"
 
-# Step 7: Check if image exists locally
-log_info "Checking for Docker image..."
-if ! docker image inspect ${IMAGE_NAME} &> /dev/null; then
-    log_warning "Image '${IMAGE_NAME}' not found locally"
-    echo "Options:"
-    echo "  1) Pull from Docker Hub (if published)"
-    echo "  2) Build from Dockerfile"
-    echo "  3) Load from tar file"
-    read -p "Select option (1/2/3): " -n 1 -r IMAGE_OPTION
-    echo
-    
-    case $IMAGE_OPTION in
-        1)
-            log_info "Pulling image from Docker Hub..."
-            docker pull ${IMAGE_NAME} || {
-                log_error "Failed to pull image"
-                exit 1
-            }
-            ;;
-        2)
-            log_info "Building image from Dockerfile..."
-            if [ ! -f "Dockerfile" ]; then
-                log_error "Dockerfile not found in current directory"
-                exit 1
-            fi
-            docker build -t ${IMAGE_NAME} . || {
-                log_error "Failed to build image"
-                exit 1
-            }
-            ;;
-        3)
-            read -p "Enter path to tar file: " TAR_PATH
-            if [ ! -f "$TAR_PATH" ]; then
-                log_error "Tar file not found: $TAR_PATH"
-                exit 1
-            fi
-            log_info "Loading image from tar..."
-            docker load -i "$TAR_PATH" || {
-                log_error "Failed to load image"
-                exit 1
-            }
-            ;;
-        *)
-            log_error "Invalid option"
-            exit 1
-            ;;
-    esac
+# Step 7: Pull latest image and cleanup
+log_info "Pulling latest image from Docker Hub..."
+docker pull ${IMAGE_NAME} || {
+    log_error "Failed to pull image"
+    exit 1
+}
+log_success "Latest image pulled"
+
+# Cleanup orphaned/dangling images
+log_info "Cleaning up orphaned images..."
+DANGLING_COUNT=$(docker images -f "dangling=true" -q | wc -l)
+if [ $DANGLING_COUNT -gt 0 ]; then
+    log_info "Found $DANGLING_COUNT dangling image(s), removing..."
+    docker image prune -f
+    log_success "Dangling images removed"
+else
+    log_info "No dangling images found"
 fi
-log_success "Docker image ready"
+
+# Remove old versions of logging-server (keep only latest)
+OLD_IMAGES=$(docker images ${IMAGE_NAME} --format "{{.ID}}" | tail -n +2)
+if [ -n "$OLD_IMAGES" ]; then
+    log_info "Removing old image versions..."
+    echo "$OLD_IMAGES" | xargs -r docker rmi -f 2>/dev/null || true
+    log_success "Old image versions removed"
+fi
 
 # Step 8: Deploy container
 log_info "Deploying container..."
@@ -198,13 +176,17 @@ docker run -d \
   -p ${WEB_PORT}:10180 \
   -p ${WS_PORT}:8081 \
   -p ${STREAM_PORT}:8082 \
-  -p 514:514/udp \
-  -p 601:601 \
+  -p 10514:514/udp \
+  -p 10601:601 \
   -p 12201:12201/udp \
   -p 12202:12202 \
   -p 5044:5044 \
   -p 9880:9880 \
-  -v "${APPDATA_PATH}/data:/app/data" \
+  -v "${APPDATA_PATH}/databases:/app/data/databases" \
+  -v "${APPDATA_PATH}/backups:/app/data/backups" \
+  -v "${APPDATA_PATH}/sessions:/app/data/sessions" \
+  -v "${APPDATA_PATH}/archives:/app/data/archives" \
+  -v "${APPDATA_PATH}/config:/app/data/config" \
   -v "${APPDATA_PATH}/logs:/app/logs" \
   -e NODE_ENV=production \
   -e PORT=10180 \
@@ -301,8 +283,10 @@ echo "  Password:      (as entered during setup)"
 echo ""
 echo "Data Locations:"
 echo "  AppData:       ${APPDATA_PATH}"
-echo "  Database:      ${APPDATA_PATH}/data/logging.db"
-echo "  Backups:       ${APPDATA_PATH}/data/backups"
+echo "  Database:      ${APPDATA_PATH}/databases/enterprise_logs.db"
+echo "  Backups:       ${APPDATA_PATH}/backups"
+echo "  Sessions:      ${APPDATA_PATH}/sessions"
+echo "  Archives:      ${APPDATA_PATH}/archives"
 echo "  Logs:          ${APPDATA_PATH}/logs"
 echo ""
 echo "Management Commands:"

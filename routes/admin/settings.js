@@ -901,6 +901,17 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                         
                         <div class="setting-item">
                             <div>
+                                <div class="setting-label"><i class="fas fa-city"></i> Server City Name</div>
+                                <div class="setting-description">City name for server location display on maps</div>
+                            </div>
+                            <div class="setting-control">
+                                <input type="text" id="server-city" value="\${settings.system?.server_city || ''}" 
+                                       placeholder="e.g. Edmonton">
+                            </div>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <div>
                                 <div class="setting-label"><i class="fas fa-globe"></i> Server Latitude</div>
                                 <div class="setting-description">Latitude coordinate for server location on maps</div>
                             </div>
@@ -1203,6 +1214,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                             timezone: document.getElementById('timezone')?.value || 'UTC',
                             auto_archive: document.getElementById('auto-archive')?.checked || false,
                             compression_enabled: document.getElementById('compression-enabled')?.checked || false,
+                            server_city: document.getElementById('server-city')?.value || '',
                             server_latitude: parseFloat(document.getElementById('server-latitude')?.value) || null,
                             server_longitude: parseFloat(document.getElementById('server-longitude')?.value) || null
                         },

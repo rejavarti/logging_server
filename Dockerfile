@@ -31,6 +31,7 @@ COPY log-parser-engine.js ./
 COPY encryption-system.js ./
 COPY universal-sqlite-adapter.js ./
 COPY resilience-workers.js ./
+COPY integration-test-helpers.js ./
 COPY seed-logs.sql ./
 COPY start.js ./
 

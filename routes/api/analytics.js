@@ -214,14 +214,16 @@ router.get('/geolocation', async (req, res) => {
     try {
       const latRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = ?', ['system.server_latitude']) || {};
       const lonRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = ?', ['system.server_longitude']) || {};
+      const cityRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = ?', ['system.server_city']) || {};
       const manualLat = latRow.setting_value ? parseFloat(latRow.setting_value) : null;
       const manualLon = lonRow.setting_value ? parseFloat(lonRow.setting_value) : null;
+      const manualCity = cityRow.setting_value || 'Server Location';
       if (typeof manualLat === 'number' && typeof manualLon === 'number' && manualLat >= -90 && manualLat <= 90 && manualLon >= -180 && manualLon <= 180) {
         serverLocation = {
           ip: 'manual',
           country: 'Configured',
           region: null,
-          city: 'Edmonton',
+          city: manualCity,
           lat: manualLat,
           lon: manualLon,
           isServer: true,

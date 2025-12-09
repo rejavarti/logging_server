@@ -135,7 +135,7 @@ router.get('/refresh', async (req, res) => {
         const todayLogsResult = await req.dal.get(`
             SELECT COUNT(*) as count 
             FROM logs 
-            WHERE date(timestamp) = date('now', 'localtime')
+            WHERE date(timestamp, 'localtime') = date('now', 'localtime')
         `);
         stats.logsToday = todayLogsResult ? todayLogsResult.count : 0;
 

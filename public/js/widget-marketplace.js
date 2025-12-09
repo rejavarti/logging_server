@@ -32,23 +32,68 @@ function installWidget(widgetId) {
     const div = document.createElement('div');
     div.className = 'widget-item';
     div.setAttribute('data-widget-id', widget.id);
-    div.innerHTML = '<div class="widget-item-content">' +
+    
+    // Add size class based on widget definition
+    let sizeClass = 'widget-' + (widget.size || 'medium');
+    
+    div.innerHTML = '<div class="widget-item-content ' + sizeClass + '">' +
         '<div class="widget-card">' +
         '<div class="widget-header">' +
         '<div class="widget-title"><i class="fas fa-' + widget.icon + '"></i> ' + widget.name + '</div>' +
         '<div class="widget-actions">' +
-        '<button class="btn-icon" title="Refresh" onclick="refreshWidget(\'' + widget.id + '\')><i class="fas fa-sync-alt"></i></button>' +
+        '<button class="btn-icon" title="Refresh" onclick="refreshWidget(\'' + widget.id + '\')"><i class="fas fa-sync-alt"></i></button>' +
         '<button class="btn-icon" title="Remove" onclick="removeWidget(this)"><i class="fas fa-times"></i></button>' +
         '</div></div>' +
         '<div class="widget-body">' + widgetHTML + '</div>' +
         '</div></div>';
     
     document.querySelector('.dashboard-grid').appendChild(div);
+    
+    // Add to Muuri grid
     if (window.grid) {
         try {
-            window.grid.add([div]);
+            const items = window.grid.add([div]);
             window.grid.refreshItems();
             window.grid.layout();
+            
+            // Setup resize observer for this specific widget
+            if (items && items.length > 0) {
+                const widgetContent = div.querySelector('.widget-item-content');
+                if (widgetContent && typeof ResizeObserver !== 'undefined') {
+                    // Make widget-item-content resizable
+                    widgetContent.style.resize = 'both';
+                    widgetContent.style.overflow = 'auto';
+                    
+                    // Debounce to avoid too many layout calls
+                    let resizeTimeout;
+                    const resizeObserver = new ResizeObserver(function(entries) {
+                        clearTimeout(resizeTimeout);
+                        resizeTimeout = setTimeout(function() {
+                            // Notify Muuri that item dimensions changed
+                            window.grid.refreshItems([div]);
+                            window.grid.layout();
+                            
+                            // Trigger chart resize if applicable
+                            if (typeof window.charts !== 'undefined') {
+                                Object.keys(window.charts).forEach(function(chartId) {
+                                    if (window.charts[chartId] && window.charts[chartId].resize) {
+                                        window.charts[chartId].resize();
+                                    }
+                                });
+                            }
+                            
+                            // Save layout after resize completes
+                            if (typeof saveLayout === 'function') {
+                                saveLayout();
+                            }
+                        }, 150);
+                    });
+                    resizeObserver.observe(widgetContent);
+                    
+                    // Store observer to clean up later if needed
+                    div._resizeObserver = resizeObserver;
+                }
+            }
         } catch (e) {
             console.error('Muuri add failed:', e);
         }

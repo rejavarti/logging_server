@@ -2,6 +2,31 @@
 
 ![coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
 
+## Quick Start
+
+**Automated Deployment to Unraid:**
+```powershell
+# PowerShell (Windows)
+.\deploy-unraid.ps1
+
+# Bash (Linux/Mac)
+./deploy-to-unraid.sh
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for full deployment documentation.
+
+**Docker Cleanup:**
+```powershell
+# Standard cleanup (removes dangling images)
+.\cleanup-docker.ps1
+
+# Aggressive cleanup (removes all unused images)
+.\cleanup-docker.ps1 -Aggressive
+
+# Include unused volumes
+.\cleanup-docker.ps1 -Aggressive -Volumes
+```
+
 ## API Standards
 - All endpoints return real, database-driven data (no mock/placeholder data)
 - Responses include `{ success: true/false }` flag
@@ -34,6 +59,38 @@
 - Created compatibility SQL views/scripts
 - Added Jest smoke tests for key endpoints
 - All tests passing with real DB data
+
+## WebSocket Real-Time Updates
+The logging server includes built-in WebSocket support for real-time log streaming and notifications.
+
+**Connection Details:**
+- **Endpoint:** `ws://YOUR-SERVER:10180/ws` (same port as HTTP)
+- **Enabled by default** — No configuration required
+- **Security:** Supports JWT authentication
+- **Channels:** Subscribe to `logs`, `alerts`, `metrics`, `sessions`
+
+**Quick Test:**
+```bash
+# Run test script
+node test-websocket.js ws://YOUR-UNRAID-IP:10180/ws
+
+# Or open websocket-test-client.html in browser
+```
+
+**Browser Example:**
+```javascript
+const ws = new WebSocket('ws://YOUR-SERVER:10180/ws');
+ws.onopen = () => {
+    ws.send(JSON.stringify({
+        event: 'subscribe',
+        payload: { channels: ['logs', 'alerts'] }
+    }));
+};
+ws.onmessage = (e) => console.log('Received:', JSON.parse(e.data));
+```
+
+**📖 Full Documentation:** See `WEBSOCKET_SETUP.md` for complete guide
+**🧪 Test Tools:** `test-websocket.js` and `websocket-test-client.html`
 
 ## File Ingestion Engine
 Real directory-based log ingestion (no mock data) can be enabled to tail and parse incoming log files.

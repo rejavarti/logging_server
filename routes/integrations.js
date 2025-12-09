@@ -39,7 +39,7 @@ router.get('/', async (req, res) => {
                     let cfg = {};
                     if (r.config) { try { cfg = JSON.parse(r.config); } catch (_) { cfg = {}; } }
                     
-                    // Determine connected status from IntegrationManager
+                    // Determine connected status from IntegrationManager OR database status
                     let connected = false;
                     const intType = (r.type || '').toLowerCase();
                     if (intType === 'homeassistant' && managerStatus.homeAssistant) {
@@ -48,13 +48,54 @@ router.get('/', async (req, res) => {
                         connected = managerStatus.mqtt.connected === true;
                     } else if (intType === 'websocket' && managerStatus.websocket) {
                         connected = managerStatus.websocket.connected === true;
+                    } else if (r.status === 'enabled' && r.last_sync) {
+                        // If no live status but test succeeded recently, assume connected
+                        // Database stores UTC via datetime('now'), compare UTC to UTC
+                        // This is timezone-independent and handles DST correctly
+                        const lastSyncUTC = new Date(r.last_sync + 'Z').getTime(); // Parse as UTC milliseconds
+                        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);        // Current UTC milliseconds - 5 min
+                        connected = lastSyncUTC > fiveMinutesAgo;
+                        // Note: Display formatting uses user's timezone, but comparison stays in UTC
+                    }
+                    
+                    // Format last_sync for display (if available)
+                    let lastSyncDisplay = 'Never';
+                    if (r.last_sync) {
+                        try {
+                            const lastSyncDate = new Date(r.last_sync + 'Z'); // Parse as UTC
+                            const now = new Date();
+                            const diffMs = now - lastSyncDate;
+                            const diffMins = Math.floor(diffMs / 60000);
+                            
+                            if (diffMins < 1) {
+                                lastSyncDisplay = 'Just now';
+                            } else if (diffMins < 60) {
+                                lastSyncDisplay = `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
+                            } else if (diffMins < 1440) {
+                                const hours = Math.floor(diffMins / 60);
+                                lastSyncDisplay = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+                            } else {
+                                // For older syncs, show formatted date in user's timezone
+                                lastSyncDisplay = lastSyncDate.toLocaleString('en-US', {
+                                    timeZone: req.systemSettings?.timezone || 'America/Edmonton',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+                            }
+                        } catch (e) {
+                            lastSyncDisplay = 'Unknown';
+                        }
                     }
                     
                     return {
                         ...r,
                         config: cfg,
                         enabled: r.enabled ? true : false,
-                        connected: connected
+                        connected: connected,
+                        statusFromDb: r.status, // Pass through database status
+                        lastActivity: lastSyncDisplay // Human-readable last sync time
                     };
                 });
             }
@@ -224,7 +265,7 @@ router.get('/', async (req, res) => {
                                     </div>
                                     <div>
                                         <div class="config-label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Last Activity</div>
-                                        <div class="config-value" style="font-size: 0.875rem;">${integration.lastActivity ? formatTimestamp(integration.lastActivity) : 'Never'}</div>
+                                        <div class="config-value" style="font-size: 0.875rem;" title="${integration.last_sync ? 'Last sync: ' + formatTimestamp(integration.last_sync + 'Z') : 'Never synced'}">${integration.lastActivity || 'Never'}</div>
                                     </div>
                                     <div>
                                         <div class="config-label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.25rem;">Success Rate</div>
@@ -1574,6 +1615,7 @@ router.get('/', async (req, res) => {
         // Test integration
         async function testCustomIntegration(integrationId) {
             try {
+                showToast('Testing integration...', 'info');
                 const response = await fetch(\`/integrations/api/\${integrationId}/test\`, {
                     method: 'POST'
                 });
@@ -1582,8 +1624,11 @@ router.get('/', async (req, res) => {
                 
                 if (response.ok && result.success) {
                     showToast('Integration test successful', 'success');
+                    // Reload the page to show updated status
+                    setTimeout(() => location.reload(), 1000);
                 } else {
                     showToast(\`Integration test failed: \${result.error || 'Unknown error'}\`, 'error');
+                    setTimeout(() => location.reload(), 1500);
                 }
             } catch (error) {
                 req.app.locals?.loggers?.system?.error('Test integration error:', error);
@@ -1819,9 +1864,14 @@ router.get('/logs/:id', async (req, res) => {
 
         // Build the content body with filtered logs view
         const contentBody = `
-            <div class="page-header">
-                <h2><i class="fas fa-list"></i> Logs for ${escapeHtml(integrationName)}</h2>
-                <p class="text-muted">Integration ID: ${escapeHtml(integrationId)}</p>
+            <div class="page-header d-flex justify-content-between align-items-start">
+                <div>
+                    <h2><i class="fas fa-list"></i> Logs for ${escapeHtml(integrationName)}</h2>
+                    <p class="text-muted">Integration ID: ${escapeHtml(integrationId)}</p>
+                </div>
+                <a href="/integrations" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Integrations
+                </a>
             </div>
 
             <div class="card mb-4">
@@ -2074,9 +2124,9 @@ router.get('/api/health', async (req, res) => {
             req.app.locals?.loggers?.system?.warn('Health API: failed to get manager status:', e.message);
         }
 
-        // Get list of enabled integrations from the integrations table
+        // Get list of ALL integrations from the integrations table (custom configured ones)
         const enabledIntegrations = await req.dal.all(
-            'SELECT id, name, type, config, created_at, updated_at FROM integrations WHERE enabled = 1'
+            'SELECT id, name, type, config, status, enabled, last_sync, error_count, last_error, created_at, updated_at FROM integrations WHERE enabled = 1'
         ) || [];
         
         // If no enabled integrations, return empty array
@@ -2117,18 +2167,29 @@ router.get('/api/health', async (req, res) => {
                 liveStatus = managerStatus.websocket.connected ? 'online' : 'offline';
             }
             
+            // Determine status: live status from IntegrationManager OR database status OR health table
+            let finalStatus = 'unknown';
+            if (liveStatus) {
+                finalStatus = liveStatus; // Live connection status (most accurate)
+            } else if (integration.status && integration.status !== 'disabled') {
+                // Use database status from last test
+                finalStatus = integration.status === 'enabled' ? 'online' : integration.status === 'error' ? 'offline' : 'unknown';
+            } else if (health?.status) {
+                finalStatus = health.status;
+            }
+            
             const baseData = {
                 id: health?.id || integration.id,
                 integration_name: nameKey,
                 integration_display_name: integration.name,
                 integration_type: integration.type,
-                status: liveStatus || health?.status || 'unknown',
-                last_check: health?.last_check || integration.updated_at,
+                status: finalStatus,
+                last_check: integration.last_sync || health?.last_check || integration.updated_at,
                 response_time: health?.response_time || 0,
-                error_count: health?.error_count || 0,
-                last_error: health?.last_error || null,
+                error_count: integration.error_count || health?.error_count || 0,
+                last_error: integration.last_error || health?.last_error || null,
                 uptime_percentage: health?.uptime_percentage || 100,
-                last_success: health?.last_success || null,
+                last_success: integration.last_sync || health?.last_success || null,
                 metadata: {
                     enabled: true,
                     type: integration.type,
@@ -2224,6 +2285,39 @@ router.post('/api/health/:name/test', async (req, res) => {
         const target = (rows || []).find(r => (r.name || '').toLowerCase() === name);
         if (!target) return res.status(404).json({ success: false, error: 'Integration not found' });
         const result = await performIntegrationTest(target, req, start);
+        
+        // Save the test result to the integrations table (primary source)
+        const newStatus = result.status === 'online' ? 'enabled' : 'error';
+        try {
+            await req.dal.run(
+                `UPDATE integrations 
+                 SET status = ?,
+                     last_sync = CASE WHEN ? = 'online' THEN CURRENT_TIMESTAMP ELSE last_sync END,
+                     error_count = CASE WHEN ? != 'online' THEN error_count + 1 ELSE 0 END,
+                     last_error = CASE WHEN ? != 'online' THEN ? ELSE NULL END,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE name = ?`,
+                [newStatus, result.status, result.status, result.status, result.message || '', target.name]
+            );
+            
+            // Also update integration_health table for consistency
+            await req.dal.run(
+                `UPDATE integration_health 
+                 SET status = ?, 
+                     last_check = CURRENT_TIMESTAMP,
+                     response_time = ?,
+                     last_success = CASE WHEN ? = 'online' THEN CURRENT_TIMESTAMP ELSE last_success END,
+                     error_count = CASE WHEN ? != 'online' THEN error_count + 1 ELSE 0 END,
+                     last_error = ?
+                 WHERE integration_name = ?`,
+                [result.status, result.latencyMs || 0, result.status, result.status, result.message || '', name]
+            );
+            
+            req.app.locals?.loggers?.system?.info(`Integration ${name} tested: ${result.status} - ${result.message}`);
+        } catch (dbError) {
+            req.app.locals?.loggers?.system?.warn('Failed to update health status:', dbError.message);
+        }
+        
         res.json({ success: true, result });
     } catch (error) {
         req.app.locals?.loggers?.system?.error('Test health integration API error:', error);
