@@ -16,6 +16,11 @@ router.get('/login', (req, res) => {
         return res.redirect('/dashboard');
     }
     
+    // Prevent caching to ensure latest JavaScript is served
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    
     const loginPageContent = `
     <button class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
         <i class="fas fa-palette"></i>
@@ -475,11 +480,15 @@ function getLoginJS() {
                 loginBtn.disabled = true;
                 loginBtn.textContent = 'Signing In...';
                 
-                const response = await fetch('/api/auth/login', {
+                // Force HTTP protocol to match current page (prevent HTTPS upgrade)
+                const apiUrl = window.location.protocol + '//' + window.location.host + '/api/auth/login';
+                
+                const response = await fetch(apiUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                , credentials: 'same-origin' });
+                    body: JSON.stringify({ username, password }),
+                    credentials: 'same-origin'
+                });
                 
                 const result = await response.json();
                 
