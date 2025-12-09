@@ -14,9 +14,24 @@ process.env.PORT = '3001'; // Different port for tests
 if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
   const path = require('path');
   const fs = require('fs');
-  const dbDir = path.dirname(process.env.TEST_DB_PATH);
+  
+  // Convert to absolute path to avoid working directory issues in CI
+  const absoluteDbPath = path.isAbsolute(process.env.TEST_DB_PATH) 
+    ? process.env.TEST_DB_PATH 
+    : path.resolve(process.cwd(), process.env.TEST_DB_PATH);
+  
+  // Update TEST_DB_PATH to use absolute path
+  process.env.TEST_DB_PATH = absoluteDbPath;
+  
+  const dbDir = path.dirname(absoluteDbPath);
+  
+  console.log(`🔧 Working directory: ${process.cwd()}`);
+  console.log(`🔧 Test DB path (relative): ${process.env.TEST_DB_PATH}`);
+  console.log(`🔧 Test DB path (absolute): ${absoluteDbPath}`);
+  console.log(`🔧 Test DB directory: ${dbDir}`);
   
   try {
+    // Create all parent directories
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true });
       console.log(`✅ Created test database directory: ${dbDir}`);
@@ -24,11 +39,25 @@ if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
       console.log(`✅ Test database directory exists: ${dbDir}`);
     }
     
+    // Verify directory is actually accessible
+    const dirStats = fs.statSync(dbDir);
+    if (!dirStats.isDirectory()) {
+      throw new Error(`Path exists but is not a directory: ${dbDir}`);
+    }
+    
     // Verify write permissions
-    fs.accessSync(dbDir, fs.constants.W_OK);
-    console.log(`✅ Test database directory is writable`);
+    fs.accessSync(dbDir, fs.constants.W_OK | fs.constants.R_OK);
+    console.log(`✅ Test database directory is readable and writable`);
+    
+    // Try creating a test file to ensure we can actually write
+    const testFile = path.join(dbDir, '.write-test');
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+    console.log(`✅ Verified write capability in test database directory`);
+    
   } catch (error) {
     console.error(`❌ Failed to ensure test database directory: ${error.message}`);
+    console.error(`   Full error:`, error);
     throw error;
   }
 }
