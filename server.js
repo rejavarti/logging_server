@@ -796,7 +796,8 @@ app.locals.legacyAuth = legacyAuth;
 // Database initialization function
 async function initializeDatabase() {
     try {
-        const dbPath = path.join(dbDir, 'enterprise_logs.db');
+        // Allow TEST_DB_PATH override for test environments
+        const dbPath = process.env.TEST_DB_PATH || path.join(dbDir, 'enterprise_logs.db');
         
         // Run database migration first to ensure all tables exist
         loggers.system.info('🔧 Running database migration...');

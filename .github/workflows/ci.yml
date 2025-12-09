@@ -32,11 +32,15 @@ jobs:
       - name: Ensure test database directory exists
         run: mkdir -p ./data ./data/databases ./data/logs ./data/backups
 
+      - name: Clean up stale test databases
+        run: rm -f ./data/databases/*.sqlite ./data/databases/*.db
+
       - name: Run tests with coverage
         env:
           NODE_ENV: test
           JWT_SECRET: test-secret
           AUTH_PASSWORD: testAdmin123!
+          TEST_DB_PATH: ./data/databases/test.sqlite
         run: npx jest --runInBand --coverage --detectOpenHandles
 
       - name: Upload coverage report
