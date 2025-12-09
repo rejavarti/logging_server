@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client - Logging Server</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .controls {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-connect {
+            background: #10b981;
+            color: white;
+        }
+
+        .btn-disconnect {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-action {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-clear {
+            background: #6b7280;
+            color: white;
+        }
+
+        .status {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-disconnected {
+            background: #ef4444;
+        }
+
+        .status-connected {
+            background: #10b981;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .messages {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .messages h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .message-list {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            word-wrap: break-word;
+        }
+
+        .message-sent {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .message-received {
+            background: #d1fae5;
+            border-left: 4px solid #10b981;
+        }
+
+        .message-error {
+            background: #fee2e2;
+            border-left: 4px solid #ef4444;
+        }
+
+        .message-info {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .timestamp {
+            color: #6b7280;
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+
+        .channel-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+
+        .channel-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .channel-checkbox input[type="checkbox"] {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 WebSocket Test Client</h1>
+            <p class="subtitle">Test WebSocket connections to your Logging Server</p>
+        </div>
+
+        <div class="controls">
+            <div class="input-group">
+                <label for="wsUrl">WebSocket URL:</label>
+                <input type="text" id="wsUrl" placeholder="ws://192.168.1.100:10180/ws" value="ws://localhost:10180/ws">
+            </div>
+
+            <div class="input-group">
+                <label for="jwtToken">JWT Token (optional):</label>
+                <input type="text" id="jwtToken" placeholder="Enter JWT token for authentication">
+            </div>
+
+            <div class="button-group">
+                <button class="btn-connect" onclick="connect()">Connect</button>
+                <button class="btn-disconnect" onclick="disconnect()" disabled id="btnDisconnect">Disconnect</button>
+                <button class="btn-clear" onclick="clearMessages()">Clear Messages</button>
+            </div>
+        </div>
+
+        <div class="status">
+            <h3>
+                <span class="status-indicator status-disconnected" id="statusIndicator"></span>
+                <span id="statusText">Disconnected</span>
+            </h3>
+            <p id="clientId"></p>
+        </div>
+
+        <div class="controls">
+            <h3 style="margin-bottom: 15px;">Actions</h3>
+            
+            <div class="input-group">
+                <label>Subscribe to Channels:</label>
+                <div class="channel-group">
+                    <div class="channel-checkbox">
+                        <input type="checkbox" id="chLogs" value="logs" checked>
+                        <label for="chLogs">Logs</label>
+                    </div>
+                    <div class="channel-checkbox">
+                        <input type="checkbox" id="chAlerts" value="alerts" checked>
+                        <label for="chAlerts">Alerts</label>
+                    </div>
+                    <div class="channel-checkbox">
+                        <input type="checkbox" id="chMetrics" value="metrics">
+                        <label for="chMetrics">Metrics</label>
+                    </div>
+                    <div class="channel-checkbox">
+                        <input type="checkbox" id="chSessions" value="sessions">
+                        <label for="chSessions">Sessions</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button class="btn-action" onclick="authenticate()" disabled id="btnAuth">Authenticate</button>
+                <button class="btn-action" onclick="subscribe()" disabled id="btnSubscribe">Subscribe</button>
+                <button class="btn-action" onclick="unsubscribe()" disabled id="btnUnsubscribe">Unsubscribe</button>
+                <button class="btn-action" onclick="ping()" disabled id="btnPing">Ping</button>
+            </div>
+        </div>
+
+        <div class="messages">
+            <h2>Messages</h2>
+            <div class="message-list" id="messageList">
+                <div class="message message-info">
+                    <div class="timestamp">Ready to connect</div>
+                    Enter your WebSocket URL above and click Connect to start
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let clientId = null;
+
+        function addMessage(type, content) {
+            const messageList = document.getElementById('messageList');
+            const message = document.createElement('div');
+            message.className = `message message-${type}`;
+            
+            const timestamp = document.createElement('div');
+            timestamp.className = 'timestamp';
+            timestamp.textContent = new Date().toLocaleTimeString();
+            
+            const text = document.createElement('div');
+            text.textContent = typeof content === 'object' ? JSON.stringify(content, null, 2) : content;
+            
+            message.appendChild(timestamp);
+            message.appendChild(text);
+            messageList.appendChild(message);
+            messageList.scrollTop = messageList.scrollHeight;
+        }
+
+        function setStatus(connected) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            const buttons = ['btnDisconnect', 'btnAuth', 'btnSubscribe', 'btnUnsubscribe', 'btnPing'];
+            
+            if (connected) {
+                indicator.className = 'status-indicator status-connected';
+                statusText.textContent = 'Connected';
+                buttons.forEach(id => document.getElementById(id).disabled = false);
+            } else {
+                indicator.className = 'status-indicator status-disconnected';
+                statusText.textContent = 'Disconnected';
+                buttons.forEach(id => document.getElementById(id).disabled = true);
+            }
+        }
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+            
+            if (!url) {
+                addMessage('error', 'Please enter a WebSocket URL');
+                return;
+            }
+
+            addMessage('info', `Connecting to ${url}...`);
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = () => {
+                    addMessage('info', '✅ Connected successfully!');
+                    setStatus(true);
+                };
+
+                ws.onmessage = (event) => {
+                    try {
+                        const message = JSON.parse(event.data);
+                        addMessage('received', message);
+                        
+                        // Handle special events
+                        if (message.event === 'connected') {
+                            clientId = message.clientId;
+                            document.getElementById('clientId').textContent = `Client ID: ${clientId}`;
+                        }
+                    } catch (error) {
+                        addMessage('error', `Failed to parse message: ${event.data}`);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    addMessage('error', `❌ WebSocket error: ${error.message || 'Connection failed'}`);
+                };
+
+                ws.onclose = (event) => {
+                    addMessage('info', `🔌 Disconnected (code: ${event.code}, reason: ${event.reason || 'No reason'})`);
+                    setStatus(false);
+                    document.getElementById('clientId').textContent = '';
+                    clientId = null;
+                };
+
+            } catch (error) {
+                addMessage('error', `❌ Failed to connect: ${error.message}`);
+            }
+        }
+
+        function disconnect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close(1000, 'User disconnected');
+                addMessage('info', 'Disconnecting...');
+            }
+        }
+
+        function authenticate() {
+            const token = document.getElementById('jwtToken').value;
+            
+            if (!token) {
+                addMessage('error', 'Please enter a JWT token');
+                return;
+            }
+
+            const message = {
+                event: 'authenticate',
+                payload: { token }
+            };
+
+            ws.send(JSON.stringify(message));
+            addMessage('sent', message);
+        }
+
+        function getSelectedChannels() {
+            const channels = [];
+            if (document.getElementById('chLogs').checked) channels.push('logs');
+            if (document.getElementById('chAlerts').checked) channels.push('alerts');
+            if (document.getElementById('chMetrics').checked) channels.push('metrics');
+            if (document.getElementById('chSessions').checked) channels.push('sessions');
+            return channels;
+        }
+
+        function subscribe() {
+            const channels = getSelectedChannels();
+            
+            if (channels.length === 0) {
+                addMessage('error', 'Please select at least one channel');
+                return;
+            }
+
+            const message = {
+                event: 'subscribe',
+                payload: { channels }
+            };
+
+            ws.send(JSON.stringify(message));
+            addMessage('sent', message);
+        }
+
+        function unsubscribe() {
+            const channels = getSelectedChannels();
+            
+            if (channels.length === 0) {
+                addMessage('error', 'Please select at least one channel');
+                return;
+            }
+
+            const message = {
+                event: 'unsubscribe',
+                payload: { channels }
+            };
+
+            ws.send(JSON.stringify(message));
+            addMessage('sent', message);
+        }
+
+        function ping() {
+            const message = { event: 'ping' };
+            ws.send(JSON.stringify(message));
+            addMessage('sent', message);
+        }
+
+        function clearMessages() {
+            document.getElementById('messageList').innerHTML = '';
+            addMessage('info', 'Messages cleared');
+        }
+
+        // Handle Enter key in URL input
+        document.getElementById('wsUrl').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') connect();
+        });
+    </script>
+</body>
+</html>
