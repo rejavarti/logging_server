@@ -1,13 +1,17 @@
 // Jest setup file - Consolidated test environment configuration
 // Sets up global test environment, mocks, and safety mechanisms
 
-// CRITICAL: Convert TEST_DB_PATH to absolute FIRST, before ANY other code runs
-if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
+// CRITICAL FIX: Use in-memory database for CI to avoid file system issues
+// This completely bypasses SQLITE_CANTOPEN errors
+if (process.env.CI || process.env.GITHUB_ACTIONS) {
+  process.env.TEST_DB_PATH = ':memory:';
+  process.stderr.write('\n🧪 CI detected: Using in-memory SQLite database for tests\n\n');
+} else if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
+  // For local testing with file-based database, convert to absolute path
   const path = require('path');
   if (!path.isAbsolute(process.env.TEST_DB_PATH)) {
     const originalPath = process.env.TEST_DB_PATH;
     process.env.TEST_DB_PATH = path.resolve(process.cwd(), process.env.TEST_DB_PATH);
-    // Use process.stderr to bypass any console mocking
     process.stderr.write(`\n🔧 Converted TEST_DB_PATH:\n`);
     process.stderr.write(`   From: ${originalPath}\n`);
     process.stderr.write(`   To:   ${process.env.TEST_DB_PATH}\n\n`);
