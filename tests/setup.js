@@ -9,13 +9,6 @@ if (!process.env.AUTH_PASSWORD) {
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key';
 process.env.PORT = '3001'; // Different port for tests
 
-// Enable in-memory database for CI environments (faster, no disk I/O issues)
-// Tests can override by setting process.env.TEST_USE_TEMP_DB = 'true'
-if (process.env.CI && !process.env.TEST_USE_TEMP_DB) {
-  process.env.TEST_DB_PATH = ':memory:';
-  console.log('🧪 CI detected: using in-memory database for tests');
-}
-
 // Mock console methods to reduce noise in test output
 global.console = {
   ...console,
@@ -33,7 +26,21 @@ jest.setTimeout(30000);
 const TEST_HARD_TIMEOUT_MS = process.env.TEST_E2E ? 60000 : 60000;
 let hardTimeout;
 
-beforeAll(() => {
+beforeAll(async () => {
+  // Initialize test database schema before any tests run
+  if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
+    const path = require('path');
+    const DatabaseMigration = require('../migrations/database-migration');
+    const winston = require('winston');
+    const testLogger = winston.createLogger({
+      transports: [new winston.transports.Console({ silent: true })]
+    });
+    
+    const migration = new DatabaseMigration(process.env.TEST_DB_PATH, testLogger);
+    await migration.runMigration();
+    console.log('✅ Test database schema initialized');
+  }
+  
   hardTimeout = setTimeout(() => {
     console.error('⚠️ TEST HARD TIMEOUT TRIGGERED – possible server freeze. Failing fast.');
     console.error('📊 This is a safety mechanism to prevent hanging.');
