@@ -1,6 +1,19 @@
 // Jest setup file - Consolidated test environment configuration
 // Sets up global test environment, mocks, and safety mechanisms
 
+// CRITICAL: Convert TEST_DB_PATH to absolute FIRST, before ANY other code runs
+if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
+  const path = require('path');
+  if (!path.isAbsolute(process.env.TEST_DB_PATH)) {
+    const originalPath = process.env.TEST_DB_PATH;
+    process.env.TEST_DB_PATH = path.resolve(process.cwd(), process.env.TEST_DB_PATH);
+    // Use process.stderr to bypass any console mocking
+    process.stderr.write(`\n🔧 Converted TEST_DB_PATH:\n`);
+    process.stderr.write(`   From: ${originalPath}\n`);
+    process.stderr.write(`   To:   ${process.env.TEST_DB_PATH}\n\n`);
+  }
+}
+
 // Set test environment variables
 process.env.NODE_ENV = 'test';
 if (!process.env.AUTH_PASSWORD) {
