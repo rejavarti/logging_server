@@ -82,8 +82,7 @@ function checkInitialSetup() {
 const express = require('express');
 const compression = require('compression');
 const session = require('express-session');
-// Temporarily disabled: SQLiteStore requires native sqlite3 bindings
-// const SQLiteStore = require('connect-sqlite3')(session);
+const SQLiteStore = require('connect-sqlite3')(session);
 const cors = require('cors');
 const helmet = require('helmet');
 const moment = require('moment-timezone');
@@ -97,7 +96,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 
 // Advanced features (with graceful fallbacks)
-let geoip, nodemailer, twilio, Pushover, Fuse, _;
+let geoip, nodemailer, twilio, Pushover, Fuse, _, useragent;
 
 // WebSocket for real-time push
 const WebSocket = require('ws');
@@ -108,6 +107,7 @@ try {
     twilio = require('twilio');
     Pushover = require('pushover-notifications');
     Fuse = require('fuse.js');
+    useragent = require('useragent');
     _ = require('lodash');
 } catch (error) {
     // Logger not yet initialized at this point in the code
@@ -560,16 +560,19 @@ app.use((req, res, next) => {
                 childSrc: ["'self'", "blob:"],
                 baseUri: ["'self'"],
                 formAction: ["'self'"],
-                upgradeInsecureRequests: [],
-                blockAllMixedContent: []
+                // Explicitly set to null to prevent helmet from adding upgrade-insecure-requests
+                upgradeInsecureRequests: null,
+                blockAllMixedContent: null
             }
         },
         crossOriginEmbedderPolicy: false, // For WebSocket compatibility
-        hsts: {
+        crossOriginOpenerPolicy: false, // Disable to prevent HTTPS upgrade on HTTP
+        originAgentCluster: false, // Disable to prevent HTTPS upgrade on HTTP
+        hsts: process.env.HTTPS_ENABLED === 'true' ? {
             maxAge: 31536000, // 1 year
             includeSubDomains: true,
             preload: true
-        },
+        } : false, // Disable HSTS when not using HTTPS to prevent browser caching issues
         noSniff: true,
         xssFilter: true,
         referrerPolicy: { policy: "strict-origin-when-cross-origin" },
@@ -579,18 +582,15 @@ app.use((req, res, next) => {
     })(req, res, next);
 });
 
-// Additional security headers
+// Additional security headers (HTTP-safe only - no HTTPS-forcing headers)
 app.use((req, res, next) => {
-    // Enhanced security headers
+    // Basic security headers that work on both HTTP and HTTPS
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN'); // Changed from DENY to allow embedding
     res.setHeader('X-XSS-Protection', '1; mode=block');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
-    // Use credentialless COEP to allow external map tiles (OpenStreetMap)
-    res.setHeader('Cross-Origin-Embedder-Policy', 'credentialless');
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade'); // More permissive for HTTP
+    // REMOVED: Cross-Origin-* headers that cause browser HTTPS upgrade on HTTP
+    // These headers will ONLY be added if serving over HTTPS
     next();
 });
 
@@ -643,16 +643,14 @@ app.use(express.static(path.join(__dirname, 'public'), {
     lastModified: true
 }));
 
-// Session configuration - Using MemoryStore for Windows compatibility testing
-// (SQLiteStore requires native sqlite3 bindings which fail on Windows Node v25)
+// Session configuration - Using SQLiteStore for persistent sessions
 app.use(session({
-    // Temporarily using MemoryStore instead of SQLiteStore for Windows testing
-    // store: new SQLiteStore({
-    //     db: 'sessions.db',
-    //     dir: path.join(__dirname, 'data', 'databases'),
-    //     table: 'sessions',
-    //     concurrentDB: true
-    // }),
+    store: new SQLiteStore({
+        db: 'sessions.db',
+        dir: path.join(__dirname, 'data', 'sessions'),
+        table: 'sessions',
+        concurrentDB: true
+    }),
     secret: config.auth.jwtSecret,
     resave: false,
     saveUninitialized: false,
@@ -1486,9 +1484,9 @@ function setupRoutes() {
                 if (useragent && userAgent !== 'unknown') {
                     try {
                         const parsed = useragent.parse(userAgent);
-                        logEntry.browser = parsed.browser;
-                        logEntry.os = parsed.os;
-                        logEntry.device = parsed.device;
+                        logEntry.browser = parsed.toAgent();
+                        logEntry.os = parsed.os.toString();
+                        logEntry.device = parsed.device.toString();
                     } catch (uaError) {
                         loggers.system.warn('User-agent parsing failed:', uaError.message);
                     }
