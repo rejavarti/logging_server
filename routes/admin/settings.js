@@ -1302,7 +1302,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                     const data = await response.json();
                     renderAPIKeys(data.keys || []);
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error loading API keys:', error);
+                    console.error('Error loading API keys:', error);
                     document.getElementById('apiKeysContainer').innerHTML = \`
                         <div style="text-align: center; padding: 3rem; color: var(--error-color);">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>

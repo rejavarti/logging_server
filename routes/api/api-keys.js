@@ -27,34 +27,35 @@ router.get('/api-keys', async (req, res) => {
             `SELECT 
                 ak.id,
                 ak.name,
-                ak.key_hash,
+                ak.key_value,
+                ak.description,
                 ak.permissions,
-                ak.enabled,
+                ak.is_active,
                 ak.expires_at,
-                ak.user_id,
+                ak.created_by,
                 ak.created_at,
-                ak.updated_at,
+                ak.last_used,
+                ak.usage_count,
                 u.username AS created_by_username
              FROM api_keys ak
-             LEFT JOIN users u ON ak.user_id = u.id
+             LEFT JOIN users u ON ak.created_by = u.id
              ORDER BY ak.created_at DESC`
         );
 
         const keys = (rows || []).map(r => ({
             id: r.id,
             name: r.name,
-            key_value: maskFromHash(r.key_hash), // masked for UI list
+            key_value: r.key_value ? `elk_${r.key_value.slice(0, 8)}...${r.key_value.slice(-4)}` : 'elk_••••••••••',
             permissions: (() => { try { return JSON.parse(r.permissions || '[]'); } catch { return []; } })(),
-            is_active: r.enabled === 1 || r.enabled === true,
+            is_active: r.is_active === 1 || r.is_active === true,
             expires_at: r.expires_at || null,
             created_at: r.created_at,
-            updated_at: r.updated_at,
-            created_by: r.user_id,
+            updated_at: r.created_at, // No updated_at in schema, use created_at
+            created_by: r.created_by,
             created_by_username: r.created_by_username || null,
-            // Compatibility fields expected by UI
-            usage_count: 0,
-            last_used: null,
-            description: null
+            usage_count: r.usage_count || 0,
+            last_used: r.last_used || null,
+            description: r.description || null
         }));
 
         res.json({ success: true, keys });
@@ -67,7 +68,7 @@ router.get('/api-keys', async (req, res) => {
 // Create new API key (returns plaintext once)
 router.post('/api-keys', async (req, res) => {
     try {
-        const { name, permissions, expires_in_days } = req.body || {};
+        const { name, description, permissions, expires_in_days } = req.body || {};
         const userId = req.user?.id || null;
 
         if (!name || !String(name).trim()) {
@@ -76,7 +77,6 @@ router.post('/api-keys', async (req, res) => {
 
         // Generate secure random API key
         const keyValue = `elk_${crypto.randomBytes(32).toString('hex')}`;
-        const keyHash = hashKey(keyValue);
 
         // Calculate expiry date (stored as ISO text)
         let expiresAt = null;
@@ -89,16 +89,16 @@ router.post('/api-keys', async (req, res) => {
         const permissionsStr = JSON.stringify(Array.isArray(permissions) ? permissions : []);
 
         const result = await req.dal.run(
-            `INSERT INTO api_keys (name, key_hash, permissions, enabled, expires_at, user_id, created_at)
-             VALUES (?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP)`,
-            [name.trim(), keyHash, permissionsStr, expiresAt, userId]
+            `INSERT INTO api_keys (name, key_value, description, permissions, is_active, expires_at, created_by, created_at)
+             VALUES (?, ?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP)`,
+            [name.trim(), keyValue, description || null, permissionsStr, expiresAt, userId]
         );
 
         const row = await req.dal.get(
-            `SELECT ak.id, ak.name, ak.key_hash, ak.permissions, ak.enabled, ak.expires_at, ak.user_id, ak.created_at, ak.updated_at,
+            `SELECT ak.id, ak.name, ak.key_value, ak.description, ak.permissions, ak.is_active, ak.expires_at, ak.created_by, ak.created_at, ak.last_used, ak.usage_count,
                     u.username AS created_by_username
              FROM api_keys ak
-             LEFT JOIN users u ON ak.user_id = u.id
+             LEFT JOIN users u ON ak.created_by = u.id
              WHERE ak.id = ?`,
             [result.lastID]
         );
@@ -106,17 +106,17 @@ router.post('/api-keys', async (req, res) => {
         const key = {
             id: row.id,
             name: row.name,
-            key_value: keyValue, // Show full key once
+            key_value: row.key_value, // Show full key once
             permissions: (() => { try { return JSON.parse(row.permissions || '[]'); } catch { return []; } })(),
-            is_active: row.enabled === 1 || row.enabled === true,
+            is_active: row.is_active === 1 || row.is_active === true,
             expires_at: row.expires_at || null,
             created_at: row.created_at,
-            updated_at: row.updated_at,
-            created_by: row.user_id,
+            updated_at: row.created_at,
+            created_by: row.created_by,
             created_by_username: row.created_by_username || null,
-            usage_count: 0,
-            last_used: null,
-            description: null
+            usage_count: row.usage_count || 0,
+            last_used: row.last_used || null,
+            description: row.description || null
         };
 
         req.app.locals.loggers?.security?.info(`API key created: ${name} by ${req.user?.username || 'system'}`);
@@ -138,7 +138,7 @@ router.put('/api-keys/:id', async (req, res) => {
         }
 
         await req.dal.run(
-            `UPDATE api_keys SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+            `UPDATE api_keys SET is_active = ? WHERE id = ?`,
             [is_active ? 1 : 0, keyId]
         );
 
@@ -175,21 +175,19 @@ router.post('/api-keys/:id/regenerate', async (req, res) => {
         const keyId = req.params.id;
 
         const newKeyValue = `elk_${crypto.randomBytes(32).toString('hex')}`;
-        const newKeyHash = hashKey(newKeyValue);
 
         await req.dal.run(
             `UPDATE api_keys 
-             SET key_hash = ?, 
-                 updated_at = CURRENT_TIMESTAMP
+             SET key_value = ?
              WHERE id = ?`,
-            [newKeyHash, keyId]
+            [newKeyValue, keyId]
         );
 
         const row = await req.dal.get(
-            `SELECT ak.id, ak.name, ak.key_hash, ak.permissions, ak.enabled, ak.expires_at, ak.user_id, ak.created_at, ak.updated_at,
+            `SELECT ak.id, ak.name, ak.key_value, ak.description, ak.permissions, ak.is_active, ak.expires_at, ak.created_by, ak.created_at, ak.last_used, ak.usage_count,
                     u.username AS created_by_username
              FROM api_keys ak
-             LEFT JOIN users u ON ak.user_id = u.id
+             LEFT JOIN users u ON ak.created_by = u.id
              WHERE ak.id = ?`,
             [keyId]
         );
@@ -201,16 +199,17 @@ router.post('/api-keys/:id/regenerate', async (req, res) => {
             key: {
                 id: row.id,
                 name: row.name,
-                key_value: maskFromHash(row.key_hash),
+                key_value: row.key_value ? `elk_${row.key_value.slice(0, 8)}...${row.key_value.slice(-4)}` : 'elk_••••••••••',
                 permissions: (() => { try { return JSON.parse(row.permissions || '[]'); } catch { return []; } })(),
-                is_active: row.enabled === 1 || row.enabled === true,
+                is_active: row.is_active === 1 || row.is_active === true,
                 expires_at: row.expires_at || null,
                 created_at: row.created_at,
-                updated_at: row.updated_at,
-                created_by: row.user_id,
+                updated_at: row.created_at,
+                created_by: row.created_by,
                 created_by_username: row.created_by_username || null,
-                usage_count: 0,
-                last_used: null
+                usage_count: row.usage_count || 0,
+                last_used: row.last_used || null,
+                description: row.description || null
             }
         });
     } catch (error) {
@@ -223,10 +222,10 @@ router.post('/api-keys/:id/regenerate', async (req, res) => {
 router.post('/api-keys/:id/toggle', async (req, res) => {
     try {
         const { id } = req.params;
-        const row = await req.dal.get(`SELECT enabled FROM api_keys WHERE id = ?`, [id]);
+        const row = await req.dal.get(`SELECT is_active FROM api_keys WHERE id = ?`, [id]);
         if (!row) return res.status(404).json({ success: false, error: 'API key not found' });
-        const next = row.enabled ? 0 : 1;
-        await req.dal.run(`UPDATE api_keys SET enabled = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, [next, id]);
+        const next = row.is_active ? 0 : 1;
+        await req.dal.run(`UPDATE api_keys SET is_active = ? WHERE id = ?`, [next, id]);
         res.json({ success: true, id, is_active: !!next });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error toggling API key status:', error);
@@ -238,11 +237,11 @@ router.post('/api-keys/:id/toggle', async (req, res) => {
 router.post('/api-keys/:id/test', async (req, res) => {
     try {
         const { id } = req.params;
-        const row = await req.dal.get(`SELECT id, enabled, expires_at FROM api_keys WHERE id = ?`, [id]);
+        const row = await req.dal.get(`SELECT id, is_active, expires_at FROM api_keys WHERE id = ?`, [id]);
         if (!row) return res.json({ success: true, test: { keyId: id, valid: false, status: 'not_found' } });
         const now = Date.now();
         const expiresOk = !row.expires_at || new Date(row.expires_at).getTime() > now;
-        res.json({ success: true, test: { keyId: id, valid: !!row.enabled && expiresOk, status: row.enabled ? 'active' : 'inactive', expiresAt: row.expires_at || null, lastTestAt: new Date().toISOString() } });
+        res.json({ success: true, test: { keyId: id, valid: !!row.is_active && expiresOk, status: row.is_active ? 'active' : 'inactive', expiresAt: row.expires_at || null, lastTestAt: new Date().toISOString() } });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error testing API key:', error);
         res.status(500).json({ success: false, error: error.message });
