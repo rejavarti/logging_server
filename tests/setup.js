@@ -97,28 +97,10 @@ const TEST_HARD_TIMEOUT_MS = process.env.TEST_E2E ? 60000 : 60000;
 let hardTimeout;
 
 beforeAll(async () => {
-  // CRITICAL: Always run migration for test database, including in-memory databases
-  // This creates all required tables (users, activity_log, etc.) before tests run
-  if (process.env.TEST_DB_PATH) {
-    const DatabaseMigration = require('../migrations/database-migration');
-    const winston = require('winston');
-    
-    // Use stderr to bypass console mocking
-    process.stderr.write(`🔧 Initializing test database: ${process.env.TEST_DB_PATH}\n`);
-    
-    const testLogger = winston.createLogger({
-      transports: [new winston.transports.Console({ silent: true })]
-    });
-    
-    try {
-      const migration = new DatabaseMigration(process.env.TEST_DB_PATH, testLogger);
-      await migration.runMigration();
-      process.stderr.write('✅ Test database schema initialized successfully\n');
-    } catch (error) {
-      process.stderr.write(`❌ Failed to initialize test database: ${error.message}\n`);
-      throw error;
-    }
-  }
+  // Database migration is handled by initializeDatabase() in server.js
+  // which is called by createTestApp() in each test file.
+  // This ensures the migration runs on the SAME :memory: database instance
+  // that tests will use (critical for :memory: databases which are per-connection).
   
   hardTimeout = setTimeout(() => {
     console.error('⚠️ TEST HARD TIMEOUT TRIGGERED – possible server freeze. Failing fast.');
