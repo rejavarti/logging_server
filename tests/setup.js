@@ -103,9 +103,8 @@ beforeAll(async () => {
     const DatabaseMigration = require('../migrations/database-migration');
     const winston = require('winston');
     
-    // Use real console for critical setup (bypass mocking)
-    const realConsole = console.constructor.prototype;
-    realConsole.log.call(console, `🔧 Initializing test database: ${process.env.TEST_DB_PATH}`);
+    // Use stderr to bypass console mocking
+    process.stderr.write(`🔧 Initializing test database: ${process.env.TEST_DB_PATH}\n`);
     
     const testLogger = winston.createLogger({
       transports: [new winston.transports.Console({ silent: true })]
@@ -114,9 +113,9 @@ beforeAll(async () => {
     try {
       const migration = new DatabaseMigration(process.env.TEST_DB_PATH, testLogger);
       await migration.runMigration();
-      realConsole.log.call(console, '✅ Test database schema initialized successfully');
+      process.stderr.write('✅ Test database schema initialized successfully\n');
     } catch (error) {
-      realConsole.error.call(console, '❌ Failed to initialize test database:', error.message);
+      process.stderr.write(`❌ Failed to initialize test database: ${error.message}\n`);
       throw error;
     }
   }
