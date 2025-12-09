@@ -62,3 +62,15 @@ playwright-test-output.txt
 test-results.txt
 dashboard-test.html
 dashboard-response.html
+# Temporary troubleshooting artifacts
+DEPLOYMENT.md
+DESKTOP_DEPLOYMENT_GUIDE.md
+QUICK_FIX_HA_INTEGRATION.md
+build-and-deploy.ps1
+cleanup-docker.ps1
+deploy-to-unraid.sh
+deploy-unraid.ps1
+quick-build-push.ps1
+merge-databases.sh
+check-*.sql
+clear_dashboard.sql
