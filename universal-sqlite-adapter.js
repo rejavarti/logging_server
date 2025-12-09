@@ -49,10 +49,22 @@ class UniversalSQLiteAdapter {
             return; // In-memory database doesn't need directory
         }
         
-        const dbDir = path.dirname(this.databasePath);
-        if (!fs.existsSync(dbDir)) {
-            fs.mkdirSync(dbDir, { recursive: true });
-            console.log(`📁 Created database directory: ${dbDir}`);
+        try {
+            const dbDir = path.dirname(this.databasePath);
+            if (!fs.existsSync(dbDir)) {
+                fs.mkdirSync(dbDir, { recursive: true });
+                console.log(`📁 Created database directory: ${dbDir}`);
+            } else {
+                console.log(`📁 Database directory exists: ${dbDir}`);
+            }
+            
+            // Verify the directory is writable
+            fs.accessSync(dbDir, fs.constants.W_OK);
+            console.log(`✅ Database directory is writable: ${dbDir}`);
+        } catch (error) {
+            console.error(`❌ Failed to ensure database directory: ${error.message}`);
+            console.error(`   Database path: ${this.databasePath}`);
+            throw new Error(`Cannot create or access database directory: ${error.message}`);
         }
     }
 

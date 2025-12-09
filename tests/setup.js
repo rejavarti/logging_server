@@ -30,11 +30,19 @@ beforeAll(async () => {
   // Initialize test database schema before any tests run
   if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
     const path = require('path');
+    const fs = require('fs');
     const DatabaseMigration = require('../migrations/database-migration');
     const winston = require('winston');
     const testLogger = winston.createLogger({
       transports: [new winston.transports.Console({ silent: true })]
     });
+    
+    // Ensure the database directory exists before migration
+    const dbDir = path.dirname(process.env.TEST_DB_PATH);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log(`📁 Created test database directory: ${dbDir}`);
+    }
     
     const migration = new DatabaseMigration(process.env.TEST_DB_PATH, testLogger);
     await migration.runMigration();
