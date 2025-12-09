@@ -30,6 +30,8 @@ router.get('/', async (req, res) => {
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         res.setHeader('Surrogate-Control', 'no-store');
+        // Bust any existing cache by changing ETag with each version
+        res.setHeader('ETag', '"v20251208-2132"');
         
         // Fetch dashboard data
         const stats = await req.dal.getSystemStats() || {};
@@ -140,13 +142,13 @@ router.get('/', async (req, res) => {
             cursor: grabbing;
         }
         
-        /* Widget sizing - all widgets resizable */
-        .widget-small { width: 300px; height: 250px; min-width: 250px; min-height: 200px; max-width: 1200px; max-height: 800px; }
-        .widget-medium { width: 400px; height: 400px; min-width: 300px; min-height: 300px; max-width: 1200px; max-height: 800px; }
-        .widget-large { width: 500px; height: 500px; min-width: 400px; min-height: 400px; max-width: 1200px; max-height: 800px; }
-        .widget-wide { width: 600px; height: 400px; min-width: 450px; min-height: 300px; max-width: 1200px; max-height: 800px; }
-        .widget-full { width: calc(100% - 20px); min-width: 800px; height: 350px; min-height: 250px; max-width: 100%; max-height: 800px; }
-        .widget-tall { width: 400px; height: 600px; min-width: 300px; min-height: 450px; max-width: 1200px; max-height: 1000px; }
+        /* Widget sizing - VERSION 20251208-2132 - all widgets resizable */
+        .widget-small { width: 240px; height: 200px; min-width: 200px; min-height: 160px; max-width: 960px; max-height: 640px; }
+        .widget-medium { width: 320px; height: 320px; min-width: 240px; min-height: 240px; max-width: 960px; max-height: 640px; }
+        .widget-large { width: 400px; height: 400px; min-width: 320px; min-height: 320px; max-width: 960px; max-height: 640px; }
+        .widget-wide { width: 480px; height: 320px; min-width: 360px; min-height: 240px; max-width: 960px; max-height: 640px; }
+        .widget-full { width: calc(100% - 20px); min-width: 640px; height: 280px; min-height: 200px; max-width: 100%; max-height: 640px; }
+        .widget-tall { width: 320px; height: 480px; min-width: 240px; min-height: 360px; max-width: 960px; max-height: 800px; }
         
         /* Make widget-item-content resizable */
         .widget-item-content {
@@ -544,6 +546,7 @@ router.get('/', async (req, res) => {
         let grid;
         let charts = {};
         let isLocked = false;
+        let resizeObserverReady = false; // Flag to prevent auto-save during initial load
         const DEBUG_LAYOUT_LOG = true; // Detailed per-widget layout logging
         
         // Timezone-aware timestamp formatter
@@ -590,11 +593,14 @@ router.get('/', async (req, res) => {
         document.addEventListener('DOMContentLoaded', function() {
             initializeGrid();
             initializeCharts();
-            setupResizeObservers();
             // Load layout AFTER grid and charts are initialized
             // Increased timeout to ensure Muuri completes layout calculation
             setTimeout(() => {
                 loadSavedLayout();
+                // Setup resize observers AFTER layout is loaded to prevent initial auto-save
+                setTimeout(() => {
+                    setupResizeObservers();
+                }, 1000);
             }, 500);
             console.log('🎨 Muuri Dashboard initialized');
         });
@@ -655,10 +661,32 @@ router.get('/', async (req, res) => {
                 const debouncedResize = debounce(() => {
                     try { Object.values(charts).forEach(c => c && c.resize && c.resize()); } catch (e) { /* Chart resize non-critical */ }
                 }, 60);
-                const ro = new ResizeObserver(() => debouncedResize());
-                document.querySelectorAll('.widget-item').forEach(el => ro.observe(el));
+                
+                // Auto-save layout after resize completes (debounced to avoid excessive saves)
+                const debouncedSave = debounce(() => {
+                    if (!isLocked && resizeObserverReady) {
+                        console.log('🔄 Auto-saving layout after resize...');
+                        autoSaveLayout();
+                    }
+                }, 1000); // Wait 1 second after resize stops before saving
+                
+                const ro = new ResizeObserver((entries) => {
+                    debouncedResize();
+                    if (resizeObserverReady) {
+                        console.log('📏 Resize detected on', entries.length, 'element(s)');
+                        debouncedSave();
+                    }
+                });
+                // Observe both .widget-item AND .widget-item-content (CSS resize is on content)
+                document.querySelectorAll('.widget-item, .widget-item-content').forEach(el => ro.observe(el));
                 // Keep reference to avoid GC
                 window._widgetResizeObserver = ro;
+                
+                // Enable auto-save after a short delay
+                setTimeout(() => {
+                    resizeObserverReady = true;
+                    console.log('✅ Resize auto-save enabled');
+                }, 500);
             } catch (e) {
                 console.warn('ResizeObserver not available, widget auto-resize disabled');
             }
@@ -1090,12 +1118,24 @@ router.get('/', async (req, res) => {
                 let left = typeof item._left === 'number' ? item._left : 0;
                 let top = typeof item._top === 'number' ? item._top : 0;
                 
+                // Validate positions - only reject severely negative coordinates (< -50px indicates a real problem)
+                // Small negatives (e.g. -5, -26) are normal from dragging near edges
+                if (left < -50 || top < -50) {
+                    console.warn('Rejecting invalid position for', elem.getAttribute('data-widget-id'), 'left:', left, 'top:', top);
+                    return null; // Mark as invalid
+                }
+                
                 // If internal properties are 0, try getPosition() as backup
                 if (left === 0 && top === 0) {
                     const pos = item.getPosition();
                     if (pos && (pos.left !== 0 || pos.top !== 0)) {
                         left = pos.left;
                         top = pos.top;
+                        // Validate again (only severely negative)
+                        if (left < -50 || top < -50) {
+                            console.warn('Rejecting invalid getPosition for', elem.getAttribute('data-widget-id'));
+                            return null;
+                        }
                     }
                 }
                 
@@ -1129,7 +1169,14 @@ router.get('/', async (req, res) => {
                     width: Math.round(rect.width),
                     height: Math.round(rect.height)
                 };
-            });
+            }).filter(item => item !== null); // Remove invalid entries
+            
+            // Don't save if we have no valid positions
+            if (layout.length === 0) {
+                console.warn('No valid widget positions to save');
+                return;
+            }
+            
             if (DEBUG_LAYOUT_LOG) {
                 console.log('[Layout] Manual save for', layout.length, 'widgets');
                 items.forEach(item => {

@@ -1508,10 +1508,26 @@ class DatabaseAccessLayer extends EventEmitter {
                 WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
             `;
             const result = await this.get(sql);
-            return result || { totalLogs: 0, errorCount: 0, warningCount: 0, infoCount: 0, debugCount: 0 };
+            
+            // Get today's logs using localtime timezone conversion
+            const todaySQL = `
+                SELECT COUNT(*) as count
+                FROM logs
+                WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+            `;
+            const todayResult = await this.get(todaySQL);
+            
+            return {
+                totalLogs: result?.totalLogs || 0,
+                errorCount: result?.errorCount || 0,
+                warningCount: result?.warningCount || 0,
+                infoCount: result?.infoCount || 0,
+                debugCount: result?.debugCount || 0,
+                logsToday: todayResult?.count || 0
+            };
         } catch (error) {
             this.logger.warn('Failed to get system stats:', error.message);
-            return { totalLogs: 0, errorCount: 0, warningCount: 0, infoCount: 0, debugCount: 0 };
+            return { totalLogs: 0, errorCount: 0, warningCount: 0, infoCount: 0, debugCount: 0, logsToday: 0 };
         }
     }
 
@@ -2102,10 +2118,22 @@ class DatabaseAccessLayer extends EventEmitter {
 
             const responseTime = Date.now() - startTime;
 
-            // Update last_tested timestamp
+            // Update status and last_tested timestamp based on test result
+            const newStatus = testResult.success ? 'enabled' : 'error';
+            
+            // Log the test result for debugging
+            console.log(`[TEST] Integration ${integrationId}: ${testResult.success ? 'SUCCESS' : 'FAILED'} - ${testResult.message}`);
+            console.log(`[TEST] Updating status to: ${newStatus}`);
+            
             await this.run(
-                `UPDATE integrations SET last_tested = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
-                [integrationId]
+                `UPDATE integrations 
+                 SET status = ?,
+                     last_sync = CASE WHEN ? = 1 THEN datetime('now') ELSE last_sync END,
+                     error_count = CASE WHEN ? = 0 THEN error_count + 1 ELSE 0 END,
+                     last_error = CASE WHEN ? = 0 THEN ? ELSE NULL END,
+                     updated_at = datetime('now') 
+                 WHERE id = ?`,
+                [newStatus, testResult.success ? 1 : 0, testResult.success ? 1 : 0, testResult.success ? 1 : 0, testResult.message || '', integrationId]
             );
 
             return {
