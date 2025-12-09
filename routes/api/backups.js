@@ -45,7 +45,7 @@ router.get('/backups', async (req, res) => {
                         created: new Date(createdMs).toISOString(),
                         modified: new Date(modifiedMs).toISOString(),
                         type: file.includes('manual') ? 'manual' : 'automatic',
-                        includes: ['database', 'settings', 'logs', 'dashboards']
+                        includes: ['database', 'sessions', 'settings', 'logs', 'config']
                     });
                 }
             }
@@ -82,7 +82,7 @@ router.get('/backups', async (req, res) => {
 // Create new backup
 router.post('/backups/create', async (req, res) => {
     try {
-        const { type = 'manual', includes = ['database', 'settings', 'logs'] } = req.body;
+        const { type = 'manual', includes = ['database', 'sessions', 'settings', 'logs', 'config'] } = req.body;
         
         const fs = require('fs').promises;
         const fsSync = require('fs');
@@ -117,7 +117,7 @@ router.post('/backups/create', async (req, res) => {
             const dbPath = path.join(__dirname, '../../data/databases/logs.db');
             try {
                 await fs.access(dbPath);
-                archive.file(dbPath, { name: 'logs.db' });
+                archive.file(dbPath, { name: 'databases/logs.db' });
             } catch (err) {
                 req.app.locals?.loggers?.api?.warn('Database file not found for backup (checked /data/databases/logs.db)');
             }
@@ -126,9 +126,18 @@ router.post('/backups/create', async (req, res) => {
             const enterpriseDbPath = path.join(__dirname, '../../data/databases/enterprise_logs.db');
             try {
                 await fs.access(enterpriseDbPath);
-                archive.file(enterpriseDbPath, { name: 'enterprise_logs.db' });
+                archive.file(enterpriseDbPath, { name: 'databases/enterprise_logs.db' });
             } catch (err) {
                 req.app.locals?.loggers?.api?.warn('Enterprise database file not found for backup (checked /data/databases/enterprise_logs.db)');
+            }
+            
+            // Backup sessions database
+            const sessionsDbPath = path.join(__dirname, '../../data/sessions/sessions.db');
+            try {
+                await fs.access(sessionsDbPath);
+                archive.file(sessionsDbPath, { name: 'sessions/sessions.db' });
+            } catch (err) {
+                req.app.locals?.loggers?.api?.warn('Sessions database not found for backup');
             }
         }
         
@@ -140,6 +149,49 @@ router.post('/backups/create', async (req, res) => {
                 archive.file(settingsPath, { name: 'settings.json' });
             } catch (err) {
                 // Settings file does not exist; skip gracefully (no settings.json yet)
+            }
+        }
+        
+        // Add application logs if included
+        if (includes.includes('logs')) {
+            const logsDir = path.join(__dirname, '../../data/logs');
+            try {
+                await fs.access(logsDir);
+                const logFiles = await fs.readdir(logsDir);
+                
+                for (const logFile of logFiles) {
+                    if (logFile.endsWith('.log')) {
+                        const logPath = path.join(logsDir, logFile);
+                        try {
+                            await fs.access(logPath);
+                            archive.file(logPath, { name: `logs/${logFile}` });
+                        } catch (err) {
+                            // Skip if log file not accessible
+                        }
+                    }
+                }
+            } catch (err) {
+                req.app.locals?.loggers?.api?.warn('Logs directory not found for backup');
+            }
+        }
+        
+        // Add config files if included
+        if (includes.includes('config')) {
+            const configDir = path.join(__dirname, '../../data/config');
+            try {
+                await fs.access(configDir);
+                const configFiles = await fs.readdir(configDir);
+                
+                for (const configFile of configFiles) {
+                    const configPath = path.join(configDir, configFile);
+                    const stat = await fs.stat(configPath);
+                    
+                    if (stat.isFile()) {
+                        archive.file(configPath, { name: `config/${configFile}` });
+                    }
+                }
+            } catch (err) {
+                // Config directory empty or not accessible, skip gracefully
             }
         }
         
