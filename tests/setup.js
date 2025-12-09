@@ -97,31 +97,28 @@ const TEST_HARD_TIMEOUT_MS = process.env.TEST_E2E ? 60000 : 60000;
 let hardTimeout;
 
 beforeAll(async () => {
-  // Initialize test database schema before any tests run
-  if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
-    const path = require('path');
-    const fs = require('fs');
+  // CRITICAL: Always run migration for test database, including in-memory databases
+  // This creates all required tables (users, activity_log, etc.) before tests run
+  if (process.env.TEST_DB_PATH) {
     const DatabaseMigration = require('../migrations/database-migration');
     const winston = require('winston');
     
-    // Use real console for this critical setup phase
+    // Use real console for critical setup (bypass mocking)
     const realConsole = console.constructor.prototype;
-    realConsole.log.call(console, `🔧 Initializing test database at: ${process.env.TEST_DB_PATH}`);
+    realConsole.log.call(console, `🔧 Initializing test database: ${process.env.TEST_DB_PATH}`);
     
     const testLogger = winston.createLogger({
       transports: [new winston.transports.Console({ silent: true })]
     });
     
-    // Verify directory exists one more time
-    const dbDir = path.dirname(process.env.TEST_DB_PATH);
-    if (!fs.existsSync(dbDir)) {
-      realConsole.error.call(console, `❌ Database directory does not exist: ${dbDir}`);
-      throw new Error(`Database directory does not exist: ${dbDir}`);
+    try {
+      const migration = new DatabaseMigration(process.env.TEST_DB_PATH, testLogger);
+      await migration.runMigration();
+      realConsole.log.call(console, '✅ Test database schema initialized successfully');
+    } catch (error) {
+      realConsole.error.call(console, '❌ Failed to initialize test database:', error.message);
+      throw error;
     }
-    
-    const migration = new DatabaseMigration(process.env.TEST_DB_PATH, testLogger);
-    await migration.runMigration();
-    realConsole.log.call(console, '✅ Test database schema initialized');
   }
   
   hardTimeout = setTimeout(() => {
