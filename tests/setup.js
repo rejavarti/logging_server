@@ -9,6 +9,13 @@ if (!process.env.AUTH_PASSWORD) {
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key';
 process.env.PORT = '3001'; // Different port for tests
 
+// Enable in-memory database for CI environments (faster, no disk I/O issues)
+// Tests can override by setting process.env.TEST_USE_TEMP_DB = 'true'
+if (process.env.CI && !process.env.TEST_USE_TEMP_DB) {
+  process.env.TEST_DB_PATH = ':memory:';
+  console.log('🧪 CI detected: using in-memory database for tests');
+}
+
 // Mock console methods to reduce noise in test output
 global.console = {
   ...console,

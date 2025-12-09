@@ -33,8 +33,27 @@ class UniversalSQLiteAdapter {
         console.log('\n🔍 Universal SQLite Adapter - Environment Detection');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
+        // Ensure database directory exists (critical for CI/tests)
+        this.ensureDatabaseDirectory();
+        
         // NOTE: Database initialization is deferred to init() method
         // because sql.js requires async initialization
+    }
+
+    /**
+     * Ensure the database directory exists
+     * This prevents SQLITE_CANTOPEN errors in CI/test environments
+     */
+    ensureDatabaseDirectory() {
+        if (this.databasePath === ':memory:') {
+            return; // In-memory database doesn't need directory
+        }
+        
+        const dbDir = path.dirname(this.databasePath);
+        if (!fs.existsSync(dbDir)) {
+            fs.mkdirSync(dbDir, { recursive: true });
+            console.log(`📁 Created database directory: ${dbDir}`);
+        }
     }
 
     /**
