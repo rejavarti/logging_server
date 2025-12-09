@@ -9,6 +9,30 @@ if (!process.env.AUTH_PASSWORD) {
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret-key';
 process.env.PORT = '3001'; // Different port for tests
 
+// Ensure test database directory exists BEFORE anything else
+// This must happen before console mocking so we can see any errors
+if (process.env.TEST_DB_PATH && process.env.TEST_DB_PATH !== ':memory:') {
+  const path = require('path');
+  const fs = require('fs');
+  const dbDir = path.dirname(process.env.TEST_DB_PATH);
+  
+  try {
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+      console.log(`✅ Created test database directory: ${dbDir}`);
+    } else {
+      console.log(`✅ Test database directory exists: ${dbDir}`);
+    }
+    
+    // Verify write permissions
+    fs.accessSync(dbDir, fs.constants.W_OK);
+    console.log(`✅ Test database directory is writable`);
+  } catch (error) {
+    console.error(`❌ Failed to ensure test database directory: ${error.message}`);
+    throw error;
+  }
+}
+
 // Mock console methods to reduce noise in test output
 global.console = {
   ...console,
@@ -33,20 +57,25 @@ beforeAll(async () => {
     const fs = require('fs');
     const DatabaseMigration = require('../migrations/database-migration');
     const winston = require('winston');
+    
+    // Use real console for this critical setup phase
+    const realConsole = console.constructor.prototype;
+    realConsole.log.call(console, `🔧 Initializing test database at: ${process.env.TEST_DB_PATH}`);
+    
     const testLogger = winston.createLogger({
       transports: [new winston.transports.Console({ silent: true })]
     });
     
-    // Ensure the database directory exists before migration
+    // Verify directory exists one more time
     const dbDir = path.dirname(process.env.TEST_DB_PATH);
     if (!fs.existsSync(dbDir)) {
-      fs.mkdirSync(dbDir, { recursive: true });
-      console.log(`📁 Created test database directory: ${dbDir}`);
+      realConsole.error.call(console, `❌ Database directory does not exist: ${dbDir}`);
+      throw new Error(`Database directory does not exist: ${dbDir}`);
     }
     
     const migration = new DatabaseMigration(process.env.TEST_DB_PATH, testLogger);
     await migration.runMigration();
-    console.log('✅ Test database schema initialized');
+    realConsole.log.call(console, '✅ Test database schema initialized');
   }
   
   hardTimeout = setTimeout(() => {
