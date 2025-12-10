@@ -1382,6 +1382,7 @@ function setupRoutes() {
         app.use('/api/webhooks', requireAuth, require('./routes/api/webhooks'));
         app.use('/api/search', requireAuth, require('./routes/api/search'));
         app.use('/api/dashboard', requireAuth, require('./routes/api/dashboard'));
+        app.use('/api/dashboard-data', requireAuth, require('./routes/api/dashboard-data'));
         // WebSocket clients inspection endpoint (REST) for parity with monolithic
         app.get('/api/websocket/clients', requireAuth, async (req, res) => {
             try {

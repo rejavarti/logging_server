@@ -27,68 +27,17 @@ router.get('/', async (req, res) => {
         );
         // Allow short-term caching for better performance (5 minutes)
         res.setHeader('Cache-Control', 'private, max-age=300');
-        res.setHeader('ETag', '"v20251210"');
+        res.setHeader('ETag', '"v20251210-fast"');
         
-        // Fetch dashboard data
-        const stats = await req.dal.getSystemStats() || {};
-        const recentLogs = await req.dal.getRecentLogs(20) || [];
-        const systemHealth = await req.dal.getSystemHealth() || {};
-        const logSources = await req.dal.getLogSources() || [];
-
-        // Get log level distribution for pie chart
-        let logLevelStats = [];
-        try {
-            logLevelStats = await req.dal.all(`
-                SELECT level, COUNT(*) as count 
-                FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours') 
-                GROUP BY level 
-                ORDER BY count DESC
-            `) || [];
-        } catch (error) {
-            console.error('Error getting log level stats:', error);
-        }
-
-        // Get hourly log distribution for timeline chart
-        let hourlyStats = [];
-        try {
-            hourlyStats = await req.dal.all(`
-                SELECT 
-                    strftime('%H:00', timestamp) as hour,
-                    COUNT(*) as count,
-                    level
-                FROM logs 
-                WHERE timestamp >= datetime('now', '-24 hours')
-                GROUP BY hour, level
-                ORDER BY hour
-            `) || [];
-        } catch (error) {
-            console.error('Error getting hourly stats:', error);
-        }
-
-        // Get integration health stats - ONLY SHOW ENABLED INTEGRATIONS
-        let integrationStats = [];
-        try {
-            // Query integrations table for ENABLED integrations only
-            const integrations = await req.dal.all(`SELECT name, type, enabled FROM integrations WHERE enabled = 1`) || [];
-            
-            if (integrations.length > 0) {
-                // Show only active integrations
-                integrationStats = integrations.map(i => ({
-                    type: i.name || i.type || 'Unknown',
-                    total: 1,
-                    healthy: 1
-                }));
-            } else {
-                // No active integrations - show appropriate message
-                integrationStats = [
-                    { type: 'No active integrations', total: 0, healthy: 0 }
-                ];
-            }
-        } catch (error) {
-            console.error('Error getting integration stats:', error);
-            integrationStats = [{ type: 'Error Loading', total: 0, healthy: 0 }];
-        }
+        // PERFORMANCE: Send HTML shell immediately, load data via AJAX
+        // Only fetch critical data needed for initial render
+        const stats = { totalLogs: 0, errors: 0, warnings: 0, devices: 0 };
+        const recentLogs = [];
+        const systemHealth = {};
+        const logSources = [];
+        const logLevelStats = [];
+        const hourlyStats = [];
+        const integrationStats = [];
 
         const contentBody = `
     <!-- Muuri + ECharts + Leaflet Dashboard -->
@@ -722,10 +671,28 @@ router.get('/', async (req, res) => {
                 return chart;
             }
 
-            const logLevelData = ${JSON.stringify(logLevelStats)};
-            const hourlyData = ${JSON.stringify(hourlyStats)};
-            const systemData = ${JSON.stringify(systemHealth)};
-            const integrationData = ${JSON.stringify(integrationStats)};
+            // PERFORMANCE: Load data via AJAX instead of embedding in HTML
+            // Show loading state immediately
+            renderEmptyChart('logLevelsChart', 'Loading...', 'Fetching dashboard data', '⏳');
+            
+            // Fetch all dashboard data in a single request
+            fetch('/api/dashboard-data/all')
+                .then(res => res.json())
+                .then(response => {
+                    if (!response.success) throw new Error(response.error);
+                    
+                    const { logLevelStats, hourlyStats, integrationStats } = response.data;
+                    const systemData = response.data.stats || {};
+                    
+                    renderChartsWithData(logLevelStats, hourlyStats, systemData, integrationStats);
+                })
+                .catch(error => {
+                    console.error('Error loading dashboard data:', error);
+                    renderEmptyChart('logLevelsChart', 'Error Loading Data', error.message, '⚠️');
+                });
+        }
+        
+        function renderChartsWithData(logLevelData, hourlyData, systemData, integrationData) {
             
             // Log Levels Pie Chart
             if (logLevelData.length > 0) {
