@@ -36,10 +36,21 @@ class DatabaseAccessLayer extends EventEmitter {
         if (!this.usingExistingDb) {
             this.initializeConnection();
         } else {
-            // For existing connections, just start the batch timer
-            this.startBatchTimer();
-            this.logger.info('✅ Reusing existing database connection - skipping initialization');
+            // For existing connections, ensure required tables exist then start batch timer
+            this.ensureRequiredTablesSync();
         }
+    }
+
+    // Synchronous wrapper for ensureRequiredTables when reusing connection
+    ensureRequiredTablesSync() {
+        this.ensureRequiredTables()
+            .then(() => {
+                this.startBatchTimer();
+                this.logger.info('✅ Reusing existing database connection - tables verified');
+            })
+            .catch((error) => {
+                this.logger.error('Failed to ensure required tables:', error);
+            });
     }
 
     async initializeConnection() {
