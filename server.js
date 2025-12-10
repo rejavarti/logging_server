@@ -2710,7 +2710,10 @@ async function createTestApp() {
         await initializeDatabase();
         await initializeSystemComponents();
         await initializeDefaultAdmin();
-        setupRoutes();
+        // Only call setupRoutes once (routes persist across dal reinitializations)
+        if (!systemReady) {
+            setupRoutes();
+        }
         systemReady = true;
     }
     return app;
