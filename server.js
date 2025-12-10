@@ -2708,12 +2708,12 @@ async function createTestApp() {
         if (config.ingestion && config.ingestion.beats) config.ingestion.beats.enabled = false;
         if (config.ingestion && config.ingestion.fluent) config.ingestion.fluent.enabled = false;
         await initializeDatabase();
-        await initializeSystemComponents();
-        await initializeDefaultAdmin();
-        // Only call setupRoutes once (routes persist across dal reinitializations)
+        // Only initialize system components once (they don't need db-specific state)
         if (!systemReady) {
+            await initializeSystemComponents();
             setupRoutes();
         }
+        await initializeDefaultAdmin();
         systemReady = true;
     }
     return app;
