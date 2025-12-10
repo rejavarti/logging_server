@@ -2634,6 +2634,11 @@ async function startServer() {
             };
             
             server = https.createServer(httpsOptions, app);
+            
+            // Configure HTTP timeouts to prevent connection hangs
+            server.keepAliveTimeout = 65000; // 65 seconds (longer than default 5s)
+            server.headersTimeout = 66000; // Must be longer than keepAliveTimeout
+            
             server.listen(PORT, '0.0.0.0', () => {
                 loggers.system.info(`🔒 HTTPS Server running on port ${PORT}`);
                 
@@ -2660,6 +2665,10 @@ async function startServer() {
                 printStartupBanner(false);
                 systemReady = true;
             });
+            
+            // Configure HTTP timeouts to prevent connection hangs
+            server.keepAliveTimeout = 65000; // 65 seconds (longer than default 5s)
+            server.headersTimeout = 66000; // Must be longer than keepAliveTimeout
         }
         
         // Server error handling
