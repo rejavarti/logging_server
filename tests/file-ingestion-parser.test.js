@@ -31,7 +31,9 @@ describe('FileIngestionEngine - Parser Tests', () => {
   beforeEach(async () => {
     // Create temp directory for test files
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'file-ingest-test-'));
-    dbPath = path.join(tempDir, 'test.db');
+    
+    // Use :memory: database in CI to avoid file system issues
+    dbPath = (process.env.CI || process.env.GITHUB_ACTIONS) ? ':memory:' : path.join(tempDir, 'test.db');
     
     // Run migration FIRST to create tables and save the database file
     const DatabaseMigration = require('../migrations/database-migration');
