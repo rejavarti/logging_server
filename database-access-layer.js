@@ -11,9 +11,10 @@ const UniversalSQLiteAdapter = require('./universal-sqlite-adapter');
 const EventEmitter = require('events');
 
 class DatabaseAccessLayer extends EventEmitter {
-    constructor(databasePath, logger) {
+    constructor(databasePath, logger, existingDb = null) {
         super();
-        this.db = new UniversalSQLiteAdapter(databasePath);
+        // CRITICAL: For :memory: databases, reuse existing connection to preserve data
+        this.db = existingDb || new UniversalSQLiteAdapter(databasePath);
         this.logger = logger;
         this.transactionActive = false;
         // Cross-platform CPU sampling (for Windows where os.loadavg is zero)

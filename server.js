@@ -811,10 +811,7 @@ async function initializeDatabase() {
         // We must reuse the SAME connection that runMigration() created.
         if (dbPath === ':memory:' && migration.db) {
             loggers.system.info('🔄 Reusing :memory: database connection from migration');
-            dal = new DatabaseAccessLayer(dbPath, loggers.system);
-            // Replace DAL's db instance with the migration's db to preserve tables
-            dal.db = migration.db;
-            dal.adapter = migration.db;
+            dal = new DatabaseAccessLayer(dbPath, loggers.system, migration.db);
         } else {
             // For file-based databases, normal connection creation is fine
             // 🔧 TIMING FIX: Allow SQLite to fully commit changes to disk
