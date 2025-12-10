@@ -1365,13 +1365,13 @@ class DatabaseMigration {
             this.logger.error('❌ Database migration failed:', error);
             throw error;
         } finally {
-            // CRITICAL: Do NOT close :memory: databases as they will be destroyed
-            // Keep them open so DatabaseAccessLayer can reuse the same instance
-            if (this.db && this.databasePath !== ':memory:') {
-                this.db.close();
-                this.logger.info('Database connection closed');
-            } else if (this.databasePath === ':memory:') {
+            // CRITICAL: Keep database connection open for reuse
+            // Closing and reopening causes lock file issues on network mounts (SMB/NFS)
+            // The DatabaseAccessLayer will reuse this connection
+            if (this.databasePath === ':memory:') {
                 this.logger.info('⚠️ Keeping :memory: database connection open for reuse');
+            } else {
+                this.logger.info('⚠️ Keeping database connection open for reuse (prevents lock issues)');
             }
         }
     }

@@ -813,20 +813,18 @@ async function initializeDatabase() {
         await migration.runMigration();
         loggers.system.info('✅ Database migration completed successfully');
         
-        // CRITICAL FIX for :memory: databases:
-        // For :memory: databases, each new connection creates a new isolated database.
-        // We must reuse the SAME connection that runMigration() created.
-        if (dbPath === ':memory:' && migration.db) {
-            loggers.system.info('🔄 Reusing :memory: database connection from migration');
+        // CRITICAL FIX: Reuse migration database connection to avoid close/reopen issues
+        // This prevents SQLite lock file problems on network mounts (SMB/NFS)
+        // and eliminates timing issues on slower filesystems
+        if (migration.db) {
+            loggers.system.info('🔄 Reusing database connection from migration (avoids lock issues)');
             dal = new DatabaseAccessLayer(dbPath, loggers.system, migration.db);
             // Wait for async table creation to complete
             await dal.waitForInitialization();
-            loggers.system.info('✅ DAL initialization complete for :memory: database');
+            loggers.system.info('✅ DAL initialization complete with reused connection');
         } else {
-            // For file-based databases, normal connection creation is fine
-            // 🔧 TIMING FIX: Allow SQLite to fully commit changes to disk
-            loggers.system.info('⏳ Ensuring database is fully ready...');
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // Fallback: create new connection if migration didn't provide one
+            loggers.system.info('⏳ Creating new database connection...');
             dal = new DatabaseAccessLayer(dbPath, loggers.system);
         }
         
