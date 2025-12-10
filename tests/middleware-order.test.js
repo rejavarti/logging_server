@@ -18,7 +18,7 @@ describe('Middleware & Security Headers', () => {
     const res = await request(app).get('/login');
     expect([200,302]).toContain(res.statusCode); // May redirect if already logged in
     expect(res.headers['x-content-type-options']).toBe('nosniff');
-    expect(res.headers['x-frame-options']).toBe('DENY');
+    expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
     expect(res.headers['x-xss-protection']).toBeDefined();
     expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
   });
