@@ -808,7 +808,8 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getLogEntries(filters = {}, limit = 100, offset = 0) {
-        let sql = `SELECT * FROM logs WHERE 1=1`;
+        // Use specific columns instead of SELECT * for better performance
+        let sql = `SELECT id, timestamp, level, source, message, device_id, severity FROM logs WHERE 1=1`;
         const params = [];
         
         if (filters.level) {

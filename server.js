@@ -1296,9 +1296,48 @@ function setupRoutes() {
             });
         });
 
-        // Core routes
-    app.use('/dashboard', requireAuth, require('./routes/dashboard'));
-        app.use('/logs', requireAuth, require('./routes/logs'));
+        // Response cache middleware for performance
+        const responseCache = require('./middleware/response-cache');
+        
+        // Auto-invalidate cache on data modifications
+        app.use((req, res, next) => {
+            if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+                // Clear cache for the modified resource
+                const basePath = req.path.split('/')[1]; // e.g., 'logs', 'dashboard'
+                const cleared = responseCache.clearPattern(basePath);
+                if (cleared > 0) {
+                    console.log(`Cache invalidated: ${cleared} entries for ${basePath}`);
+                }
+            }
+            next();
+        });
+        
+        // Add cache-aware middleware that includes user ID in cache key
+        const userAwareCache = (ttl) => (req, res, next) => {
+            if (req.method !== 'GET' || !req.user) return next();
+            
+            const cacheKey = `${req.user.id}:${req.originalUrl || req.url}`;
+            const cached = responseCache.get(cacheKey);
+            
+            if (cached) {
+                res.setHeader('X-Cache', 'HIT');
+                return res.send(cached);
+            }
+            
+            const originalSend = res.send;
+            res.send = (body) => {
+                if (res.statusCode === 200) {
+                    responseCache.set(cacheKey, body, ttl);
+                    res.setHeader('X-Cache', 'MISS');
+                }
+                return originalSend.call(res, body);
+            };
+            next();
+        };
+
+        // Core routes with caching
+    app.use('/dashboard', requireAuth, userAwareCache(60000), require('./routes/dashboard')); // 60s cache
+        app.use('/logs', requireAuth, userAwareCache(30000), require('./routes/logs')); // 30s cache
         app.use('/log-analyzer', requireAuth, require('./routes/log-analyzer'));
         app.use('/search', requireAuth, require('./routes/search'));
         app.use('/webhooks', requireAuth, require('./routes/webhooks'));

@@ -1191,6 +1191,10 @@ class DatabaseMigration {
             'CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs(timestamp)',
             'CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)',
             'CREATE INDEX IF NOT EXISTS idx_logs_source ON logs(source)',
+            // Composite indexes for common query patterns
+            'CREATE INDEX IF NOT EXISTS idx_logs_timestamp_level ON logs(timestamp DESC, level)',
+            'CREATE INDEX IF NOT EXISTS idx_logs_level_timestamp ON logs(level, timestamp DESC)',
+            'CREATE INDEX IF NOT EXISTS idx_logs_source_timestamp ON logs(source, timestamp DESC)',
             'CREATE INDEX IF NOT EXISTS idx_activity_log_user_id ON activity_log(user_id)',
             'CREATE INDEX IF NOT EXISTS idx_activity_log_created_at ON activity_log(created_at)',
             'CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token)',

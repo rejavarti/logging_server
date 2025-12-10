@@ -25,13 +25,9 @@ router.get('/', async (req, res) => {
             "font-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.gstatic.com https://use.fontawesome.com https://cdnjs.cloudflare.com data:; " +
             "connect-src 'self' ws: wss: https: http:; "
         );
-        // Prevent browser/proxy caching of the dashboard HTML to avoid stale inline scripts
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        res.setHeader('Surrogate-Control', 'no-store');
-        // Bust any existing cache by changing ETag with each version
-        res.setHeader('ETag', '"v20251208-2132"');
+        // Allow short-term caching for better performance (5 minutes)
+        res.setHeader('Cache-Control', 'private, max-age=300');
+        res.setHeader('ETag', '"v20251210"');
         
         // Fetch dashboard data
         const stats = await req.dal.getSystemStats() || {};
