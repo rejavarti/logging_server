@@ -1361,9 +1361,13 @@ class DatabaseMigration {
             this.logger.error('❌ Database migration failed:', error);
             throw error;
         } finally {
-            if (this.db) {
+            // CRITICAL: Do NOT close :memory: databases as they will be destroyed
+            // Keep them open so DatabaseAccessLayer can reuse the same instance
+            if (this.db && this.databasePath !== ':memory:') {
                 this.db.close();
                 this.logger.info('Database connection closed');
+            } else if (this.databasePath === ':memory:') {
+                this.logger.info('⚠️ Keeping :memory: database connection open for reuse');
             }
         }
     }

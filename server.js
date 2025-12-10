@@ -806,11 +806,23 @@ async function initializeDatabase() {
         await migration.runMigration();
         loggers.system.info('✅ Database migration completed successfully');
         
-        // 🔧 TIMING FIX: Allow SQLite to fully commit changes to disk
-        loggers.system.info('⏳ Ensuring database is fully ready...');
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // CRITICAL FIX for :memory: databases:
+        // For :memory: databases, each new connection creates a new isolated database.
+        // We must reuse the SAME connection that runMigration() created.
+        if (dbPath === ':memory:' && migration.db) {
+            loggers.system.info('🔄 Reusing :memory: database connection from migration');
+            dal = new DatabaseAccessLayer(dbPath, loggers.system);
+            // Replace DAL's db instance with the migration's db to preserve tables
+            dal.db = migration.db;
+            dal.adapter = migration.db;
+        } else {
+            // For file-based databases, normal connection creation is fine
+            // 🔧 TIMING FIX: Allow SQLite to fully commit changes to disk
+            loggers.system.info('⏳ Ensuring database is fully ready...');
+            await new Promise(resolve => setTimeout(resolve, 200));
+            dal = new DatabaseAccessLayer(dbPath, loggers.system);
+        }
         
-        dal = new DatabaseAccessLayer(dbPath, loggers.system);
         // Attach metrics manager reference for reliability counters once initialized
         db = dal.db; // Legacy compatibility
         
