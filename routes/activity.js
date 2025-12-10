@@ -37,39 +37,20 @@ router.get('/', async (req, res) => {
         // Calculate offset for pagination
         const offset = (page - 1) * limit;
 
-        // Use actual DAL methods to get real activity data
-        const activitiesResult = await req.dal.getActivityLog(
-            filters.user, 
-            limit + 10, // Get a few extra to check for pagination
-            offset
-        );
-        
-        const activities = activitiesResult || [];
-        const total = activities.length;
-        const totalPages = Math.ceil(total / limit);
-        
-        // Get basic statistics from the data
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        
-        const todayActivities = activities.filter(a => new Date(a.created_at) >= todayStart);
-        const uniqueUsers = [...new Set(activities.map(a => a.user_id).filter(id => id))];
-        const actionCounts = activities.reduce((acc, a) => {
-            acc[a.action] = (acc[a.action] || 0) + 1;
-            return acc;
-        }, {});
-        const mostActiveAction = Object.keys(actionCounts).sort((a, b) => actionCounts[b] - actionCounts[a])[0] || 'N/A';
+        // PERFORMANCE: Send HTML shell immediately, load data via AJAX
+        const activities = [];
+        const total = 0;
+        const totalPages = 0;
         
         const activityStats = {
-            totalActivities: total,
-            activitiesToday: todayActivities.length,
-            activeUsers: uniqueUsers.length,
-            mostActiveAction: mostActiveAction
+            totalActivities: 0,
+            activitiesToday: 0,
+            activeUsers: 0,
+            mostActiveAction: 'N/A'
         };
         
-        const users = await req.dal.getAllUsers() || [];
-        // Get unique activity types from the data
-        const types = [...new Set(activities.map(a => a.action).filter(action => action))];
+        const users = [];
+        const types = [];
 
         const contentBody = `
         <!-- Activity Stats -->

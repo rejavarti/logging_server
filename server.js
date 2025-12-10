@@ -1383,6 +1383,11 @@ function setupRoutes() {
         app.use('/api/search', requireAuth, require('./routes/api/search'));
         app.use('/api/dashboard', requireAuth, require('./routes/api/dashboard'));
         app.use('/api/dashboard-data', requireAuth, require('./routes/api/dashboard-data'));
+        app.use('/api/webhooks-data', requireAuth, require('./routes/api/webhooks-data'));
+        app.use('/api/integrations-data', requireAuth, require('./routes/api/integrations-data'));
+        app.use('/api/activity-data', requireAuth, require('./routes/api/activity-data'));
+        app.use('/api/logs-data', requireAuth, require('./routes/api/logs-data'));
+        app.use('/api/search-data', requireAuth, require('./routes/api/search-data'));
         // WebSocket clients inspection endpoint (REST) for parity with monolithic
         app.get('/api/websocket/clients', requireAuth, async (req, res) => {
             try {

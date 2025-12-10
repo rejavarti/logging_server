@@ -20,45 +20,17 @@ const router = express.Router();
  */
 router.get('/', async (req, res) => {
     try {
-        // Use actual DAL methods to get real webhook data
-        const webhooks = await req.dal.getWebhooks() || [];
-        
-        // Get recent webhook deliveries from activity log
-        let recentDeliveries = [];
-        try {
-            recentDeliveries = await req.dal.all(
-                `SELECT * FROM activity_log 
-                 WHERE action = 'webhook_delivery' 
-                 ORDER BY timestamp DESC 
-                 LIMIT 100`
-            ) || [];
-        } catch (err) {
-            req.app.locals?.loggers?.system?.warn('Failed to fetch webhook deliveries:', err.message);
-        }
-        
-        // Calculate webhook statistics
-        const activeWebhooks = webhooks.filter(w => w.active);
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
-        
-        const todayDeliveries = recentDeliveries.filter(d => new Date(d.attempted_at) >= todayStart);
-        const successfulDeliveries = recentDeliveries.filter(d => d.delivery_status === 'success');
-        const successRate = recentDeliveries.length > 0 ? Math.round((successfulDeliveries.length / recentDeliveries.length) * 100) : 100;
-        
-        const responseTimes = recentDeliveries
-            .filter(d => d.response_time)
-            .map(d => d.response_time);
-        const avgResponseTime = responseTimes.length > 0 
-            ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length)
-            : 0;
+        // PERFORMANCE: Send HTML shell immediately, load data via AJAX
+        const webhooks = [];
+        const recentDeliveries = [];
         
         const webhookStats = {
-            total: webhooks.length,
-            active: activeWebhooks.length,
-            inactive: webhooks.length - activeWebhooks.length,
-            deliveriesToday: todayDeliveries.length,
-            successRate: successRate,
-            avgResponseTime: avgResponseTime
+            total: 0,
+            active: 0,
+            inactive: 0,
+            deliveriesToday: 0,
+            successRate: 100,
+            avgResponseTime: 0
         };
 
         const contentBody = `

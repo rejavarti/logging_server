@@ -36,22 +36,12 @@ router.get('/', async (req, res) => {
             endDate: endDate || null
         };
 
-        // Use actual DAL methods to get real data
+        // PERFORMANCE: Send HTML shell immediately, load data via AJAX
         const offset = (page - 1) * limit;
-        const logs = await req.dal.getLogEntries({
-            level: filters.level,
-            source: filters.source,
-            search: filters.search,
-            startDate: filters.startDate,
-            endDate: filters.endDate,
-            limit,
-            offset
-        });
-        
-        const totalResult = await req.dal.getLogCount(filters);
-        const total = totalResult.count || 0;
-        const totalPages = Math.ceil(total / limit);
-        const sources = await req.dal.getLogSources();
+        const logs = [];
+        const total = 0;
+        const totalPages = 0;
+        const sources = [];
         const levels = ['debug', 'info', 'warning', 'error'];
 
         const additionalCSS = `

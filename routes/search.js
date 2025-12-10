@@ -28,44 +28,15 @@ router.get('/', async (req, res) => {
         const regex = req.query.regex === 'true';
         const caseSensitive = req.query.case_sensitive === 'true';
         
+        // PERFORMANCE: Send HTML shell immediately, load data via AJAX
         let results = [];
         let total = 0;
         let searchPerformed = false;
         
-        // Search if query OR any filter is provided
-        if (query || level || source || startDate || endDate) {
-            searchPerformed = true;
-            const searchParams = {
-                query,
-                level: level || null,
-                source: source || null,
-                startDate: startDate || null,
-                endDate: endDate || null,
-                regex,
-                caseSensitive
-            };
-            
-            const searchResult = await req.dal.advancedSearch(searchParams);
-            results = searchResult.results;
-            total = searchResult.total;
-        }
-        
-        const sources = await req.dal.getLogSources().catch(() => []);
+        const sources = [];
         const levels = ['debug', 'info', 'warning', 'error'];
         
-        // Get saved searches from settings or database
         let savedSearches = [];
-        try {
-            // Query settings table for saved_searches JSON
-            const savedSearchConfig = await req.dal.get(
-                `SELECT value FROM settings WHERE key = 'saved_searches'`
-            );
-            if (savedSearchConfig && savedSearchConfig.value) {
-                savedSearches = JSON.parse(savedSearchConfig.value);
-            }
-        } catch (err) {
-            req.app.locals?.loggers?.system?.warn('Failed to load saved searches:', err.message);
-        }
 
         const contentBody = `
         <!-- Saved Searches Section -->

@@ -20,116 +20,13 @@ const router = express.Router();
  */
 router.get('/', async (req, res) => {
     try {
-        // Get IntegrationManager status for live connection info
-        let managerStatus = {};
-        try {
-            if (req.integrationManager && typeof req.integrationManager.getStatus === 'function') {
-                managerStatus = req.integrationManager.getStatus();
-            }
-        } catch (e) {
-            req.app.locals?.loggers?.system?.warn('Integrations page: failed to get manager status:', e.message);
-        }
+        // PERFORMANCE: Send HTML shell immediately, load data via AJAX
+        const managerStatus = {};
+        const integrations = [];
 
-        // Fetch real integrations from DAL when available
-        let integrations = [];
-        try {
-            if (req.dal && typeof req.dal.getIntegrations === 'function') {
-                const rows = await req.dal.getIntegrations();
-                integrations = (rows || []).map(r => {
-                    let cfg = {};
-                    if (r.config) { try { cfg = JSON.parse(r.config); } catch (_) { cfg = {}; } }
-                    
-                    // Determine connected status from IntegrationManager OR database status
-                    let connected = false;
-                    const intType = (r.type || '').toLowerCase();
-                    if (intType === 'homeassistant' && managerStatus.homeAssistant) {
-                        connected = managerStatus.homeAssistant.connected === true;
-                    } else if (intType === 'mqtt' && managerStatus.mqtt) {
-                        connected = managerStatus.mqtt.connected === true;
-                    } else if (intType === 'websocket' && managerStatus.websocket) {
-                        connected = managerStatus.websocket.connected === true;
-                    } else if (r.status === 'enabled' && r.last_sync) {
-                        // If no live status but test succeeded recently, assume connected
-                        // Database stores UTC via datetime('now'), compare UTC to UTC
-                        // This is timezone-independent and handles DST correctly
-                        const lastSyncUTC = new Date(r.last_sync + 'Z').getTime(); // Parse as UTC milliseconds
-                        const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);        // Current UTC milliseconds - 5 min
-                        connected = lastSyncUTC > fiveMinutesAgo;
-                        // Note: Display formatting uses user's timezone, but comparison stays in UTC
-                    }
-                    
-                    // Format last_sync for display (if available)
-                    let lastSyncDisplay = 'Never';
-                    if (r.last_sync) {
-                        try {
-                            const lastSyncDate = new Date(r.last_sync + 'Z'); // Parse as UTC
-                            const now = new Date();
-                            const diffMs = now - lastSyncDate;
-                            const diffMins = Math.floor(diffMs / 60000);
-                            
-                            if (diffMins < 1) {
-                                lastSyncDisplay = 'Just now';
-                            } else if (diffMins < 60) {
-                                lastSyncDisplay = `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`;
-                            } else if (diffMins < 1440) {
-                                const hours = Math.floor(diffMins / 60);
-                                lastSyncDisplay = `${hours} hour${hours !== 1 ? 's' : ''} ago`;
-                            } else {
-                                // For older syncs, show formatted date in user's timezone
-                                lastSyncDisplay = lastSyncDate.toLocaleString('en-US', {
-                                    timeZone: req.systemSettings?.timezone || 'America/Edmonton',
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                });
-                            }
-                        } catch (e) {
-                            lastSyncDisplay = 'Unknown';
-                        }
-                    }
-                    
-                    return {
-                        ...r,
-                        config: cfg,
-                        enabled: r.enabled ? true : false,
-                        connected: connected,
-                        statusFromDb: r.status, // Pass through database status
-                        lastActivity: lastSyncDisplay // Human-readable last sync time
-                    };
-                });
-            }
-        } catch (e) {
-            req.app.locals?.loggers?.system?.warn('Integrations page: failed to load integrations from DAL:', e.message);
-        }
-
-        // Basic stats derived from real data (no mock data)
-        // Query actual metrics from logs table
+        // PERFORMANCE: Stats will be loaded via AJAX
         let messagesToday = 0;
         let successRate = 100;
-        try {
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
-            const todayISO = todayStart.toISOString();
-            
-            // Count integration-related logs today
-            const messageStats = await req.dal.get(
-                `SELECT COUNT(*) as total, 
-                 SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) as errors 
-                 FROM logs 
-                 WHERE source LIKE '%integration%' AND timestamp >= ?`,
-                [todayISO]
-            );
-            
-            if (messageStats) {
-                messagesToday = messageStats.total || 0;
-                successRate = messageStats.total > 0 
-                    ? Math.round(((messageStats.total - messageStats.errors) / messageStats.total) * 100)
-                    : 100;
-            }
-        } catch (err) {
-            req.app.locals?.loggers?.system?.warn('Failed to fetch integration metrics:', err.message);
-        }
         
         const integrationStats = {
             total: integrations.length,
