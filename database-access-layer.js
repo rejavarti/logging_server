@@ -17,6 +17,7 @@ class DatabaseAccessLayer extends EventEmitter {
         this.db = existingDb || new UniversalSQLiteAdapter(databasePath);
         this.logger = logger;
         this.transactionActive = false;
+        this.usingExistingDb = !!existingDb; // Track if we're reusing a connection
         // Cross-platform CPU sampling (for Windows where os.loadavg is zero)
         this._lastCpuSample = null; // { usage: process.cpuUsage(), time: Date.now() }
         
@@ -31,8 +32,14 @@ class DatabaseAccessLayer extends EventEmitter {
         this.batchFlushInProgress = false;
         this.batchTimer = null;
         
-        // Initialize with optimizations
-        this.initializeConnection();
+        // Initialize with optimizations (skip if reusing existing connection)
+        if (!this.usingExistingDb) {
+            this.initializeConnection();
+        } else {
+            // For existing connections, just start the batch timer
+            this.startBatchTimer();
+            this.logger.info('✅ Reusing existing database connection - skipping initialization');
+        }
     }
 
     async initializeConnection() {
