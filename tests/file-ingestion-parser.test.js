@@ -40,10 +40,17 @@ describe('FileIngestionEngine - Parser Tests', () => {
     const migration = new DatabaseMigration(dbPath, testLogger);
     await migration.runMigration();
     
-    // Now initialize DAL - it will load the migrated database from disk
-    dal = new DatabaseAccessLayer(dbPath, testLogger);
-    // Wait for DAL to fully initialize (it has async initialization)
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // For :memory: databases, reuse migration.db connection to preserve tables
+    // For file-based databases, migration closes connection after creating file
+    if (dbPath === ':memory:' && migration.db) {
+      dal = new DatabaseAccessLayer(dbPath, testLogger, migration.db);
+      // Wait for async table creation
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } else {
+      // File-based: load the migrated database from disk
+      dal = new DatabaseAccessLayer(dbPath, testLogger);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
     
     // Configure engine
     process.env.FILE_INGESTION_ENABLED = 'true';

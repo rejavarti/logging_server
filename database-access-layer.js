@@ -32,25 +32,35 @@ class DatabaseAccessLayer extends EventEmitter {
         this.batchFlushInProgress = false;
         this.batchTimer = null;
         
+        // Promise to track async initialization status
+        this._initializationPromise = null;
+        
         // Initialize with optimizations (skip if reusing existing connection)
         if (!this.usingExistingDb) {
-            this.initializeConnection();
+            this._initializationPromise = this.initializeConnection();
         } else {
             // For existing connections, ensure required tables exist then start batch timer
-            this.ensureRequiredTablesSync();
+            this._initializationPromise = this.ensureRequiredTablesAndStart();
         }
     }
 
-    // Synchronous wrapper for ensureRequiredTables when reusing connection
-    ensureRequiredTablesSync() {
-        this.ensureRequiredTables()
-            .then(() => {
-                this.startBatchTimer();
-                this.logger.info('✅ Reusing existing database connection - tables verified');
-            })
-            .catch((error) => {
-                this.logger.error('Failed to ensure required tables:', error);
-            });
+    // Async initialization for reused connections
+    async ensureRequiredTablesAndStart() {
+        try {
+            await this.ensureRequiredTables();
+            this.startBatchTimer();
+            this.logger.info('✅ Reusing existing database connection - tables verified');
+        } catch (error) {
+            this.logger.error('Failed to ensure required tables:', error);
+            throw error; // Propagate error so caller knows initialization failed
+        }
+    }
+
+    // Return promise that resolves when initialization is complete
+    async waitForInitialization() {
+        if (this._initializationPromise) {
+            await this._initializationPromise;
+        }
     }
 
     async initializeConnection() {

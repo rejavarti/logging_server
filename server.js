@@ -813,7 +813,8 @@ async function initializeDatabase() {
             loggers.system.info('🔄 Reusing :memory: database connection from migration');
             dal = new DatabaseAccessLayer(dbPath, loggers.system, migration.db);
             // Wait for async table creation to complete
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await dal.waitForInitialization();
+            loggers.system.info('✅ DAL initialization complete for :memory: database');
         } else {
             // For file-based databases, normal connection creation is fine
             // 🔧 TIMING FIX: Allow SQLite to fully commit changes to disk
