@@ -2687,8 +2687,12 @@ if (require.main === module) {
 // Test initialization helper: sets up database, system components, routes without starting network listener
 // Ensures default admin user exists for authentication tests
 async function createTestApp() {
-    // Avoid re-initializing if already set up
-    if (!dal) {
+    // For :memory: databases, we MUST reinitialize for each test file
+    // because Jest runs test files sequentially and each needs its own database instance
+    const isMemoryDb = process.env.TEST_DB_PATH === ':memory:';
+    
+    // Avoid re-initializing if already set up (unless using :memory:)
+    if (!dal || isMemoryDb) {
         // Require AUTH_PASSWORD explicitly in test environments for security (no fallback)
         if (!process.env.AUTH_PASSWORD) {
             throw new Error('AUTH_PASSWORD environment variable must be set for tests');
