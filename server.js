@@ -644,13 +644,8 @@ app.use(express.static(path.join(__dirname, 'public'), {
 }));
 
 // Session configuration - Using SQLiteStore for persistent sessions
-app.use(session({
-    store: new SQLiteStore({
-        db: 'sessions.db',
-        dir: path.join(__dirname, 'data', 'sessions'),
-        table: 'sessions',
-        concurrentDB: true
-    }),
+// In test mode, use MemoryStore to avoid file system access
+const sessionConfig = {
     secret: config.auth.jwtSecret,
     resave: false,
     saveUninitialized: false,
@@ -662,7 +657,19 @@ app.use(session({
     },
     name: 'sessionId', // Don't use default session name
     rolling: true // Refresh session on activity
-}));
+};
+
+// Only use SQLiteStore in non-test environments
+if (process.env.NODE_ENV !== 'test') {
+    sessionConfig.store = new SQLiteStore({
+        db: 'sessions.db',
+        dir: path.join(__dirname, 'data', 'sessions'),
+        table: 'sessions',
+        concurrentDB: true
+    });
+}
+
+app.use(session(sessionConfig));
 
 // Rate limiting
 // Can be disabled for stress testing with DISABLE_RATE_LIMIT=true
