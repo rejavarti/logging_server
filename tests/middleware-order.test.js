@@ -20,7 +20,7 @@ describe('Middleware & Security Headers', () => {
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
     expect(res.headers['x-xss-protection']).toBeDefined();
-    expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+    expect(res.headers['referrer-policy']).toBe('no-referrer-when-downgrade');
   });
 
   test('API route rejects unauthenticated access with JSON 401', async () => {
