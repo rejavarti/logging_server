@@ -227,7 +227,7 @@ class AlertingEngine {
                     try {
                         const query = `
                             INSERT INTO alert_rules (
-                                name, description, type, condition, channels, severity, 
+                                name, description, type, conditions, channels, severity, 
                                 enabled, cooldown, escalation_rules, created_by, trigger_count
                             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         `;

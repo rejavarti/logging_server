@@ -1100,19 +1100,19 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async createAlertRule(ruleData) {
-        // Handle both frontend format (condition object) and direct condition string
-        const conditionValue = typeof ruleData.condition === 'object' 
-            ? JSON.stringify(ruleData.condition) 
-            : (ruleData.condition || '{}');
+        // Handle both frontend format (conditions object) and direct conditions string
+        const conditionsValue = typeof ruleData.conditions === 'object' 
+            ? JSON.stringify(ruleData.conditions) 
+            : (ruleData.conditions || '{}');
         
-        const sql = `INSERT INTO alert_rules (name, description, type, condition, severity, cooldown, 
+        const sql = `INSERT INTO alert_rules (name, description, type, conditions, severity, cooldown, 
                      enabled, channels, escalation_rules, created_at, updated_at) 
                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
         const params = [
             ruleData.name,
             ruleData.description || null,
             ruleData.type || 'pattern',
-            conditionValue,
+            conditionsValue,
             ruleData.severity || 'warning',
             ruleData.cooldown || 300,
             ruleData.enabled !== undefined ? (ruleData.enabled ? true : false) : true,
