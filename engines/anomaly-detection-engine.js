@@ -63,8 +63,8 @@ class AnomalyDetectionEngine {
 
         const queries = [
             `CREATE TABLE IF NOT EXISTS anomaly_detections (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMPTZ DEFAULT NOW(),
                 log_id INTEGER,
                 anomaly_type TEXT NOT NULL,
                 severity TEXT DEFAULT 'medium',
@@ -72,56 +72,56 @@ class AnomalyDetectionEngine {
                 description TEXT,
                 pattern_data TEXT,
                 context_data TEXT,
-                resolved INTEGER DEFAULT 0,
-                resolved_at DATETIME,
+                resolved BOOLEAN DEFAULT false,
+                resolved_at TIMESTAMPTZ,
                 resolved_by INTEGER,
-                false_positive INTEGER DEFAULT 0,
-                feedback_provided INTEGER DEFAULT 0,
+                false_positive BOOLEAN DEFAULT false,
+                feedback_provided BOOLEAN DEFAULT false,
                 FOREIGN KEY (log_id) REFERENCES logs (id),
                 FOREIGN KEY (resolved_by) REFERENCES users (id)
             )`,
             `CREATE TABLE IF NOT EXISTS anomaly_rules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
                 description TEXT,
                 rule_type TEXT NOT NULL,
                 parameters TEXT NOT NULL,
-                enabled INTEGER DEFAULT 1,
+                enabled BOOLEAN DEFAULT true,
                 confidence_threshold REAL DEFAULT 0.7,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
                 usage_count INTEGER DEFAULT 0,
                 accuracy_rating REAL DEFAULT 0
             )`,
             `CREATE TABLE IF NOT EXISTS anomaly_patterns (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 pattern_type TEXT NOT NULL,
                 pattern_signature TEXT NOT NULL,
                 frequency_normal REAL DEFAULT 0,
                 frequency_threshold REAL DEFAULT 0,
-                first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                first_seen TIMESTAMPTZ DEFAULT NOW(),
+                last_seen TIMESTAMPTZ DEFAULT NOW(),
                 occurrence_count INTEGER DEFAULT 1,
-                is_baseline INTEGER DEFAULT 0
+                is_baseline BOOLEAN DEFAULT false
             )`,
             `CREATE TABLE IF NOT EXISTS anomaly_training_data (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 feature_vector TEXT NOT NULL,
                 label TEXT NOT NULL,
                 weight REAL DEFAULT 1.0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
                 source_type TEXT DEFAULT 'automatic'
             )`,
             `CREATE TABLE IF NOT EXISTS anomaly_models (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 model_name TEXT UNIQUE NOT NULL,
                 model_type TEXT NOT NULL,
                 model_data TEXT NOT NULL,
-                training_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                training_date TIMESTAMPTZ DEFAULT NOW(),
                 accuracy_score REAL DEFAULT 0,
                 validation_score REAL DEFAULT 0,
                 parameters TEXT,
-                is_active INTEGER DEFAULT 1
+                is_active BOOLEAN DEFAULT true
             )`
         ];
 
@@ -139,7 +139,7 @@ class AnomalyDetectionEngine {
 
         const queries = [
             `CREATE TABLE IF NOT EXISTS log_correlations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 rule_id TEXT NOT NULL,
                 rule_name TEXT NOT NULL,
                 pattern_type TEXT NOT NULL,
@@ -148,14 +148,14 @@ class AnomalyDetectionEngine {
                 time_window INTEGER DEFAULT 300,
                 confidence_score REAL DEFAULT 0,
                 threshold_value REAL DEFAULT 0,
-                detected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                first_event_time DATETIME,
-                last_event_time DATETIME,
+                detected_at TIMESTAMPTZ DEFAULT NOW(),
+                first_event_time TIMESTAMPTZ,
+                last_event_time TIMESTAMPTZ,
                 events_json TEXT,
-                alert_triggered INTEGER DEFAULT 0,
-                alert_sent_at DATETIME,
-                resolved INTEGER DEFAULT 0,
-                resolved_at DATETIME,
+                alert_triggered BOOLEAN DEFAULT false,
+                alert_sent_at TIMESTAMPTZ,
+                resolved BOOLEAN DEFAULT false,
+                resolved_at TIMESTAMPTZ,
                 resolved_by TEXT,
                 notes TEXT
             )`,
@@ -168,17 +168,17 @@ class AnomalyDetectionEngine {
                 time_window INTEGER DEFAULT 300,
                 threshold INTEGER DEFAULT 5,
                 severity TEXT DEFAULT 'medium',
-                enabled INTEGER DEFAULT 1,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_triggered DATETIME,
+                enabled BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                last_triggered TIMESTAMPTZ,
                 trigger_count INTEGER DEFAULT 0
             )`,
             `CREATE TABLE IF NOT EXISTS correlation_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 correlation_id INTEGER NOT NULL,
                 log_id INTEGER NOT NULL,
-                event_timestamp DATETIME NOT NULL,
+                event_timestamp TIMESTAMPTZ NOT NULL,
                 event_data TEXT,
                 matched_pattern TEXT,
                 FOREIGN KEY (correlation_id) REFERENCES log_correlations (id),

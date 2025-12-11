@@ -56,12 +56,12 @@ class RealTimeStreamingEngine {
 
         const queries = [
             `CREATE TABLE IF NOT EXISTS streaming_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 client_id TEXT UNIQUE NOT NULL,
                 ip_address TEXT NOT NULL,
                 user_agent TEXT,
-                connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                disconnected_at DATETIME,
+                connected_at TIMESTAMPTZ DEFAULT NOW(),
+                disconnected_at TIMESTAMPTZ,
                 duration_seconds INTEGER,
                 messages_sent INTEGER DEFAULT 0,
                 bytes_sent INTEGER DEFAULT 0,
@@ -69,20 +69,20 @@ class RealTimeStreamingEngine {
                 status TEXT DEFAULT 'active'
             )`,
             `CREATE TABLE IF NOT EXISTS streaming_filters (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
                 description TEXT,
                 filter_criteria TEXT NOT NULL,
                 created_by INTEGER,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                is_public INTEGER DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                is_public BOOLEAN DEFAULT false,
                 usage_count INTEGER DEFAULT 0,
                 FOREIGN KEY (created_by) REFERENCES users (id)
             )`,
             `CREATE TABLE IF NOT EXISTS streaming_statistics (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMPTZ DEFAULT NOW(),
                 connected_clients INTEGER,
                 messages_per_second REAL,
                 bytes_per_second REAL,
