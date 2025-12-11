@@ -82,7 +82,6 @@ function checkInitialSetup() {
 const express = require('express');
 const compression = require('compression');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
 const cors = require('cors');
 const helmet = require('helmet');
 const moment = require('moment-timezone');
@@ -643,8 +642,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
     lastModified: true
 }));
 
-// Session configuration - Using SQLiteStore for persistent sessions
-// In test mode, use MemoryStore to avoid file system access
+// Session configuration - Using in-memory session store
 const sessionConfig = {
     secret: config.auth.jwtSecret,
     resave: false,
@@ -658,16 +656,6 @@ const sessionConfig = {
     name: 'sessionId', // Don't use default session name
     rolling: true // Refresh session on activity
 };
-
-// Only use SQLiteStore in non-test environments
-if (process.env.NODE_ENV !== 'test') {
-    sessionConfig.store = new SQLiteStore({
-        db: 'sessions.db',
-        dir: path.join(__dirname, 'data', 'sessions'),
-        table: 'sessions',
-        concurrentDB: true
-    });
-}
 
 app.use(session(sessionConfig));
 
