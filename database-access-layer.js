@@ -539,7 +539,8 @@ class DatabaseAccessLayer extends EventEmitter {
         }
         
         const values = fields.map(field => updates[field]);
-        const setClause = fields.map(field => `\`${field}\` = ?`).join(', ');
+        // PostgreSQL uses unquoted identifiers (or double quotes if needed)
+        const setClause = fields.map(field => `${field} = ?`).join(', ');
         const sql = `UPDATE users SET ${setClause} WHERE id = ?`;
         return await this.run(sql, [...values, userId]);
     }
