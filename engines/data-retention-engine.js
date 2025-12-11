@@ -55,6 +55,12 @@ class DataRetentionEngine {
     }
 
     async createRetentionSchema() {
+        // Skip table creation for PostgreSQL - schema is created by postgres-schema.sql
+        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            this.loggers.system.info('✅ Retention schema exists (PostgreSQL)');
+            return;
+        }
+
         const queries = [
             `CREATE TABLE IF NOT EXISTS retention_policies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
