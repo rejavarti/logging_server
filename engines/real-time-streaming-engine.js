@@ -48,6 +48,12 @@ class RealTimeStreamingEngine {
     }
 
     async createStreamingSchema() {
+        // Skip table creation for PostgreSQL - schema is created by postgres-schema.sql
+        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            this.loggers.system.info('✅ Streaming schema exists (PostgreSQL)');
+            return;
+        }
+
         const queries = [
             `CREATE TABLE IF NOT EXISTS streaming_sessions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

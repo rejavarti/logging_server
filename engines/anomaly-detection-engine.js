@@ -55,6 +55,12 @@ class AnomalyDetectionEngine {
     }
 
     async createAnomalySchema() {
+        // Skip table creation for PostgreSQL - schema is created by postgres-schema.sql
+        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            this.loggers.system.info('✅ Anomaly detection schema exists (PostgreSQL)');
+            return;
+        }
+
         const queries = [
             `CREATE TABLE IF NOT EXISTS anomaly_detections (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
