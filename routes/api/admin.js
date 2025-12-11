@@ -16,7 +16,7 @@ router.get('/users', async (req, res) => {
         const users = await req.dal.all(
             `SELECT 
                 id, username, email, role, 
-                active as status,
+                is_active as status,
                 created_at as created, 
                 last_login as lastLogin
              FROM users
