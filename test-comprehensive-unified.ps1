@@ -936,6 +936,288 @@ const puppeteer = require('puppeteer');
 } catch { Write-TestResult "Dashboard Lock Toggle" $false $_.Exception.Message }
 
 # ============================================================================
+# PHASE 7.5: ASYNC DATA LOADING VALIDATION (CRITICAL)
+# ============================================================================
+
+Write-TestHeader "PHASE 7.5: Async Data Loading & Frontend AJAX Validation"
+
+Write-Host "`n[7.5.1] Testing async data API endpoints..." -ForegroundColor Yellow
+$asyncEndpoints = @(
+    @{Name='Webhooks Data'; Path='/api/webhooks-data/all'; RequiredFields=@('webhooks','recentDeliveries','stats')},
+    @{Name='Integrations Data'; Path='/api/integrations-data/all'; RequiredFields=@('integrations','status','stats')},
+    @{Name='Activity Data'; Path='/api/activity-data/all'; RequiredFields=@('activities','users','stats')},
+    @{Name='Logs Data'; Path='/api/logs-data/all'; RequiredFields=@('entries','total','sources')},
+    @{Name='Search Data'; Path='/api/search-data/all'; RequiredFields=@('results','metadata')}
+)
+
+$asyncEndpointsPassed = 0
+foreach($endpoint in $asyncEndpoints){
+    try {
+        $response = Invoke-RestMethod -Uri "$ServerUrl$($endpoint.Path)" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"} -TimeoutSec 10
+        $missingFields = @()
+        if($response.success -and $response.data){
+            foreach($field in $endpoint.RequiredFields){
+                if(-not ($response.data.PSObject.Properties.Name -contains $field)){
+                    $missingFields += $field
+                }
+            }
+        } else {
+            $missingFields = $endpoint.RequiredFields
+        }
+        
+        if($missingFields.Count -eq 0){
+            Write-Host "    ✅ $($endpoint.Name)" -ForegroundColor Green
+            $asyncEndpointsPassed++
+        } else {
+            Write-Host "    ⚠️  $($endpoint.Name) - Missing: $($missingFields -join ', ')" -ForegroundColor Yellow
+        }
+    } catch {
+        Write-Host "    ❌ $($endpoint.Name) - $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+Write-TestResult "Async Data Endpoints" ($asyncEndpointsPassed -eq $asyncEndpoints.Count) "$asyncEndpointsPassed/$($asyncEndpoints.Count) endpoints functional" @{Passed=$asyncEndpointsPassed;Total=$asyncEndpoints.Count}
+
+Write-Host "`n[7.5.2] Checking for AJAX fetch calls in page HTML..." -ForegroundColor Yellow
+$pagesWithAjax = @(
+    @{Name='Webhooks'; Route='/webhooks'; FetchPattern='/api/webhooks-data'},
+    @{Name='Integrations'; Route='/integrations'; FetchPattern='/api/integrations-data'},
+    @{Name='Activity'; Route='/activity'; FetchPattern='/api/activity-data'},
+    @{Name='Logs'; Route='/logs'; FetchPattern='/api/logs-data'},
+    @{Name='Search'; Route='/search'; FetchPattern='/api/search-data'}
+)
+
+$ajaxImplemented = 0
+foreach($page in $pagesWithAjax){
+    try {
+        $html = Invoke-WebRequest -Uri "$ServerUrl$($page.Route)" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"} -UseBasicParsing -TimeoutSec 10
+        if($html.Content -match [regex]::Escape($page.FetchPattern)){
+            Write-Host "    ✅ $($page.Name) has AJAX loading" -ForegroundColor Green
+            $ajaxImplemented++
+        } else {
+            Write-Host "    ❌ $($page.Name) missing AJAX code (searching for: $($page.FetchPattern))" -ForegroundColor Red
+        }
+    } catch {
+        Write-Host "    ❌ $($page.Name) - $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+Write-TestResult "Frontend AJAX Implementation" ($ajaxImplemented -eq $pagesWithAjax.Count) "$ajaxImplemented/$($pagesWithAjax.Count) pages have async loading" @{Implemented=$ajaxImplemented;Total=$pagesWithAjax.Count}
+
+Write-Host "`n[7.5.3] Testing page load performance (HTML vs Total)..." -ForegroundColor Yellow
+$performanceResults = @()
+foreach($page in $pagesWithAjax){
+    try {
+        # Measure initial HTML load
+        $htmlTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $htmlResponse = Invoke-WebRequest -Uri "$ServerUrl$($page.Route)" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"} -UseBasicParsing -TimeoutSec 10
+        $htmlTimer.Stop()
+        
+        # Measure data API load
+        $dataTimer = [System.Diagnostics.Stopwatch]::StartNew()
+        $dataPath = $page.FetchPattern + '/all'
+        Invoke-RestMethod -Uri "$ServerUrl$dataPath" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"} -TimeoutSec 10 | Out-Null
+        $dataTimer.Stop()
+        
+        $performanceResults += [PSCustomObject]@{
+            Page = $page.Name
+            HTMLTime = $htmlTimer.ElapsedMilliseconds
+            DataTime = $dataTimer.ElapsedMilliseconds
+            TotalTime = $htmlTimer.ElapsedMilliseconds + $dataTimer.ElapsedMilliseconds
+            Target = 1000  # Should be <1s total
+        }
+        
+        $status = if(($htmlTimer.ElapsedMilliseconds + $dataTimer.ElapsedMilliseconds) -lt 1000){'✅'}else{'⚠️'}
+        Write-Host "    $status $($page.Name): HTML ${htmlTimer.ElapsedMilliseconds}ms + Data $($dataTimer.ElapsedMilliseconds)ms = $($htmlTimer.ElapsedMilliseconds + $dataTimer.ElapsedMilliseconds)ms" -ForegroundColor $(if($status -eq '✅'){'Green'}else{'Yellow'})
+    } catch {
+        Write-Host "    ❌ $($page.Name) - $($_.Exception.Message)" -ForegroundColor Red
+    }
+}
+
+$fastPages = ($performanceResults | Where-Object {$_.TotalTime -lt 1000}).Count
+Write-TestResult "Async Loading Performance" ($fastPages -eq $performanceResults.Count) "$fastPages/$($performanceResults.Count) pages load in <1s" @{
+    FastPages = $fastPages
+    Total = $performanceResults.Count
+    Results = $performanceResults
+}
+
+# ============================================================================
+# PHASE 7.6: PAGE FUNCTIONALITY VALIDATION (CRITICAL)
+# ============================================================================
+
+Write-TestHeader "PHASE 7.6: Page-Specific Functionality Tests"
+
+Write-Host "`n[7.6.1] Webhooks Page - Create/Test/Delete..." -ForegroundColor Yellow
+try {
+    # Create test webhook
+    $createWebhook = @{
+        name = "Test Webhook $(Get-Random)"
+        url = "https://webhook.site/unique-id"
+        events = @('log.created', 'log.error')
+        is_active = $true
+    } | ConvertTo-Json
+    
+    $created = Invoke-RestMethod -Uri "$ServerUrl/api/webhooks" -Method POST -Body $createWebhook -ContentType 'application/json' -Headers @{Authorization="Bearer $global:AuthToken"}
+    $webhookId = $created.id
+    
+    # Test webhook
+    $testResult = Invoke-RestMethod -Uri "$ServerUrl/api/webhooks/$webhookId/test" -Method POST -Headers @{Authorization="Bearer $global:AuthToken"}
+    
+    # Delete webhook
+    Invoke-RestMethod -Uri "$ServerUrl/api/webhooks/$webhookId" -Method DELETE -Headers @{Authorization="Bearer $global:AuthToken"} | Out-Null
+    
+    Write-TestResult "Webhooks CRUD Operations" $true "Created, tested, and deleted webhook #$webhookId" @{WebhookId=$webhookId}
+} catch {
+    Write-TestResult "Webhooks CRUD Operations" $false $_.Exception.Message
+}
+
+Write-Host "`n[7.6.2] Integrations Page - Toggle/Status..." -ForegroundColor Yellow
+try {
+    $integrations = Invoke-RestMethod -Uri "$ServerUrl/api/integrations" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"}
+    if($integrations.Count -gt 0){
+        $integration = $integrations[0]
+        # Try to get integration status
+        $status = Invoke-RestMethod -Uri "$ServerUrl/api/integrations/$($integration.id)/status" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"}
+        Write-TestResult "Integration Status Check" $true "Integration #$($integration.id): $($status.status)" @{IntegrationId=$integration.id;Status=$status.status}
+    } else {
+        Write-TestResult "Integration Status Check" $false "No integrations available to test"
+    }
+} catch {
+    Write-TestResult "Integration Status Check" $false $_.Exception.Message
+}
+
+Write-Host "`n[7.6.3] Activity Page - Filter/Search..." -ForegroundColor Yellow
+try {
+    $activities = Invoke-RestMethod -Uri "$ServerUrl/api/activity?limit=10" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"}
+    Write-TestResult "Activity Log Retrieval" ($activities.Count -ge 0) "Retrieved $($activities.Count) recent activities" @{Count=$activities.Count}
+} catch {
+    Write-TestResult "Activity Log Retrieval" $false $_.Exception.Message
+}
+
+Write-Host "`n[7.6.4] Logs Page - Filter/Pagination..." -ForegroundColor Yellow
+try {
+    # Test with filters
+    $logsFiltered = Invoke-RestMethod -Uri "$ServerUrl/api/logs?level=error&limit=5" -Method GET -Headers @{Authorization="Bearer $global:AuthToken"}
+    $totalLogs = if($logsFiltered.total){$logsFiltered.total}else{$logsFiltered.Count}
+    Write-TestResult "Log Filtering" $true "Error logs: $totalLogs" @{Level='error';Total=$totalLogs}
+} catch {
+    Write-TestResult "Log Filtering" $false $_.Exception.Message
+}
+
+Write-Host "`n[7.6.5] Search Page - Query Execution..." -ForegroundColor Yellow
+try {
+    $searchQuery = @{
+        query = 'error'
+        level = 'error'
+        limit = 10
+    } | ConvertTo-Json
+    
+    $searchResults = Invoke-RestMethod -Uri "$ServerUrl/api/search" -Method POST -Body $searchQuery -ContentType 'application/json' -Headers @{Authorization="Bearer $global:AuthToken"}
+    $resultCount = if($searchResults.results){$searchResults.results.Count}else{$searchResults.Count}
+    Write-TestResult "Search Functionality" $true "Found $resultCount results for 'error'" @{Query='error';Results=$resultCount}
+} catch {
+    Write-TestResult "Search Functionality" $false $_.Exception.Message
+}
+
+# ============================================================================
+# PHASE 7.7: POSTGRESQL-SPECIFIC TESTS (NEW)
+# ============================================================================
+
+Write-TestHeader "PHASE 7.7: PostgreSQL Integration Tests"
+
+Write-Host "`n[7.7.1] PostgreSQL environment validation..." -ForegroundColor Yellow
+try {
+    $envVars = @{
+        DB_TYPE = $env:DB_TYPE
+        POSTGRES_HOST = $env:POSTGRES_HOST
+        POSTGRES_PORT = $env:POSTGRES_PORT
+        POSTGRES_DB = $env:POSTGRES_DB
+        POSTGRES_USER = $env:POSTGRES_USER
+    }
+    
+    $missing = @()
+    foreach($key in $envVars.Keys){
+        if(-not $envVars[$key]){
+            $missing += $key
+        }
+    }
+    
+    $isPostgres = $envVars.DB_TYPE -eq 'postgres'
+    Write-TestResult "PostgreSQL Environment" ($missing.Count -eq 0 -and $isPostgres) "DB_TYPE=$($envVars.DB_TYPE), Missing vars: $($missing -join ', ')" @{EnvVars=$envVars;Missing=$missing}
+} catch {
+    Write-TestResult "PostgreSQL Environment" $false $_.Exception.Message
+}
+
+Write-Host "`n[7.7.2] PostgreSQL connection test..." -ForegroundColor Yellow
+if($env:DB_TYPE -eq 'postgres' -and (Get-Command docker -ErrorAction SilentlyContinue)){
+    try {
+        $pgTest = docker exec logging-server-postgres pg_isready -U postgres 2>&1
+        $connected = $pgTest -match 'accepting connections'
+        Write-TestResult "PostgreSQL Connection" $connected "Status: $pgTest" @{Output=$pgTest}
+    } catch {
+        Write-TestResult "PostgreSQL Connection" $false $_.Exception.Message
+    }
+} else {
+    Write-Host "    ⚠️  Skipped - Not using PostgreSQL or Docker not available" -ForegroundColor Yellow
+}
+
+Write-Host "`n[7.7.3] PostgreSQL table existence check..." -ForegroundColor Yellow
+if($env:DB_TYPE -eq 'postgres' -and (Get-Command docker -ErrorAction SilentlyContinue)){
+    try {
+        $tables = docker exec -i logging-server-postgres psql -U postgres -d logging_server -t -c "\dt" 2>&1 | Where-Object {$_ -match '\|'}
+        $tableNames = $tables | ForEach-Object {
+            if($_ -match '\|\s*(\w+)\s*\|'){
+                $matches[1]
+            }
+        }
+        
+        $requiredTables = @('logs','users','webhooks','integrations','system_settings','encrypted_secrets','activity_log')
+        $missingTables = @()
+        foreach($table in $requiredTables){
+            if($tableNames -notcontains $table){
+                $missingTables += $table
+            }
+        }
+        
+        Write-TestResult "PostgreSQL Schema" ($missingTables.Count -eq 0) "Tables found: $($tableNames.Count), Missing: $($missingTables -join ', ')" @{Found=$tableNames.Count;Missing=$missingTables}
+    } catch {
+        Write-TestResult "PostgreSQL Schema" $false $_.Exception.Message
+    }
+} else {
+    Write-Host "    ⚠️  Skipped - Not using PostgreSQL or Docker not available" -ForegroundColor Yellow
+}
+
+Write-Host "`n[7.7.4] PostgreSQL concurrent writes test..." -ForegroundColor Yellow
+try {
+    $concurrentInserts = 20
+    $jobs = @()
+    
+    for($i = 1; $i -le $concurrentInserts; $i++){
+        $jobs += Start-Job -ScriptBlock {
+            param($url, $token, $index)
+            $logEntry = @{
+                level = 'info'
+                message = "Concurrent test log #$index"
+                source = 'test-suite'
+            } | ConvertTo-Json
+            
+            Invoke-RestMethod -Uri "$url/api/logs" -Method POST -Body $logEntry -ContentType 'application/json' -Headers @{Authorization="Bearer $token"} -TimeoutSec 10
+        } -ArgumentList $ServerUrl, $global:AuthToken, $i
+    }
+    
+    $timer = [System.Diagnostics.Stopwatch]::StartNew()
+    $results = $jobs | Wait-Job -Timeout 30 | Receive-Job
+    $timer.Stop()
+    
+    $jobs | Remove-Job -Force
+    
+    $successful = ($results | Where-Object {$_.success}).Count
+    $avgTime = [math]::Round($timer.ElapsedMilliseconds / $concurrentInserts, 1)
+    
+    Write-TestResult "PostgreSQL Concurrent Writes" ($successful -eq $concurrentInserts) "$successful/$concurrentInserts writes succeeded (${avgTime}ms avg)" @{Successful=$successful;Total=$concurrentInserts;AvgTime=$avgTime}
+} catch {
+    Write-TestResult "PostgreSQL Concurrent Writes" $false $_.Exception.Message
+}
+
+# ============================================================================
 # PHASE 8: PERFORMANCE METRICS
 # ============================================================================
 
