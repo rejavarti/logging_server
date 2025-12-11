@@ -190,7 +190,17 @@ class UniversalSQLiteAdapter {
         });
         
         // Optimize for performance
-        this.db.pragma('journal_mode = WAL');
+        // CRITICAL: WAL mode doesn't work on network filesystems (SMB/NFS)
+        // Use DELETE mode (rollback journal) for compatibility with Unraid/NAS mounts
+        // Set SQLITE_USE_WAL=true to enable WAL for local filesystems only
+        const useWAL = process.env.SQLITE_USE_WAL === 'true';
+        if (useWAL) {
+            this.db.pragma('journal_mode = WAL');
+            this.logger.info('📝 Using WAL journal mode (fast, local filesystem only)');
+        } else {
+            this.db.pragma('journal_mode = DELETE');
+            this.logger.info('📝 Using DELETE journal mode (compatible with SMB/NFS mounts)');
+        }
         this.db.pragma('synchronous = NORMAL');
         this.db.pragma('cache_size = -64000'); // 64MB cache
         this.db.pragma('temp_store = MEMORY');
