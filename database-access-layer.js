@@ -1,20 +1,36 @@
 /**
- * SIMPLIFIED DATABASE ACCESS LAYER WITH UNIVERSAL SQLITE ADAPTER
+ * DATABASE ACCESS LAYER
  * 
- * Uses the Universal SQLite Adapter for optimal performance:
- * 🐳 Docker/Linux: better-sqlite3 (native performance)
- * 💻 Windows: sql.js (universal compatibility)
- * 🔄 Fallback: sqlite3 (legacy support)
+ * Supports PostgreSQL for production and SQLite for testing/development
  */
 
-const UniversalSQLiteAdapter = require('./universal-sqlite-adapter');
 const EventEmitter = require('events');
 
 class DatabaseAccessLayer extends EventEmitter {
     constructor(databasePath, logger, existingDb = null) {
         super();
-        // CRITICAL: For :memory: databases, reuse existing connection to preserve data
-        this.db = existingDb || new UniversalSQLiteAdapter(databasePath);
+        
+        // Direct adapter selection based on DB_TYPE
+        if (existingDb) {
+            // CRITICAL: For :memory: databases, reuse existing connection to preserve data
+            this.db = existingDb;
+        } else if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            // PostgreSQL for production
+            const PostgresAdapter = require('./postgres-adapter');
+            const config = {
+                host: process.env.POSTGRES_HOST || 'localhost',
+                port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+                database: process.env.POSTGRES_DB || 'logging_server',
+                user: process.env.POSTGRES_USER || 'postgres',
+                password: process.env.POSTGRES_PASSWORD
+            };
+            this.db = new PostgresAdapter(config, logger);
+        } else {
+            // SQLite for testing/development
+            const UniversalSQLiteAdapter = require('./universal-sqlite-adapter');
+            this.db = new UniversalSQLiteAdapter(databasePath);
+        }
+        
         this.logger = logger;
         this.transactionActive = false;
         this.usingExistingDb = !!existingDb; // Track if we're reusing a connection
