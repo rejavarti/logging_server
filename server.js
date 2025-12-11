@@ -806,26 +806,34 @@ async function initializeDatabase() {
         // Allow TEST_DB_PATH override for test environments
         const dbPath = process.env.TEST_DB_PATH || path.join(dbDir, 'enterprise_logs.db');
         
-        // Run database migration first to ensure all tables exist
-        loggers.system.info('🔧 Running database migration...');
-        const DatabaseMigration = require('./migrations/database-migration');
-        const migration = new DatabaseMigration(dbPath, loggers.system);
-        await migration.runMigration();
-        loggers.system.info('✅ Database migration completed successfully');
-        
-        // CRITICAL FIX: Reuse migration database connection to avoid close/reopen issues
-        // This prevents SQLite lock file problems on network mounts (SMB/NFS)
-        // and eliminates timing issues on slower filesystems
-        if (migration.db) {
-            loggers.system.info('🔄 Reusing database connection from migration (avoids lock issues)');
-            dal = new DatabaseAccessLayer(dbPath, loggers.system, migration.db);
-            // Wait for async table creation to complete
-            await dal.waitForInitialization();
-            loggers.system.info('✅ DAL initialization complete with reused connection');
-        } else {
-            // Fallback: create new connection if migration didn't provide one
-            loggers.system.info('⏳ Creating new database connection...');
+        // Skip SQLite migration for PostgreSQL (schema already created)
+        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            loggers.system.info('📊 Using PostgreSQL - skipping SQLite migration');
             dal = new DatabaseAccessLayer(dbPath, loggers.system);
+            await dal.waitForInitialization();
+            loggers.system.info('✅ PostgreSQL database initialized');
+        } else {
+            // Run database migration first to ensure all tables exist (SQLite only)
+            loggers.system.info('🔧 Running database migration...');
+            const DatabaseMigration = require('./migrations/database-migration');
+            const migration = new DatabaseMigration(dbPath, loggers.system);
+            await migration.runMigration();
+            loggers.system.info('✅ Database migration completed successfully');
+            
+            // CRITICAL FIX: Reuse migration database connection to avoid close/reopen issues
+            // This prevents SQLite lock file problems on network mounts (SMB/NFS)
+            // and eliminates timing issues on slower filesystems
+            if (migration.db) {
+                loggers.system.info('🔄 Reusing database connection from migration (avoids lock issues)');
+                dal = new DatabaseAccessLayer(dbPath, loggers.system, migration.db);
+                // Wait for async table creation to complete
+                await dal.waitForInitialization();
+                loggers.system.info('✅ DAL initialization complete with reused connection');
+            } else {
+                // Fallback: create new connection if migration didn't provide one
+                loggers.system.info('⏳ Creating new database connection...');
+                dal = new DatabaseAccessLayer(dbPath, loggers.system);
+            }
         }
         
         // Attach metrics manager reference for reliability counters once initialized
