@@ -231,7 +231,7 @@ class AnomalyDetectionEngine {
             
             const patterns = await this.db.all(`
                 SELECT * FROM anomaly_patterns 
-                WHERE is_baseline = 1
+                WHERE is_baseline = true
             `);
 
             this.anomalyThresholds.clear();
@@ -316,12 +316,13 @@ class AnomalyDetectionEngine {
             for (const rule of defaultRules) {
                 await this.db.run(`
                     INSERT INTO anomaly_rules (
-                        name, description, rule_config, threshold
-                    ) VALUES (?, ?, ?, ?)
+                        name, description, rule_type, parameters, confidence_threshold
+                    ) VALUES (?, ?, ?, ?, ?)
                 `, [
                     rule.name,
                     rule.description,
-                    JSON.stringify({ type: rule.rule_type, parameters: rule.parameters }),
+                    rule.rule_type || 'statistical',
+                    JSON.stringify(rule.parameters || {}),
                     rule.confidence_threshold || 0.8
                 ]);
             }
@@ -1112,7 +1113,7 @@ class AnomalyDetectionEngine {
             const topRules = await this.db.all(`
                 SELECT ar.name, ar.usage_count, ar.accuracy_rating
                 FROM anomaly_rules ar
-                WHERE ar.enabled = 1
+                WHERE ar.enabled = true
                 ORDER BY ar.usage_count DESC
                 LIMIT 10
             `);

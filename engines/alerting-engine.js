@@ -227,16 +227,24 @@ class AlertingEngine {
                     try {
                         const query = `
                             INSERT INTO alert_rules (
-                                name, description, type, conditions, channels, severity, 
+                                name, description, type, conditions, actions, channels, severity, 
                                 enabled, cooldown, escalation_rules, created_by, trigger_count
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         `;
+                        
+                        // Create default actions from channels
+                        const actions = rule.channels.map(channel => ({
+                            type: 'notify',
+                            channel: channel,
+                            template: 'default'
+                        }));
                         
                         await this.dal.run(query, [
                             rule.name,
                             rule.description || '',
                             rule.type,
                             JSON.stringify(rule.condition),
+                            JSON.stringify(actions),
                             JSON.stringify(rule.channels),
                             rule.severity,
                             rule.enabled ? true : false,
