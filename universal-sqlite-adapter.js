@@ -23,9 +23,20 @@ const fs = require('fs');
 const path = require('path');
 
 class UniversalSQLiteAdapter {
-    constructor(databasePath, options = {}) {
+    constructor(databasePath, optionsOrLogger = {}) {
         this.databasePath = databasePath;
-        this.options = options;
+        
+        // Support both new style (options object) and legacy style (logger passed directly)
+        if (optionsOrLogger && typeof optionsOrLogger.info === 'function') {
+            // Legacy: logger passed directly as second parameter
+            this.logger = optionsOrLogger;
+            this.options = {};
+        } else {
+            // New: options object with optional logger
+            this.options = optionsOrLogger || {};
+            this.logger = this.options.logger || console;
+        }
+        
         this.db = null;
         this.dbType = null;
         this.periodicSaveInterval = null; // Track interval for cleanup
