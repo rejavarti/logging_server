@@ -57,6 +57,7 @@
     "muuri": "^0.9.5",
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.0",
+    "pg": "^8.11.3",
     "pushover-notifications": "^1.2.3",
     "sql.js": "^1.13.0",
     "sqlite3": "^5.1.7",

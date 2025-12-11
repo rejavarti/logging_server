@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: logging-server-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: logging_server
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ChangeMeSecurePassword123!}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations/postgres-schema.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - logging-network
+
+  logging-server:
+    image: rejavarti/logging-server:latest
+    container_name: logging-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Database configuration
+      DB_TYPE: postgres
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: logging_server
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ChangeMeSecurePassword123!}
+      
+      # Application configuration
+      NODE_ENV: production
+      TZ: America/Edmonton
+      PORT: 10180
+      WS_PORT: 8081
+      STREAM_PORT: 8082
+      
+      # Security
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-Admin123!}
+    ports:
+      - "10180:10180"
+      - "8081:8081"
+      - "8082:8082"
+      - "514:514/udp"
+      - "601:601/tcp"
+      - "12201:12201/udp"
+      - "5044:5044/tcp"
+    networks:
+      - logging-network
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  logging-network:
+    driver: bridge

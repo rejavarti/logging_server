@@ -82,12 +82,38 @@ class UniversalSQLiteAdapter {
     /**
      * Initialize the database adapter (must be called after construction)
      * This is async because sql.js requires async initialization
+     * Also supports PostgreSQL via DB_TYPE environment variable
      */
     async init() {
         if (this.db) {
             return; // Already initialized
         }
+        
+        // Check if PostgreSQL is requested
+        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            return await this.initPostgreSQL();
+        }
+        
         await this.initializeDatabase();
+    }
+
+    /**
+     * Initialize PostgreSQL adapter
+     */
+    async initPostgreSQL() {
+        const PostgresAdapter = require('./postgres-adapter');
+        const config = {
+            host: process.env.POSTGRES_HOST,
+            port: process.env.POSTGRES_PORT,
+            database: process.env.POSTGRES_DB,
+            user: process.env.POSTGRES_USER,
+            password: process.env.POSTGRES_PASSWORD
+        };
+        
+        this.db = new PostgresAdapter(config, this.logger);
+        await this.db.init();
+        this.dbType = 'postgres';
+        this.logger.info('✅ Using PostgreSQL database');
     }
 
     /**
