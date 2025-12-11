@@ -14,8 +14,8 @@ router.get('/', async (req, res) => {
                 username: user.username,
                 email: user.email,
                 role: user.role || 'viewer',
-                status: user.active ? 'active' : 'inactive',
-                is_active: user.active === 1,
+                status: user.is_active ? 'active' : 'inactive',
+                is_active: user.is_active,
                 created: user.created_at,
                 created_at: user.created_at,
                 lastLogin: user.last_login,
@@ -67,8 +67,8 @@ router.post('/', async (req, res) => {
         
         // Insert user
         const result = await req.dal.run(
-            `INSERT INTO users (username, email, password_hash, role, active) VALUES (?, ?, ?, ?, ?)`,
-            [username, email, password_hash, role || 'viewer', 1]
+            `INSERT INTO users (username, email, password_hash, role, is_active) VALUES (?, ?, ?, ?, ?)`,
+            [username, email, password_hash, role || 'viewer', true]
         );
         
         const newUser = {
@@ -149,8 +149,8 @@ router.put('/:id', async (req, res) => {
         }
         
         if (updates.status) {
-            updateFields.push('active = ?');
-            params.push(updates.status === 'active' ? 1 : 0);
+            updateFields.push('is_active = ?');
+            params.push(updates.status === 'active' ? true : false);
         }
         
         if (updateFields.length === 0) {
@@ -176,8 +176,8 @@ router.put('/:id', async (req, res) => {
             username: user.username,
             email: user.email,
             role: user.role || 'viewer',
-            status: user.active ? 'active' : 'inactive',
-            is_active: user.active === 1,
+            status: user.is_active ? 'active' : 'inactive',
+            is_active: user.is_active,
             created: user.created_at,
             lastLogin: user.last_login,
             updated: new Date().toISOString()
