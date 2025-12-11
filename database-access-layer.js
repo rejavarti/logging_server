@@ -1627,7 +1627,8 @@ class DatabaseAccessLayer extends EventEmitter {
             // Get database size
             let dbSize = 0;
             try {
-                const sizeResult = await this.get(`SELECT page_count * page_size as size FROM pragma_page_count(), pragma_page_size()`);
+                // PostgreSQL: Get database size using pg_database_size()
+                const sizeResult = await this.get(`SELECT pg_database_size(current_database()) as size`);
                 dbSize = sizeResult ? Math.round(sizeResult.size / 1024 / 1024) : 0;
             } catch (error) {
                 // Ignore errors getting DB size

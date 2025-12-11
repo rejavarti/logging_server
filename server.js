@@ -949,7 +949,7 @@ async function initializeSystemComponents() {
             // Update session last_activity (use explicit UTC time)
             const utcNow = moment.utc().format('YYYY-MM-DD HH:mm:ss');
             dal.run(
-                `UPDATE user_sessions SET last_activity = ? WHERE session_token = ? AND is_active = 1`,
+                `UPDATE user_sessions SET last_activity = ? WHERE session_token = ?`,
                 [utcNow, token],
                 (err) => {
                     if (err) loggers.system.error('Failed to update session activity:', err);
