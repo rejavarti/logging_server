@@ -178,6 +178,12 @@ class DatabaseAccessLayer extends EventEmitter {
 
     // Ensure required tables exist (especially user_sessions which is critical for session tracking)
     async ensureRequiredTables() {
+        // Skip table creation for PostgreSQL - schema already managed via postgres-schema.sql
+        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            this.logger.info('PostgreSQL detected - skipping table creation (schema pre-initialized)');
+            return;
+        }
+        
         try {
             // Create user_sessions table if it doesn't exist
             await this.db.run(`
