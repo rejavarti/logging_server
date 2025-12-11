@@ -31,11 +31,11 @@ class IntegrationHealthWidget extends BaseWidget {
                     enabled,
                     last_triggered,
                     CASE 
-                        WHEN enabled = 1 THEN 'active'
+                        WHEN enabled = true THEN 'active'
                         ELSE 'inactive'
                     END as status
                 FROM integrations
-                WHERE enabled = 1
+                WHERE enabled = true
                 ORDER BY name
             `) || [];
 

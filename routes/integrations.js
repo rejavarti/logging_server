@@ -2023,7 +2023,7 @@ router.get('/api/health', async (req, res) => {
 
         // Get list of ALL integrations from the integrations table (custom configured ones)
         const enabledIntegrations = await req.dal.all(
-            'SELECT id, name, type, config, status, enabled, last_sync, error_count, last_error, created_at, updated_at FROM integrations WHERE enabled = 1'
+            'SELECT id, name, type, config, status, enabled, last_sync, error_count, last_error, created_at, updated_at FROM integrations WHERE enabled = true'
         ) || [];
         
         // If no enabled integrations, return empty array

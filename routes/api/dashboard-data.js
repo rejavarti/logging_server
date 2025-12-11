@@ -133,7 +133,7 @@ router.get('/all', async (req, res) => {
                 GROUP BY hour, level
                 ORDER BY hour
             `).catch(() => []),
-            req.dal.all(`SELECT name, type, enabled FROM integrations WHERE enabled = 1`).catch(() => [])
+            req.dal.all(`SELECT name, type, enabled FROM integrations WHERE enabled = true`).catch(() => [])
         ]);
 
         let integrationStats = [];

@@ -155,6 +155,14 @@ class PostgresAdapter {
             client.release();
         }
     }
+
+    // Driver info for compatibility
+    getDriverInfo() {
+        return {
+            type: 'PostgreSQL',
+            performance: 'high'
+        };
+    }
 }
 
 module.exports = PostgresAdapter;

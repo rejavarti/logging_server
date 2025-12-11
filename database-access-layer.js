@@ -1144,7 +1144,7 @@ class DatabaseAccessLayer extends EventEmitter {
     // Alert and notification methods
     async getAlertRules() {
         try {
-            const sql = `SELECT * FROM alert_rules WHERE enabled = 1 ORDER BY priority DESC`;
+            const sql = `SELECT * FROM alert_rules WHERE enabled = true ORDER BY priority DESC`;
             return await this.all(sql);
         } catch (error) {
             this.logger.warn('Failed to get alert rules:', error.message);

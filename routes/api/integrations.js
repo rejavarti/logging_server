@@ -121,7 +121,7 @@ router.post('/integrations', async (req, res) => {
         if (typeof enabled === 'boolean') {
             enabled = enabled ? 1 : 0;
         } else if (enabled === undefined) {
-            enabled = 1;
+            enabled = true;
         }
         
         if (typeof verifySsl === 'boolean') {

@@ -131,6 +131,12 @@ class AnomalyDetectionEngine {
     }
 
     async createCorrelationSchema() {
+        // Skip table creation for PostgreSQL - schema is created by postgres-schema.sql
+        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+            this.loggers.system.info('✅ Correlation schema exists (PostgreSQL)');
+            return;
+        }
+
         const queries = [
             `CREATE TABLE IF NOT EXISTS log_correlations (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -191,7 +197,7 @@ class AnomalyDetectionEngine {
             
             const rules = await this.db.all(`
                 SELECT * FROM anomaly_rules 
-                WHERE enabled = 1 
+                WHERE enabled = true 
                 ORDER BY name
             `);
 

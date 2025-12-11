@@ -104,7 +104,7 @@ class AlertingEngine {
     async loadAlertRulesFromDB() {
         try {
             // Use DAL 'all' method for querying alert rules
-            const rows = await this.dal.all('SELECT * FROM alert_rules WHERE enabled = 1');
+            const rows = await this.dal.all('SELECT * FROM alert_rules WHERE enabled = true');
             
             if (rows && rows.length > 0) {
                 this.rules = rows.map(row => ({
@@ -275,7 +275,7 @@ class AlertingEngine {
     async loadNotificationChannelsFromDB() {
         try {
             // Use DAL 'all' method for querying notification channels
-            const rows = await this.dal.all('SELECT * FROM notification_channels WHERE enabled = 1');
+            const rows = await this.dal.all('SELECT * FROM notification_channels WHERE enabled = true');
             
             if (rows && rows.length > 0) {
                 rows.forEach(row => {
