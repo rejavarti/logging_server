@@ -76,7 +76,7 @@ router.get('/sessions', async (req, res) => {
                     s.is_active as active
                  FROM user_sessions s
                  LEFT JOIN users u ON s.user_id = u.id
-                 WHERE s.is_active = 1 AND s.expires_at > datetime('now')
+                 WHERE s.is_active = true AND s.expires_at > NOW()
                  ORDER BY s.last_activity DESC`
             );
         } catch (dbErr) {

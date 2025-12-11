@@ -392,7 +392,7 @@ router.get('/system/rate-limits', async (req, res) => {
         const recentRequests = await req.dal.all(
             `SELECT endpoint, COUNT(*) as count, AVG(response_time_ms) as avg_time
              FROM request_metrics 
-             WHERE timestamp > datetime('now', '-1 hour')
+             WHERE timestamp > NOW() - INTERVAL '1 hour'
              GROUP BY endpoint 
              ORDER BY count DESC 
              LIMIT 10`,
@@ -400,7 +400,7 @@ router.get('/system/rate-limits', async (req, res) => {
         ).catch(() => []);
         
         const totalRequests = await req.dal.get(
-            `SELECT COUNT(*) as total FROM request_metrics WHERE timestamp > datetime('now', '-1 hour')`,
+            `SELECT COUNT(*) as total FROM request_metrics WHERE timestamp > NOW() - INTERVAL '1 hour'`,
             []
         ).catch(() => ({ total: 0 }));
         

@@ -224,7 +224,7 @@ router.get('/analytics', async (req, res) => {
                     COUNT(DISTINCT user_id) as unique_users,
                     AVG(LENGTH(query)) as avg_query_length
                 FROM saved_searches 
-                WHERE created_at >= datetime('now', '-24 hours')
+                WHERE created_at >= NOW() - INTERVAL '24 hours'
             `);
             
             if (stats && stats[0]) {

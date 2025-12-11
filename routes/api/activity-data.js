@@ -31,7 +31,7 @@ router.get('/all', async (req, res) => {
         const activityByType = await req.dal.all(
             `SELECT action_type, COUNT(*) as count 
              FROM activity_log 
-             WHERE created_at > datetime('now', '-24 hours')
+             WHERE created_at > NOW() - INTERVAL '24 hours'
              GROUP BY action_type 
              ORDER BY count DESC`
         ).catch(() => []);
@@ -104,7 +104,7 @@ router.get('/stats', async (req, res) => {
             req.dal.all(
                 `SELECT action_type, COUNT(*) as count 
                  FROM activity_log 
-                 WHERE created_at > datetime('now', '-24 hours')
+                 WHERE created_at > NOW() - INTERVAL '24 hours'
                  GROUP BY action_type 
                  ORDER BY count DESC`
             )

@@ -86,7 +86,7 @@ router.get('/dependencies', async (req, res) => {
             FROM logs
             WHERE source IS NOT NULL 
               AND source != ''
-              AND timestamp > datetime('now', '-7 days')
+              AND timestamp > NOW() - INTERVAL '7 days'
             GROUP BY source
             HAVING count > 0
             ORDER BY count DESC

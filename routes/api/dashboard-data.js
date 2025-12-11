@@ -62,13 +62,13 @@ router.get('/hourly-stats', async (req, res) => {
     try {
         const hourlyStats = await req.dal.all(`
             SELECT 
-                strftime('%H:00', timestamp) as hour,
+                TO_CHAR(DATE_TRUNC('hour', timestamp), 'HH24:00') as hour,
                 COUNT(*) as count,
                 level
             FROM logs 
-            WHERE timestamp >= datetime('now', '-24 hours')
-            GROUP BY hour, level
-            ORDER BY hour
+            WHERE timestamp >= NOW() - INTERVAL '24 hours'
+            GROUP BY DATE_TRUNC('hour', timestamp), level
+            ORDER BY DATE_TRUNC('hour', timestamp)
         `) || [];
         res.json({ success: true, data: hourlyStats });
     } catch (error) {
@@ -86,7 +86,7 @@ router.get('/integrations', async (req, res) => {
         const integrations = await req.dal.all(`
             SELECT name, type, enabled 
             FROM integrations 
-            WHERE enabled = 1
+            WHERE enabled = true
         `) || [];
         
         let integrationStats = [];
@@ -119,17 +119,17 @@ router.get('/all', async (req, res) => {
             req.dal.all(`
                 SELECT level, COUNT(*) as count 
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours') 
+                WHERE timestamp >= NOW() - INTERVAL '24 hours' 
                 GROUP BY level 
                 ORDER BY count DESC
             `).catch(() => []),
             req.dal.all(`
                 SELECT 
-                    strftime('%H:00', timestamp) as hour,
+                    TO_CHAR(DATE_TRUNC('hour', timestamp), 'HH24:00') as hour,
                     COUNT(*) as count,
                     level
                 FROM logs 
-                WHERE timestamp >= datetime('now', '-24 hours')
+                WHERE timestamp >= NOW() - INTERVAL '24 hours'
                 GROUP BY hour, level
                 ORDER BY hour
             `).catch(() => []),

@@ -44,7 +44,7 @@ router.get('/top-sources', async (req,res)=>{
 // GET /api/analytics/severities
 router.get('/severities', async (req,res)=>{
   try {
-    const rows = await req.dal.all("SELECT level as severity, COUNT(*) as count FROM logs WHERE timestamp >= datetime('now','-24 hours') GROUP BY level");
+    const rows = await req.dal.all("SELECT level as severity, COUNT(*) as count FROM logs WHERE timestamp >= NOW() - INTERVAL '24 hours' GROUP BY level");
     res.json({ success:true, severities: rows });
   } catch(err){ res.status(500).json({success:false,error:'failed'}); }
 });
@@ -52,7 +52,7 @@ router.get('/severities', async (req,res)=>{
 // GET /api/analytics/categories
 router.get('/categories', async (req,res)=>{
   try {
-    const rows = await req.dal.all("SELECT COALESCE(category, source, 'System') as category, COUNT(*) as count FROM logs WHERE timestamp >= datetime('now','-24 hours') GROUP BY category ORDER BY count DESC LIMIT 25");
+    const rows = await req.dal.all("SELECT COALESCE(category, source, 'System') as category, COUNT(*) as count FROM logs WHERE timestamp >= NOW() - INTERVAL '24 hours' GROUP BY category ORDER BY count DESC LIMIT 25");
     res.json({ success:true, categories: rows });
   } catch(err){ res.status(500).json({success:false,error:'failed'}); }
 });
@@ -62,7 +62,7 @@ router.get('/histogram/hourly', async (req,res)=>{
   try {
     const hours = intParam(req.query.hours,{def:24,min:1,max:168});
     const data = await cache.getOrSet('histogram_hourly_'+hours, 30_000, async () => {
-      return await req.dal.all("SELECT strftime('%Y-%m-%d %H:00:00', timestamp) as bucket, COUNT(*) as count FROM logs WHERE timestamp >= datetime('now', ? ) GROUP BY bucket ORDER BY bucket DESC", [`-${hours} hours`]);
+      return await req.dal.all("SELECT TO_CHAR(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00:00') as bucket, COUNT(*) as count FROM logs WHERE timestamp >= NOW() - INTERVAL '1 hour' * ? GROUP BY bucket ORDER BY bucket DESC", [hours]);
     });
     res.json({ success:true, hours, buckets: data });
   } catch(err){ res.status(500).json({success:false,error:'failed'}); }
@@ -73,7 +73,7 @@ router.get('/histogram/daily', async (req,res)=>{
   try {
     const days = intParam(req.query.days,{def:7,min:1,max:30});
     const data = await cache.getOrSet('histogram_daily_'+days, 60_000, async () => {
-      return await req.dal.all("SELECT strftime('%Y-%m-%d', timestamp) as bucket, COUNT(*) as count FROM logs WHERE timestamp >= datetime('now', ? ) GROUP BY bucket ORDER BY bucket DESC", [`-${days} days`]);
+      return await req.dal.all("SELECT TO_CHAR(DATE_TRUNC('day', timestamp), 'YYYY-MM-DD') as bucket, COUNT(*) as count FROM logs WHERE timestamp >= NOW() - INTERVAL '1 day' * ? GROUP BY bucket ORDER BY bucket DESC", [days]);
     });
     res.json({ success:true, days, buckets: data });
   } catch(err){ res.status(500).json({success:false,error:'failed'}); }
@@ -83,7 +83,7 @@ router.get('/histogram/daily', async (req,res)=>{
 router.get('/histogram/messages', async (req,res)=>{
   try {
     // use last 24h and group by level for a simple message distribution
-    const rows = await req.dal.all("SELECT level, COUNT(*) as count FROM logs WHERE timestamp >= datetime('now','-24 hours') GROUP BY level");
+    const rows = await req.dal.all("SELECT level, COUNT(*) as count FROM logs WHERE timestamp >= NOW() - INTERVAL '24 hours' GROUP BY level");
     res.json({ success:true, distribution: rows });
   } catch(err){ res.status(500).json({success:false,error:'failed'}); }
 });
@@ -91,7 +91,7 @@ router.get('/histogram/messages', async (req,res)=>{
 // GET /api/analytics/heatmap/severity-time
 router.get('/heatmap/severity-time', async (req,res)=>{
   try {
-    const rows = await req.dal.all("SELECT strftime('%H', timestamp) as hour, level as severity, COUNT(*) as count FROM logs WHERE timestamp >= datetime('now','-24 hours') GROUP BY hour, severity");
+    const rows = await req.dal.all("SELECT EXTRACT(HOUR FROM timestamp)::TEXT as hour, level as severity, COUNT(*) as count FROM logs WHERE timestamp >= NOW() - INTERVAL '24 hours' GROUP BY hour, severity");
     res.json({ success:true, points: rows });
   } catch(err){ res.status(500).json({success:false,error:'failed'}); }
 });

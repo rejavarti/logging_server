@@ -155,9 +155,9 @@ router.get('/audit-trail/stats', async (req, res) => {
         // Totals over different windows
         const [totalRow, last24Row, last7Row, last30Row] = await Promise.all([
             dal.get(`SELECT COUNT(*) AS c FROM activity_log`),
-            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= datetime('now','-24 hours')`),
-            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= datetime('now','-7 days')`),
-            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= datetime('now','-30 days')`)
+            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= NOW() - INTERVAL '24 hours'`),
+            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= NOW() - INTERVAL '7 days'`),
+            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= NOW() - INTERVAL '30 days'`)
         ]);
         const total = totalRow?.c || 0;
 
@@ -165,7 +165,7 @@ router.get('/audit-trail/stats', async (req, res) => {
         const topActionsRows = await dal.all(`
             SELECT action, COUNT(*) AS count
             FROM activity_log
-            WHERE created_at >= datetime('now','-30 days')
+            WHERE created_at >= NOW() - INTERVAL '30 days'
             GROUP BY action
             ORDER BY count DESC
             LIMIT 10
@@ -212,7 +212,7 @@ router.get('/audit-trail/security-events', async (req, res) => {
             SELECT a.id, a.created_at AS timestamp, a.action, a.ip_address, a.user_id, u.username
             FROM activity_log a
             LEFT JOIN users u ON a.user_id = u.id
-            WHERE a.created_at >= datetime('now','-30 days')
+            WHERE a.created_at >= NOW() - INTERVAL '30 days'
               AND a.action IN ('login_failed','unauthorized_access','permission_denied','account_locked')
             ORDER BY a.created_at DESC
             LIMIT 200
@@ -340,7 +340,7 @@ router.delete('/audit-trail/cleanup', async (req, res) => {
 
         const safeDays = Math.max(1, parseInt(olderThan));
         const result = await dal.run(
-            `DELETE FROM activity_log WHERE created_at < datetime('now', ?)`,
+            `DELETE FROM activity_log WHERE created_at < NOW() - INTERVAL '1 day' * ?`,
             [`-${safeDays} days`]
         );
 

@@ -431,14 +431,14 @@ router.get('/audit-trail/stats', async (req, res) => {
         }
         const [totalRow, last24Row, last7Row, last30Row] = await Promise.all([
             dal.get(`SELECT COUNT(*) AS c FROM activity_log`),
-            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= datetime('now','-24 hours')`),
-            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= datetime('now','-7 days')`),
-            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= datetime('now','-30 days')`)
+            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= NOW() - INTERVAL '24 hours'`),
+            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= NOW() - INTERVAL '7 days'`),
+            dal.get(`SELECT COUNT(*) AS c FROM activity_log WHERE created_at >= NOW() - INTERVAL '30 days'`)
         ]);
         const total = totalRow?.c || 0;
-        const topActionsRows = await dal.all(`SELECT action, COUNT(*) AS count FROM activity_log WHERE created_at >= datetime('now','-30 days') GROUP BY action ORDER BY count DESC LIMIT 10`);
+        const topActionsRows = await dal.all(`SELECT action, COUNT(*) AS count FROM activity_log WHERE created_at >= NOW() - INTERVAL '30 days' GROUP BY action ORDER BY count DESC LIMIT 10`);
         const topActions = (topActionsRows || []).map(r => ({ action: r.action, count: r.count, percentage: total ? Math.round((r.count / total) * 1000) / 10 : 0 }));
-        const topUsersRows = await dal.all(`SELECT COALESCE(u.username,'unknown') AS username, COUNT(*) AS entries FROM activity_log a LEFT JOIN users u ON a.user_id = u.id WHERE a.created_at >= datetime('now','-30 days') GROUP BY COALESCE(u.username,'unknown') ORDER BY entries DESC LIMIT 10`);
+        const topUsersRows = await dal.all(`SELECT COALESCE(u.username,'unknown') AS username, COUNT(*) AS entries FROM activity_log a LEFT JOIN users u ON a.user_id = u.id WHERE a.created_at >= NOW() - INTERVAL '30 days' GROUP BY COALESCE(u.username,'unknown') ORDER BY entries DESC LIMIT 10`);
         const topUsers = (topUsersRows || []).map(r => ({ username: r.username, entries: r.entries, percentage: total ? Math.round((r.entries / total) * 1000) / 10 : 0 }));
         const stats = { totalEntries: total, entriesLast24h: last24Row?.c || 0, entriesLast7d: last7Row?.c || 0, entriesLast30d: last30Row?.c || 0, topActions, topUsers };
         res.json({ success: true, stats });
@@ -455,7 +455,7 @@ router.get('/audit-trail/security-events', async (req, res) => {
         if (!dal || typeof dal.all !== 'function') {
             return res.json({ success: true, securityEvents: [] });
         }
-        const rows = await dal.all(`SELECT a.id, a.created_at AS timestamp, a.action, a.ip_address, a.user_id, u.username FROM activity_log a LEFT JOIN users u ON a.user_id = u.id WHERE a.created_at >= datetime('now','-30 days') AND a.action IN ('login_failed','unauthorized_access','permission_denied','account_locked') ORDER BY a.created_at DESC LIMIT 200`);
+        const rows = await dal.all(`SELECT a.id, a.created_at AS timestamp, a.action, a.ip_address, a.user_id, u.username FROM activity_log a LEFT JOIN users u ON a.user_id = u.id WHERE a.created_at >= NOW() - INTERVAL '30 days' AND a.action IN ('login_failed','unauthorized_access','permission_denied','account_locked') ORDER BY a.created_at DESC LIMIT 200`);
         const securityEvents = (rows || []).map(r => ({ id: r.id, timestamp: r.timestamp, severity: r.action === 'account_locked' ? 'high' : 'medium', type: r.action, description: null, ip: r.ip_address || null, userId: r.user_id || null, username: r.username || null }));
         res.json({ success: true, securityEvents });
     } catch (error) {
@@ -497,7 +497,7 @@ router.delete('/audit-trail/cleanup', async (req, res) => {
             return res.status(503).json({ success: false, error: 'Database not available' });
         }
         const safeDays = Math.max(1, parseInt(olderThan));
-        const result = await dal.run(`DELETE FROM activity_log WHERE created_at < datetime('now', ?)`, [`-${safeDays} days`]);
+        const result = await dal.run(`DELETE FROM activity_log WHERE created_at < NOW() - INTERVAL '1 day' * ?`, [safeDays]);
         res.json({ success: true, cleanup: { olderThan: safeDays, deletedEntries: result?.changes || 0, executedAt: new Date().toISOString(), executedBy: req.user ? req.user.username : 'system' } });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error cleaning up audit trail:', error);
