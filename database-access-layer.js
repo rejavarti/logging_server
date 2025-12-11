@@ -631,42 +631,6 @@ class DatabaseAccessLayer extends EventEmitter {
             );
             
             return { changes: result.changes, lastID: result.lastID };
-            }
-            
-            // Fallback to async for other adapters
-            let meta = null;
-            if (entry.metadata) {
-                if (typeof entry.metadata === 'string') {
-                    meta = entry.metadata;
-                } else {
-                    meta = JSON.stringify(entry.metadata);
-                }
-            } else {
-                const derived = {};
-                const metaFields = ['user_agent','country','region','city','timezone','coordinates','browser','os','device','device_id'];
-                metaFields.forEach(f => { if (entry[f] !== undefined) derived[f] = entry[f]; });
-                if (Object.keys(derived).length) meta = JSON.stringify(derived);
-            }
-
-            let tags = null;
-            if (entry.tags) {
-                if (Array.isArray(entry.tags)) tags = entry.tags.join(',');
-                else if (typeof entry.tags === 'object') tags = Object.keys(entry.tags).join(',');
-                else tags = String(entry.tags);
-            }
-
-            const sql = `INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-            const params = [
-                entry.timestamp || new Date().toISOString(),
-                entry.level || 'info',
-                entry.source || entry.category || 'system',
-                entry.message || '',
-                meta,
-                entry.ip || entry.clientIp || null,
-                entry.user_id || entry.userId || null,
-                tags
-            ];
-            return await this.run(sql, params);
         } catch (error) {
             this.logger.error('Failed to create log entry:', error);
             // Queue for retry only if database is locked/busy
