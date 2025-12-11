@@ -1,7 +1,7 @@
 /**
  * PostgreSQL Database Adapter
- * Drop-in replacement for UniversalSQLiteAdapter with PostgreSQL backend
- * Compatible with existing DAL interface
+ * Provides async database operations for PostgreSQL backend
+ * Compatible with database access layer interface
  */
 
 const { Pool } = require('pg');
@@ -48,12 +48,12 @@ class PostgresAdapter {
         }
     }
 
-    // SQLite-compatible methods for DAL compatibility
+    // PostgreSQL async methods for DAL compatibility
 
     async run(sql, params = []) {
         const client = await this.pool.connect();
         try {
-            // Convert SQLite ? placeholders to PostgreSQL $1, $2, etc
+            // Convert ? placeholders to PostgreSQL $1, $2, etc
             const pgSql = this.convertPlaceholders(sql);
             const result = await client.query(pgSql, params);
             return {
@@ -88,7 +88,7 @@ class PostgresAdapter {
     }
 
     prepare(sql) {
-        // Return a prepared statement object compatible with better-sqlite3 interface
+        // Return a prepared statement object compatible with DAL interface
         const pgSql = this.convertPlaceholders(sql);
         return {
             run: async (...params) => {
@@ -134,7 +134,7 @@ class PostgresAdapter {
         return this.pool.end();
     }
 
-    // Helper: Convert SQLite ? placeholders to PostgreSQL $1, $2, etc
+    // Helper: Convert ? placeholders to PostgreSQL $1, $2, etc
     convertPlaceholders(sql) {
         let index = 1;
         return sql.replace(/\?/g, () => `$${index++}`);

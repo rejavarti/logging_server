@@ -75,12 +75,8 @@ class DatabaseAccessLayer extends EventEmitter {
             if (this.db && typeof this.db.init === 'function') {
                 await this.db.init();
             }
-            // Additional pragma settings if needed
-            if (this.db.dbType === 'sqlite3') {
-                await this.db.run('PRAGMA foreign_keys = ON');
-            }
             
-            // Ensure required tables exist
+            // Ensure required tables exist (PostgreSQL schema pre-initialized)
             await this.ensureRequiredTables();
             
             const driverInfo = this.db.getDriverInfo();
@@ -122,14 +118,14 @@ class DatabaseAccessLayer extends EventEmitter {
         const batch = this.logBatch.splice(0, this.logBatch.length); // drain
         let successCount = 0;
         try {
-            if (this.db.dbType === 'better-sqlite3' && this.db.db?.prepare) {
-                const stmt = this.preparedStatements.get('insert_log') || this.db.db.prepare(`INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-                if (!this.preparedStatements.get('insert_log')) this.preparedStatements.set('insert_log', stmt);
-                const transaction = this.db.db.transaction((entries) => {
-                    for (const e of entries) {
-                        const meta = this._serializeMetadata(e);
-                        const tags = this._serializeTags(e);
-                        stmt.run(
+            // PostgreSQL batch insert using async queries
+            for (const e of batch) {
+                const meta = this._serializeMetadata(e);
+                const tags = this._serializeTags(e);
+                try {
+                    await this.db.run(
+                        `INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
                             e.timestamp || new Date().toISOString(),
                             e.level || 'info',
                             e.source || e.category || 'system',
@@ -138,18 +134,11 @@ class DatabaseAccessLayer extends EventEmitter {
                             e.ip || e.clientIp || null,
                             e.user_id || e.userId || null,
                             tags
-                        );
-                        successCount++;
-                    }
-                });
-                transaction(batch);
-            } else {
-                // Fallback: sequential inserts with minimal await
-                for (const e of batch) {
-                    try {
-                        await this.createLogEntry(e); // uses retry logic
-                        successCount++;
-                    } catch { /* already logged */ }
+                        ]
+                    );
+                    successCount++;
+                } catch (err) {
+                    this.logger.error('Batch insert error:', err.message);
                 }
             }
             if (this.metricsManager) {
@@ -606,37 +595,30 @@ class DatabaseAccessLayer extends EventEmitter {
      */
     async createLogEntry(entry) {
         try {
-            // Use faster synchronous insert when available (better-sqlite3)
-            if (this.db.dbType === 'better-sqlite3' && typeof this.db.db?.prepare === 'function') {
-                // Build metadata object
-                let meta = null;
-                if (entry.metadata) {
-                    meta = typeof entry.metadata === 'string' ? entry.metadata : JSON.stringify(entry.metadata);
-                } else {
-                    const derived = {};
-                    ['user_agent','country','region','city','timezone','coordinates','browser','os','device','device_id'].forEach(f => {
-                        if (entry[f] !== undefined) derived[f] = entry[f];
-                    });
-                    if (Object.keys(derived).length) meta = JSON.stringify(derived);
-                }
+            // Build metadata object
+            let meta = null;
+            if (entry.metadata) {
+                meta = typeof entry.metadata === 'string' ? entry.metadata : JSON.stringify(entry.metadata);
+            } else {
+                const derived = {};
+                ['user_agent','country','region','city','timezone','coordinates','browser','os','device','device_id'].forEach(f => {
+                    if (entry[f] !== undefined) derived[f] = entry[f];
+                });
+                if (Object.keys(derived).length) meta = JSON.stringify(derived);
+            }
 
-                // Normalize tags
-                let tags = null;
-                if (entry.tags) {
-                    if (Array.isArray(entry.tags)) tags = entry.tags.join(',');
-                    else if (typeof entry.tags === 'object') tags = Object.keys(entry.tags).join(',');
-                    else tags = String(entry.tags);
-                }
+            // Normalize tags
+            let tags = null;
+            if (entry.tags) {
+                if (Array.isArray(entry.tags)) tags = entry.tags.join(',');
+                else if (typeof entry.tags === 'object') tags = Object.keys(entry.tags).join(',');
+                else tags = String(entry.tags);
+            }
 
-                // Use prepared statement from cache
-                const cacheKey = 'insert_log';
-                let stmt = this.preparedStatements.get(cacheKey);
-                if (!stmt) {
-                    stmt = this.db.db.prepare(`INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-                    this.preparedStatements.set(cacheKey, stmt);
-                }
-
-                const result = stmt.run(
+            // PostgreSQL async insert
+            const result = await this.db.run(
+                `INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
                     entry.timestamp || new Date().toISOString(),
                     entry.level || 'info',
                     entry.source || entry.category || 'system',
@@ -645,9 +627,10 @@ class DatabaseAccessLayer extends EventEmitter {
                     entry.ip || entry.clientIp || null,
                     entry.user_id || entry.userId || null,
                     tags
-                );
-                
-                return { changes: result.changes, lastID: result.lastInsertRowid };
+                ]
+            );
+            
+            return { changes: result.changes, lastID: result.lastID };
             }
             
             // Fallback to async for other adapters
@@ -2366,14 +2349,14 @@ class DatabaseAccessLayer extends EventEmitter {
             // Text search - check message OR source for match
             if (query) {
                 if (regex) {
-                    // SQLite doesn't support REGEXP by default, use LIKE with wildcards
-                    sql += ` AND (message LIKE ? OR source LIKE ?)`;
-                    params.push(`%${query}%`, `%${query}%`);
-                } else if (caseSensitive) {
-                    sql += ` AND (message GLOB ? OR source GLOB ?)`;
-                    params.push(`*${query}*`, `*${query}*`);
+                    // PostgreSQL regex support with ~ operator
+                    const regexOp = caseSensitive ? '~' : '~*';
+                    sql += ` AND (message ${regexOp} ? OR source ${regexOp} ?)`;
+                    params.push(query, query);
                 } else {
-                    sql += ` AND (message LIKE ? OR source LIKE ?)`;
+                    // Use ILIKE for case-insensitive, LIKE for case-sensitive
+                    const likeOp = caseSensitive ? 'LIKE' : 'ILIKE';
+                    sql += ` AND (message ${likeOp} ? OR source ${likeOp} ?)`;
                     params.push(`%${query}%`, `%${query}%`);
                 }
             }
