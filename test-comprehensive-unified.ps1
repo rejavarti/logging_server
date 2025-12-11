@@ -32,12 +32,31 @@
 #>
 
 param(
-    [string]$ServerUrl = "http://localhost:10180",
+    [string]$ServerUrl,
     [string]$Username = "admin",
     [int]$Iterations = 3,
     [int]$ConcurrentLogs = 50,
     [System.Management.Automation.PSCredential]$Credential
 )
+
+# Auto-detect if running on local dev machine or Unraid server
+if (-not $ServerUrl) {
+    # Check if we're on the Unraid server (Linux with specific hostname pattern)
+    if ($IsLinux -and (hostname) -match 'unraid|tower') {
+        $ServerUrl = "http://localhost:10180"
+        Write-Host "Detected Unraid server, using local URL: $ServerUrl" -ForegroundColor Cyan
+    }
+    # Check if we're on Windows dev machine
+    elseif ($IsWindows -or (-not $IsLinux -and -not $IsMacOS)) {
+        $ServerUrl = "http://192.168.222.3:10180"
+        Write-Host "Detected Windows dev machine, using Unraid server URL: $ServerUrl" -ForegroundColor Cyan
+    }
+    else {
+        # Default fallback
+        $ServerUrl = "http://localhost:10180"
+        Write-Host "Using default URL: $ServerUrl" -ForegroundColor Yellow
+    }
+}
 
 # Analyzer appeasement variables (used in final report metrics)
 $__appease1 = $true
