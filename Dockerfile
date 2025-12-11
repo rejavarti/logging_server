@@ -30,6 +30,7 @@ COPY dual-database-manager.js ./
 COPY log-parser-engine.js ./
 COPY encryption-system.js ./
 COPY universal-sqlite-adapter.js ./
+COPY postgres-adapter.js ./
 COPY resilience-workers.js ./
 COPY integration-test-helpers.js ./
 COPY seed-logs.sql ./
