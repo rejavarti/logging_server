@@ -63,23 +63,23 @@ class DataRetentionEngine {
 
         const queries = [
             `CREATE TABLE IF NOT EXISTS retention_policies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 name TEXT UNIQUE NOT NULL,
                 description TEXT,
                 target_table TEXT NOT NULL,
                 retention_days INTEGER NOT NULL,
-                archive_enabled INTEGER DEFAULT 1,
-                compression_enabled INTEGER DEFAULT 1,
-                delete_after_archive INTEGER DEFAULT 0,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                last_executed DATETIME,
-                is_active INTEGER DEFAULT 1
+                archive_enabled BOOLEAN DEFAULT true,
+                compression_enabled BOOLEAN DEFAULT true,
+                delete_after_archive BOOLEAN DEFAULT false,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW(),
+                last_executed TIMESTAMPTZ,
+                is_active BOOLEAN DEFAULT true
             )`,
             `CREATE TABLE IF NOT EXISTS retention_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id SERIAL PRIMARY KEY,
                 policy_id INTEGER,
-                execution_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                execution_date TIMESTAMPTZ DEFAULT NOW(),
                 records_processed INTEGER DEFAULT 0,
                 records_archived INTEGER DEFAULT 0,
                 records_deleted INTEGER DEFAULT 0,
@@ -105,7 +105,7 @@ class DataRetentionEngine {
             try {
                 policies = await this.dal.all(`
                     SELECT * FROM retention_policies 
-                    WHERE is_active = 1 
+                    WHERE is_active = true 
                     ORDER BY name
                 `);
             } catch (schemaError) {
