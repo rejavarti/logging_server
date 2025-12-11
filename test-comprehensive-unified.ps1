@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingPlainTextForPassword','', Justification='Credential parameter with SecureString used; plain secret only inside JSON POST body for auth endpoint.')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidAssignmentToAutomaticVariable','', Justification='False positive: no assignment to $matches; external audit refactored to avoid using Matches API.')]
 [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseDeclaredVarsMoreThanAssignments','', Justification='Variables consumed within Write-TestResult metrics; static analyzer misreports usage.')] 
@@ -519,7 +519,7 @@ try {
 Write-TestHeader "PHASE 6: Browser Console Validation"
 
 Write-Host "`n[6.1] Launching headless browser with enhanced validation..." -ForegroundColor Yellow
-$browserTestScript = @"
+$browserTestScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
     const browser = await puppeteer.launch({
@@ -561,10 +561,10 @@ const puppeteer = require('puppeteer');
     });
     
     try {
-        await page.goto('$ServerUrl/login', {waitUntil: 'networkidle2', timeout: 10000});
+        await page.goto('{0}/login', {waitUntil: 'networkidle2', timeout: 10000});
         await page.waitForSelector('#username', {timeout: 5000});
-        await page.type('#username', '$Username');
-        await page.type('#password', '$adminSecretValue');
+        await page.type('#username', '{1}');
+        await page.type('#password', '{2}');
         await page.click('button[type=submit]');
         await page.waitForNavigation({waitUntil: 'networkidle2', timeout: 15000});
         
@@ -673,7 +673,7 @@ const puppeteer = require('puppeteer');
     
     await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
 
 try {
     $browserResult = node -e $browserTestScript | ConvertFrom-Json
@@ -751,7 +751,7 @@ try {
 
 Write-Host "\n[6.2] Testing Analytics Tab Rendering (Lesson: Nov 22, 2025)..." -ForegroundColor Yellow
 try {
-$analyticsTestScript = @"
+$analyticsTestScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
     const browser = await puppeteer.launch({ headless: true });
@@ -760,13 +760,13 @@ const puppeteer = require('puppeteer');
     page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
     
     try {
-        await page.goto('$ServerUrl/login', {waitUntil: 'networkidle2', timeout: 10000});
-        await page.type('#username', '$Username');
-        await page.type('#password', '$adminSecretValue');
+        await page.goto('{0}/login', {waitUntil: 'networkidle2', timeout: 10000});
+        await page.type('#username', '{1}');
+        await page.type('#password', '{2}');
         await page.click('button[type=submit]');
         await page.waitForNavigation({waitUntil: 'networkidle2'});
         
-        await page.goto('$ServerUrl/logs');
+        await page.goto('{0}/logs');
         await page.waitForSelector('#tab-analytics', {timeout: 5000});
         await page.click('#tab-analytics');
         await new Promise(r => setTimeout(r, 8000));
@@ -803,7 +803,7 @@ const puppeteer = require('puppeteer');
     }
     await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
 
 try {
     # Filter output to only get the final JSON line (diagnostics appear on other lines)
@@ -832,7 +832,7 @@ try {
 # PHASE 7: WIDGET FUNCTIONALITY TEST (Restored)
 # ============================================================================
 
-Write-TestHeader "PHASE 7: Widget Functionality & API Response Validation"
+Write-TestHeader "PHASE 7: Widget Functionality and API Response Validation"
 
 Write-Host "`n[7.1] Fetching widget catalog and validating response structure..." -ForegroundColor Yellow
 try {
@@ -874,18 +874,18 @@ Write-TestResult "Widget API Response Validation" ($validatedEndpoints -eq $widg
 
 Write-Host "`n[7.3] Testing dashboard lock toggle..." -ForegroundColor Yellow
 try {
-    $lockTestScript = @"
+    $lockTestScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   try {
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2', timeout:10000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2', timeout:10000});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2'});
-    await page.goto('$ServerUrl/dashboard');
+    await page.goto('{0}/dashboard');
     await page.waitForSelector('#lockText', {timeout:5000});
     
     // Wait for grid initialization (critical for lock function)
@@ -925,7 +925,7 @@ const puppeteer = require('puppeteer');
   }
   await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
     $lockResult = node -e $lockTestScript | Select-Object -Last 1 | ConvertFrom-Json
     if($lockResult.success){
         Write-TestResult "Dashboard Lock Toggle" $true "State: $($lockResult.before) -> $($lockResult.after.text)" @{Before=$lockResult.before;After=$lockResult.after.text}
@@ -939,7 +939,7 @@ const puppeteer = require('puppeteer');
 # PHASE 7.5: ASYNC DATA LOADING VALIDATION (CRITICAL)
 # ============================================================================
 
-Write-TestHeader "PHASE 7.5: Async Data Loading & Frontend AJAX Validation"
+Write-TestHeader "PHASE 7.5: Async Data Loading and Frontend AJAX Validation"
 
 Write-Host "`n[7.5.1] Testing async data API endpoints..." -ForegroundColor Yellow
 $asyncEndpoints = @(
@@ -1033,7 +1033,7 @@ foreach($page in $pagesWithAjax){
 }
 
 $fastPages = ($performanceResults | Where-Object {$_.TotalTime -lt 1000}).Count
-Write-TestResult "Async Loading Performance" ($fastPages -eq $performanceResults.Count) "$fastPages/$($performanceResults.Count) pages load in <1s" @{
+Write-TestResult "Async Loading Performance" ($fastPages -eq $performanceResults.Count) "$fastPages/$($performanceResults.Count) pages load under 1s" @{
     FastPages = $fastPages
     Total = $performanceResults.Count
     Results = $performanceResults
@@ -1501,7 +1501,7 @@ try {
 
     Write-Host "`n[12.1] Validating widget coordinate persistence (system-stats, log-levels, geolocation-map, integrations)..." -ForegroundColor Yellow
     try {
-            $layoutTestScript = @"
+            $layoutTestScript = @'
     const puppeteer = require('puppeteer');
     (async () => {
         const browser = await puppeteer.launch({ headless: true, args:['--no-sandbox','--disable-setuid-sandbox'] });
@@ -1509,9 +1509,9 @@ try {
         const sampleIds = ['system-stats','log-levels','geolocation-map','integrations'];
         const result = { baseline:{}, moved:{}, deltas:{}, issues:[] };
         try {
-            await page.goto('$ServerUrl/login', {waitUntil:'networkidle2', timeout:15000});
-            await page.type('#username', '$Username');
-            await page.type('#password', '$adminSecretValue');
+            await page.goto('{0}/login', {waitUntil:'networkidle2', timeout:15000});
+            await page.type('#username', '{1}');
+            await page.type('#password', '{2}');
             await page.click('button[type=submit]');
             await page.waitForNavigation({waitUntil:'networkidle2', timeout:15000});
             // Wait explicitly for DOMContentLoaded to fire and grid to initialize
@@ -1565,7 +1565,7 @@ try {
             await new Promise(r=>setTimeout(r, 2500));
 
             // Reload dashboard to force layout load
-            await page.goto('$ServerUrl/dashboard', {waitUntil:'networkidle2', timeout:15000});
+            await page.goto('{0}/dashboard', {waitUntil:'networkidle2', timeout:15000});
             // Wait explicitly for DOMContentLoaded to fire and grid to initialize
             await page.waitForFunction(() => window.grid && window.grid.getItems, {timeout:20000});
             // Additional wait for grid to populate items
@@ -1620,7 +1620,7 @@ try {
     } catch (e){ console.log(JSON.stringify({success:false, error:e.message, result})); }
     await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
     $layoutResult = node -e $layoutTestScript | ConvertFrom-Json
             if($layoutResult.success){
                     $deltaSummary = @()
@@ -1650,19 +1650,19 @@ try {
 
     Write-Host "`n[13.1] Testing dashboard control buttons (reset, save, refresh)..." -ForegroundColor Yellow
     try {
-        $dashboardControlsScript = @"
+        $dashboardControlsScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   const results = {reset:false, save:false, refresh:false, errors:[]};
   try {
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2', timeout:10000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2', timeout:10000});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2'});
-    await page.goto('$ServerUrl/dashboard', {waitUntil:'networkidle2'});
+    await page.goto('{0}/dashboard', {waitUntil:'networkidle2'});
     await page.waitForSelector('#lockText', {timeout:5000});
     await new Promise(r=>setTimeout(r, 1000));
 
@@ -1697,25 +1697,25 @@ const puppeteer = require('puppeteer');
   }
   await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
         $controlsResult = node -e $dashboardControlsScript | Select-Object -Last 1 | ConvertFrom-Json
         Write-TestResult "Dashboard Control Buttons" $controlsResult.success "Refresh:$($controlsResult.results.refresh) Save:$($controlsResult.results.save) Reset:$($controlsResult.results.reset)" @{Results=$controlsResult.results}
     } catch { Write-TestResult "Dashboard Control Buttons" $false $_.Exception.Message }
 
-    Write-Host "`n[13.2] Testing theme toggle cycle (auto→light→dark→ocean→auto)..." -ForegroundColor Yellow
+    Write-Host "`n[13.2] Testing theme toggle cycle (auto-light-dark-ocean-auto)..." -ForegroundColor Yellow
     try {
-        $themeToggleScript = @"
+        $themeToggleScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   try {
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2', timeout:10000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2', timeout:10000});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2'});
-    await page.goto('$ServerUrl/dashboard', {waitUntil:'networkidle2'});
+    await page.goto('{0}/dashboard', {waitUntil:'networkidle2'});
     
     // Wait for DOMContentLoaded to complete and theme to be applied
     await page.waitForFunction(() => document.body.hasAttribute('data-theme'), {timeout: 5000});
@@ -1734,7 +1734,7 @@ const puppeteer = require('puppeteer');
       themes.push(theme);
     }
     
-    // Expected cycle from auto: light → dark → ocean → auto → light
+    // Expected cycle from auto: light - dark - ocean - auto - light
     const expectedCycle = themes[0]==='light' && themes[1]==='dark' && themes[2]==='ocean' && themes[3]==='auto' && themes[4]==='light';
     console.log(JSON.stringify({success: expectedCycle, initialTheme, themes}));
   } catch(e){
@@ -1742,14 +1742,14 @@ const puppeteer = require('puppeteer');
   }
   await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
         $themeResult = node -e $themeToggleScript | Select-Object -Last 1 | ConvertFrom-Json
-        Write-TestResult "Theme Toggle Cycle" $themeResult.success "Cycle: $($themeResult.themes -join ' → ')" @{Themes=$themeResult.themes}
+        Write-TestResult "Theme Toggle Cycle" $themeResult.success "Cycle: $($themeResult.themes -join ' - ')" @{Themes=$themeResult.themes}
     } catch { Write-TestResult "Theme Toggle Cycle" $false $_.Exception.Message }
 
     Write-Host "`n[13.3] Testing sidebar toggle..." -ForegroundColor Yellow
     try {
-        $sidebarToggleScript = @"
+        $sidebarToggleScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: true });
@@ -1757,12 +1757,12 @@ const puppeteer = require('puppeteer');
   // Set desktop viewport to avoid mobile sidebar behavior
   await page.setViewport({ width: 1920, height: 1080 });
   try {
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2', timeout:10000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2', timeout:10000});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2'});
-    await page.goto('$ServerUrl/dashboard', {waitUntil:'networkidle2'});
+    await page.goto('{0}/dashboard', {waitUntil:'networkidle2'});
     
     // Wait for page to fully load - skip waitForSelector with visible:true as it sometimes fails
     await new Promise(r=>setTimeout(r, 1000));
@@ -1786,25 +1786,25 @@ const puppeteer = require('puppeteer');
   }
   await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
         $sidebarResult = node -e $sidebarToggleScript | Select-Object -Last 1 | ConvertFrom-Json
-        Write-TestResult "Sidebar Toggle" $sidebarResult.success "States: $($sidebarResult.states -join ' → ')" @{States=$sidebarResult.states}
+        Write-TestResult "Sidebar Toggle" $sidebarResult.success "States: $($sidebarResult.states -join ' - ')" @{States=$sidebarResult.states}
     } catch { Write-TestResult "Sidebar Toggle" $false $_.Exception.Message }
 
     Write-Host "`n[13.4] Testing modal open/close (widget marketplace)..." -ForegroundColor Yellow
     try {
-        $modalTestScript = @"
+        $modalTestScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   try {
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2', timeout:10000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2', timeout:10000});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2'});
-    await page.goto('$ServerUrl/dashboard', {waitUntil:'networkidle2'});
+    await page.goto('{0}/dashboard', {waitUntil:'networkidle2'});
     await new Promise(r=>setTimeout(r, 1000));
 
     // Open widget marketplace modal (addWidget button)
@@ -1839,7 +1839,7 @@ const puppeteer = require('puppeteer');
   }
   await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
         $modalResult = node -e $modalTestScript | Select-Object -Last 1 | ConvertFrom-Json
         Write-TestResult "Modal Open/Close" $modalResult.success "Open:$($modalResult.modalVisible) Close:$($modalResult.modalHidden)" @{ModalVisible=$modalResult.modalVisible;ModalHidden=$modalResult.modalHidden}
     } catch { Write-TestResult "Modal Open/Close" $false $_.Exception.Message }
@@ -1847,16 +1847,16 @@ const puppeteer = require('puppeteer');
     Write-Host "`n[13.5] Testing logout and re-login cycle..." -ForegroundColor Yellow
     try {
         Start-Sleep -Seconds 3
-        $logoutLoginScript = @"
+        $logoutLoginScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(30000);
   try {
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2', timeout:30000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2', timeout:30000});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2', timeout:30000});
     
@@ -1871,8 +1871,8 @@ const puppeteer = require('puppeteer');
     const onLogin = await page.evaluate(()=>window.location.pathname==='/login');
     
     // Re-login
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2', timeout:30000});
     
@@ -1885,9 +1885,9 @@ const puppeteer = require('puppeteer');
   }
   await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
         $logoutResult = node -e $logoutLoginScript | Select-Object -Last 1 | ConvertFrom-Json
-        Write-TestResult "Logout/Re-login Cycle" $logoutResult.success "Dashboard→Login→Dashboard: $($logoutResult.onDashboard)→$($logoutResult.onLogin)→$($logoutResult.backOnDashboard)" @{Flow=$logoutResult}
+        Write-TestResult "Logout/Re-login Cycle" $logoutResult.success "Dashboard-Login-Dashboard: $($logoutResult.onDashboard)-$($logoutResult.onLogin)-$($logoutResult.backOnDashboard)" @{Flow=$logoutResult}
     } catch { Write-TestResult "Logout/Re-login Cycle" $false $_.Exception.Message }
 
         # ============================================================================
@@ -1901,18 +1901,18 @@ const puppeteer = require('puppeteer');
 
         Write-Host "`n[14.1] Crawling pages, links, and assets..." -ForegroundColor Yellow
         try {
-                $crawlerScript = @"
+                $crawlerScript = @'
 const puppeteer = require('puppeteer');
 const axios = require('axios');
 (async ()=>{
-    const base = '$ServerUrl'.replace(/\/$/, '');
+    const base = '{0}'.replace(/\/$/, '');
     const browser = await puppeteer.launch({ headless:true, args:['--no-sandbox','--disable-setuid-sandbox'] });
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(30000);
     // Login
     await page.goto(base + '/login', {waitUntil:'networkidle2', timeout:30000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2', timeout:30000});
     const routes = ['/dashboard','/logs','/search','/webhooks','/activity','/integrations'];
@@ -1958,7 +1958,7 @@ const axios = require('axios');
         }
     }));
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
                 $crawl = node -e $crawlerScript | ConvertFrom-Json
                 $ok = ($crawl.summary.pages.fail -eq 0 -and $crawl.summary.links.fail -eq 0 -and $crawl.summary.assets.fail -eq 0)
                 Write-TestResult "Link/Asset Crawl" $ok "Pages OK:$($crawl.summary.pages.ok)/$($crawl.summary.pages.total) Links OK:$($crawl.summary.links.ok)/$($crawl.summary.links.total) Assets OK:$($crawl.summary.assets.ok)/$($crawl.summary.assets.total)" @{Summary=$crawl.summary;Failures=$crawl.failures}
@@ -2005,18 +2005,18 @@ const axios = require('axios');
 
         Write-Host "`n[16.1] Verifying buttons/links trigger real actions..." -ForegroundColor Yellow
         try {
-                $clickTest = @"
+                $clickTest = @'
 const puppeteer = require('puppeteer');
 (async ()=>{
-    const base = '$ServerUrl'.replace(/\/$/, '');
+    const base = '{0}'.replace(/\/$/, '');
     const browser = await puppeteer.launch({ headless:true, args:['--no-sandbox','--disable-setuid-sandbox'] });
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(30000);
     const requests=[];
     page.on('request', r=>{ requests.push(r.url()); });
     await page.goto(base + '/login', {waitUntil:'networkidle2', timeout:30000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2', timeout:30000});
     await page.goto(base + '/dashboard', {waitUntil:'networkidle2', timeout:30000});
@@ -2064,7 +2064,7 @@ const puppeteer = require('puppeteer');
     await browser.close();
     console.log(JSON.stringify({tested, acted, actions}));
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
                 $clickRes = node -e $clickTest | ConvertFrom-Json
                 $clickOk = ($clickRes.acted -ge [Math]::Min(10,$clickRes.tested))
                 Write-TestResult "Clickability Wiring" $clickOk "Acted: $($clickRes.acted)/$($clickRes.tested) controls produced effects" @{Details=$clickRes.actions}
@@ -2079,26 +2079,26 @@ const puppeteer = require('puppeteer');
 
         Write-Host "`n[17.1] Running axe-core accessibility audit (Playwright)..." -ForegroundColor Yellow
         try {
-                $axeScript = @"
+                $axeScript = @'
 const { chromium } = require('playwright');
 const { AxeBuilder } = require('@axe-core/playwright');
 (async ()=>{
     const browser = await chromium.launch();
     const context = await browser.newContext();
     const page = await context.newPage();
-    await page.goto('$ServerUrl/login');
-    await page.fill('#username', '$Username');
-    await page.fill('#password', '$adminSecretValue');
+    await page.goto('{0}/login');
+    await page.fill('#username', '{1}');
+    await page.fill('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForLoadState('networkidle');
-    await page.goto('$ServerUrl/dashboard');
+    await page.goto('{0}/dashboard');
     await page.waitForLoadState('networkidle');
     const results = await new AxeBuilder({ page }).analyze();
     const serious = results.violations.filter(v=>['critical','serious'].includes(v.impact||''));
     console.log(JSON.stringify({ total: results.violations.length, serious: serious.length, sample: serious.slice(0,3) }));
     await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
                 $axe = node -e $axeScript | ConvertFrom-Json
                 $axeOk = $true
                 Write-TestResult "Accessibility Audit (axe)" $axeOk "Violations: $($axe.total), Serious: $($axe.serious)" @{Violations=$axe.total;Serious=$axe.serious;Sample=$axe.sample}
@@ -2110,16 +2110,16 @@ const { AxeBuilder } = require('@axe-core/playwright');
 
         Write-Host "`n[17.2] Theme cycle visual sanity (attribute toggles)..." -ForegroundColor Yellow
         try {
-                $themeSanity = @"
+                $themeSanity = @'
 const puppeteer = require('puppeteer');
 (async ()=>{
-    const base = '$ServerUrl'.replace(/\/$/, '');
+    const base = '{0}'.replace(/\/$/, '');
     const browser = await puppeteer.launch({ headless:true });
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(30000);
     await page.goto(base + '/login', {waitUntil:'networkidle2', timeout:30000});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2', timeout:30000});
     await page.goto(base + '/dashboard', {waitUntil:'networkidle2', timeout:30000});
@@ -2128,10 +2128,10 @@ const puppeteer = require('puppeteer');
     console.log(JSON.stringify({themes}));
     await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
                 $themeSanityRes = node -e $themeSanity | ConvertFrom-Json
                 $themeSanityOk = ($themeSanityRes.themes.Count -eq 4)
-                Write-TestResult "Theme Attribute Cycle" $themeSanityOk "Themes: $($themeSanityRes.themes -join ' → ')" @{Themes=$themeSanityRes.themes}
+                Write-TestResult "Theme Attribute Cycle" $themeSanityOk "Themes: $($themeSanityRes.themes -join ' - ')" @{Themes=$themeSanityRes.themes}
         } catch { Write-TestResult "Theme Attribute Cycle" $false $_.Exception.Message }
 
         # ============================================================================
@@ -2455,18 +2455,18 @@ const puppeteer = require('puppeteer');
 
         Write-Host "`n[23.2] Testing Muuri grid performance..." -ForegroundColor Yellow
         try {
-            $gridTestScript = @"
+            $gridTestScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
     const browser = await puppeteer.launch({headless:true, args:['--no-sandbox']});
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(30000);
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2'});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2'});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2'});
-    await page.goto('$ServerUrl/dashboard', {waitUntil:'networkidle2'});
+    await page.goto('{0}/dashboard', {waitUntil:'networkidle2'});
     await page.waitForFunction(() => window.grid !== undefined, {timeout: 5000}).catch(() => {});
     await new Promise(r => setTimeout(r, 1500));
     const perf = await page.evaluate(() => {
@@ -2487,7 +2487,7 @@ const puppeteer = require('puppeteer');
     console.log(JSON.stringify(perf));
     await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
             $gridPerf = node -e $gridTestScript | ConvertFrom-Json
             if($gridPerf.error){
                 Write-TestResult "Muuri Grid Performance" $true "Grid API mismatch (non-blocking): $($gridPerf.error)" @{Error=$gridPerf.error;GridType=$gridPerf.gridType}
@@ -2507,19 +2507,19 @@ const puppeteer = require('puppeteer');
 
         Write-Host "`n[24.1] Measuring page load timing..." -ForegroundColor Yellow
         try {
-            $perfTestScript = @"
+            $perfTestScript = @'
 const puppeteer = require('puppeteer');
 (async () => {
     const browser = await puppeteer.launch({headless:true, args:['--no-sandbox']});
     const page = await browser.newPage();
     page.setDefaultNavigationTimeout(30000);
-    await page.goto('$ServerUrl/login', {waitUntil:'networkidle2'});
-    await page.type('#username', '$Username');
-    await page.type('#password', '$adminSecretValue');
+    await page.goto('{0}/login', {waitUntil:'networkidle2'});
+    await page.type('#username', '{1}');
+    await page.type('#password', '{2}');
     await page.click('button[type=submit]');
     await page.waitForNavigation({waitUntil:'networkidle2'});
     const start = Date.now();
-    await page.goto('$ServerUrl/dashboard', {waitUntil:'load'});
+    await page.goto('{0}/dashboard', {waitUntil:'load'});
     const loadTime = Date.now() - start;
     const timing = await page.evaluate(() => {
         const perf = performance.getEntriesByType('navigation')[0];
@@ -2535,7 +2535,7 @@ const puppeteer = require('puppeteer');
     console.log(JSON.stringify({loadTime, timing}));
     await browser.close();
 })();
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
             $perfResult = node -e $perfTestScript | ConvertFrom-Json
             $acceptable = ($perfResult.loadTime -lt 5000)  # 5 second budget
             Write-TestResult "Page Load Timing" $acceptable "Total: $($perfResult.loadTime)ms (budget: 5000ms)" @{LoadTime=$perfResult.loadTime;Timing=$perfResult.timing}
@@ -2674,7 +2674,7 @@ const puppeteer = require('puppeteer');
 
         Write-Host "`n[27.1] Testing WebSocket reconnection..." -ForegroundColor Yellow
         try {
-            $wsTestScript = @"
+            $wsTestScript = @'
 const WebSocket = require('ws');
 let reconnected = false;
 const ws = new WebSocket('ws://localhost:10180/ws');
@@ -2687,7 +2687,7 @@ ws.on('close', () => {
     ws2.on('open', () => { reconnected = true; ws2.close(); });
     ws2.on('close', () => console.log(JSON.stringify({reconnected})));
 });
-"@
+'@ -f $ServerUrl, $Username, $adminSecretValue
             $wsResult = node -e $wsTestScript 2>&1 | Select-String -Pattern '\{' | Select-Object -Last 1
             if($wsResult){
                 $wsData = $wsResult.ToString() | ConvertFrom-Json
