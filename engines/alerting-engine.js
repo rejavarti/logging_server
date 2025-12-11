@@ -239,7 +239,7 @@ class AlertingEngine {
                             JSON.stringify(rule.condition),
                             JSON.stringify(rule.channels),
                             rule.severity,
-                            rule.enabled ? 1 : 0,
+                            rule.enabled ? true : false,
                             rule.cooldown,
                             rule.escalationRules ? JSON.stringify(rule.escalationRules) : null,
                             null, // set to null to avoid foreign key constraint until admin user exists

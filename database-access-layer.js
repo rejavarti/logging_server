@@ -1107,7 +1107,7 @@ class DatabaseAccessLayer extends EventEmitter {
         
         const sql = `INSERT INTO alert_rules (name, description, type, condition, severity, cooldown, 
                      enabled, channels, escalation_rules, created_at, updated_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))`;
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
         const params = [
             ruleData.name,
             ruleData.description || null,
@@ -1115,7 +1115,7 @@ class DatabaseAccessLayer extends EventEmitter {
             conditionValue,
             ruleData.severity || 'warning',
             ruleData.cooldown || 300,
-            ruleData.enabled !== undefined ? (ruleData.enabled ? 1 : 0) : 1,
+            ruleData.enabled !== undefined ? (ruleData.enabled ? true : false) : true,
             ruleData.channels ? JSON.stringify(ruleData.channels) : '[]',
             ruleData.escalation_rules ? JSON.stringify(ruleData.escalation_rules) : null
         ];
