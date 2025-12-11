@@ -803,13 +803,14 @@ app.locals.legacyAuth = legacyAuth;
 // Database initialization function
 async function initializeDatabase() {
     try {
-        // Allow TEST_DB_PATH override for test environments
-        const dbPath = process.env.TEST_DB_PATH || path.join(dbDir, 'enterprise_logs.db');
+        // Determine database path (only needed for SQLite)
+        const isPostgres = process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql';
+        const dbPath = isPostgres ? null : (process.env.TEST_DB_PATH || path.join(dbDir, 'enterprise_logs.db'));
         
         // Skip SQLite migration for PostgreSQL (schema already created)
-        if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
+        if (isPostgres) {
             loggers.system.info('📊 Using PostgreSQL - skipping SQLite migration');
-            dal = new DatabaseAccessLayer(dbPath, loggers.system);
+            dal = new DatabaseAccessLayer(null, loggers.system);
             await dal.waitForInitialization();
             loggers.system.info('✅ PostgreSQL database initialized');
         } else {
