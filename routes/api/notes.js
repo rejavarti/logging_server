@@ -4,7 +4,7 @@ const { isNonEmptyString } = require('../../utils/validate');
 
 // Ensure table exists (lazy init)
 async function ensureTable(dal){
-  await dal.run("CREATE TABLE IF NOT EXISTS user_notes (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, text TEXT NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+  await dal.run("CREATE TABLE IF NOT EXISTS user_notes (id SERIAL PRIMARY KEY, username TEXT NOT NULL, text TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())");
 }
 
 // GET /api/notes - list notes for current user
