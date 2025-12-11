@@ -514,13 +514,13 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getAllUsers() {
-        const sql = `SELECT id, username, email, created_at, last_login, active FROM users ORDER BY created_at DESC`;
+        const sql = `SELECT id, username, email, created_at, last_login, is_active FROM users ORDER BY created_at DESC`;
         return await this.all(sql);
     }
 
     async updateUser(userId, updates) {
         // Whitelist allowed fields to prevent SQL injection
-        const allowedFields = ['username', 'email', 'password_hash', 'active', 'last_login', 'preferences', 'role'];
+        const allowedFields = ['username', 'email', 'password_hash', 'is_active', 'last_login', 'preferences', 'role'];
         const fields = Object.keys(updates).filter(field => allowedFields.includes(field));
         
         if (fields.length === 0) {
