@@ -44,8 +44,13 @@ class UniversalSQLiteAdapter {
         console.log('\n🔍 Universal SQLite Adapter - Environment Detection');
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         
-        // Ensure database directory exists (critical for CI/tests)
-        this.ensureDatabaseDirectory();
+        // Only ensure database directory if NOT using PostgreSQL
+        // PostgreSQL doesn't need a local database file
+        if (process.env.DB_TYPE !== 'postgres' && process.env.DB_TYPE !== 'postgresql') {
+            this.ensureDatabaseDirectory();
+        } else {
+            console.log('🐘 PostgreSQL mode - skipping SQLite directory creation');
+        }
         
         // NOTE: Database initialization is deferred to init() method
         // because sql.js requires async initialization
