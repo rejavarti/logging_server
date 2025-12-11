@@ -1,35 +1,25 @@
 /**
  * DATABASE ACCESS LAYER
  * 
- * Supports PostgreSQL for production and SQLite for testing/development
+ * PostgreSQL-only database access layer
  */
 
 const EventEmitter = require('events');
+const PostgresAdapter = require('./postgres-adapter');
 
 class DatabaseAccessLayer extends EventEmitter {
     constructor(databasePath, logger, existingDb = null) {
         super();
         
-        // Direct adapter selection based on DB_TYPE
-        if (existingDb) {
-            // CRITICAL: For :memory: databases, reuse existing connection to preserve data
-            this.db = existingDb;
-        } else if (process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql') {
-            // PostgreSQL for production
-            const PostgresAdapter = require('./postgres-adapter');
-            const config = {
-                host: process.env.POSTGRES_HOST || 'localhost',
-                port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
-                database: process.env.POSTGRES_DB || 'logging_server',
-                user: process.env.POSTGRES_USER || 'postgres',
-                password: process.env.POSTGRES_PASSWORD
-            };
-            this.db = new PostgresAdapter(config, logger);
-        } else {
-            // SQLite for testing/development
-            const UniversalSQLiteAdapter = require('./universal-sqlite-adapter');
-            this.db = new UniversalSQLiteAdapter(databasePath);
-        }
+        // Use PostgreSQL adapter
+        const config = {
+            host: process.env.DB_HOST || process.env.POSTGRES_HOST || 'localhost',
+            port: parseInt(process.env.DB_PORT || process.env.POSTGRES_PORT || '5432', 10),
+            database: process.env.DB_NAME || process.env.POSTGRES_DB || 'logging_server',
+            user: process.env.DB_USER || process.env.POSTGRES_USER || 'postgres',
+            password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD
+        };
+        this.db = new PostgresAdapter(config, logger);
         
         this.logger = logger;
         this.transactionActive = false;

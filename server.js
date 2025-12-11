@@ -803,39 +803,11 @@ app.locals.legacyAuth = legacyAuth;
 // Database initialization function
 async function initializeDatabase() {
     try {
-        // Determine database path (only needed for SQLite)
-        const isPostgres = process.env.DB_TYPE === 'postgres' || process.env.DB_TYPE === 'postgresql';
-        const dbPath = isPostgres ? null : (process.env.TEST_DB_PATH || path.join(dbDir, 'enterprise_logs.db'));
+        loggers.system.info('📊 Initializing PostgreSQL database connection...');
         
-        // Skip SQLite migration for PostgreSQL (schema already created)
-        if (isPostgres) {
-            loggers.system.info('📊 Using PostgreSQL - skipping SQLite migration');
-            dal = new DatabaseAccessLayer(null, loggers.system);
-            await dal.waitForInitialization();
-            loggers.system.info('✅ PostgreSQL database initialized');
-        } else {
-            // Run database migration first to ensure all tables exist (SQLite only)
-            loggers.system.info('🔧 Running database migration...');
-            const DatabaseMigration = require('./migrations/database-migration');
-            const migration = new DatabaseMigration(dbPath, loggers.system);
-            await migration.runMigration();
-            loggers.system.info('✅ Database migration completed successfully');
-            
-            // CRITICAL FIX: Reuse migration database connection to avoid close/reopen issues
-            // This prevents SQLite lock file problems on network mounts (SMB/NFS)
-            // and eliminates timing issues on slower filesystems
-            if (migration.db) {
-                loggers.system.info('🔄 Reusing database connection from migration (avoids lock issues)');
-                dal = new DatabaseAccessLayer(dbPath, loggers.system, migration.db);
-                // Wait for async table creation to complete
-                await dal.waitForInitialization();
-                loggers.system.info('✅ DAL initialization complete with reused connection');
-            } else {
-                // Fallback: create new connection if migration didn't provide one
-                loggers.system.info('⏳ Creating new database connection...');
-                dal = new DatabaseAccessLayer(dbPath, loggers.system);
-            }
-        }
+        // Create DAL with PostgreSQL adapter
+        dal = new DatabaseAccessLayer(null, loggers.system);
+        await dal.waitForInitialization();
         
         // Attach metrics manager reference for reliability counters once initialized
         db = dal.db; // Legacy compatibility
