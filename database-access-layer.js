@@ -491,10 +491,11 @@ class DatabaseAccessLayer extends EventEmitter {
 
     // User management methods
     async createUser(userData) {
-        // Use INSERT OR IGNORE to handle race conditions during parallel initialization
-        const sql = `INSERT OR IGNORE INTO users (username, password_hash, email, role, created_at, active) 
-                     VALUES (?, ?, ?, ?, datetime('now'), ?)`;
-        const params = [userData.username, userData.password_hash, userData.email, userData.role || 'user', userData.active || 1];
+        // PostgreSQL: Use ON CONFLICT DO NOTHING instead of INSERT OR IGNORE
+        const sql = `INSERT INTO users (username, password_hash, email, role, created_at, is_active) 
+                     VALUES ($1, $2, $3, $4, NOW(), $5)
+                     ON CONFLICT (username) DO NOTHING`;
+        const params = [userData.username, userData.password_hash, userData.email || null, userData.role || 'user', userData.is_active !== undefined ? userData.is_active : true];
         const result = await this.run(sql, params);
         // If no rows were affected (user already exists), return the existing user
         if (result && result.changes === 0) {
@@ -559,7 +560,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async createRole(roleData) {
-        const sql = `INSERT INTO roles (name, description, permissions, created_at, updated_at) VALUES (?, ?, ?, datetime('now'), datetime('now'))`;
+        const sql = `INSERT INTO roles (name, description, permissions, created_at, updated_at) VALUES ($1, $2, $3, NOW(), NOW())`;
         const perms = Array.isArray(roleData.permissions) ? JSON.stringify(roleData.permissions) : JSON.stringify([]);
         return await this.run(sql, [roleData.name, roleData.description || null, perms]);
     }
@@ -571,7 +572,7 @@ class DatabaseAccessLayer extends EventEmitter {
         if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
         if (updates.permissions) { fields.push('permissions = ?'); values.push(JSON.stringify(updates.permissions)); }
         if (!fields.length) throw new Error('No valid role fields to update');
-        const sql = `UPDATE roles SET ${fields.join(', ')}, updated_at = datetime('now') WHERE id = ?`;
+        const sql = `UPDATE roles SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${values.length + 1}`;
         values.push(roleId);
         return await this.run(sql, values);
     }
@@ -697,7 +698,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async upsertIntegrationDoc(type, doc) {
-        const sql = `INSERT INTO integration_docs (type, doc, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(type) DO UPDATE SET doc = excluded.doc, updated_at = excluded.updated_at`;
+        const sql = `INSERT INTO integration_docs (type, doc, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT(type) DO UPDATE SET doc = excluded.doc, updated_at = excluded.updated_at`;
         return await this.run(sql, [type, doc]);
     }
 
@@ -713,14 +714,14 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async setFileOffset(filePath, offset) {
-        const sql = `INSERT INTO file_ingestion_offsets (file_path, last_offset, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(file_path) DO UPDATE SET last_offset = excluded.last_offset, updated_at = excluded.updated_at`;
+        const sql = `INSERT INTO file_ingestion_offsets (file_path, last_offset, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT(file_path) DO UPDATE SET last_offset = excluded.last_offset, updated_at = excluded.updated_at`;
         return await this.run(sql, [filePath, offset]);
     }
 
     // Parse error recording (non-blocking notifications)
     async recordParseError(err) {
         try {
-            const sql = `INSERT INTO parse_errors (source, file_path, line_number, line_snippet, reason, created_at, acknowledged) VALUES (?, ?, ?, ?, ?, datetime('now'), 0)`;
+            const sql = `INSERT INTO parse_errors (source, file_path, line_number, line_snippet, reason, created_at, acknowledged) VALUES ($1, $2, $3, $4, $5, NOW(), false)`;
             const params = [
                 err.source || 'unknown',
                 err.file_path || null,
@@ -835,12 +836,12 @@ class DatabaseAccessLayer extends EventEmitter {
         
         // Support time-based relative filters
         if (filters.since_hours) {
-            sql += ` AND timestamp >= datetime('now', 'localtime', '-' || ? || ' hours')`;
+            sql += ` AND timestamp >= NOW() - INTERVAL '1 hour' * $${params.length + 1}`;
             params.push(filters.since_hours);
         }
         
         if (filters.since_days) {
-            sql += ` AND timestamp >= datetime('now', 'localtime', '-' || ? || ' days')`;
+            sql += ` AND timestamp >= NOW() - INTERVAL '1 day' * $${params.length + 1}`;
             params.push(filters.since_days);
         }
         
@@ -852,13 +853,13 @@ class DatabaseAccessLayer extends EventEmitter {
     async getDailyLogTrends(days = 7) {
         const sql = `
             SELECT 
-                date(timestamp) as date,
+                DATE(timestamp) as date,
                 COUNT(*) as count,
                 SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) as errors,
                 SUM(CASE WHEN level = 'warning' THEN 1 ELSE 0 END) as warnings
             FROM logs
-            WHERE timestamp >= datetime('now', 'localtime', '-' || ? || ' days')
-            GROUP BY date(timestamp)
+            WHERE timestamp >= NOW() - INTERVAL '1 day' * $1
+            GROUP BY DATE(timestamp)
             ORDER BY date ASC
         `;
         return await this.all(sql, [days]);
@@ -868,13 +869,13 @@ class DatabaseAccessLayer extends EventEmitter {
     async getHourlyLogTrends(hours = 24) {
         const sql = `
             SELECT 
-                strftime('%Y-%m-%d %H:00', timestamp) as hour,
+                TO_CHAR(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00') as hour,
                 COUNT(*) as count,
                 SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) as errors,
                 SUM(CASE WHEN level = 'warning' THEN 1 ELSE 0 END) as warnings
             FROM logs
-            WHERE timestamp >= datetime('now', 'localtime', '-' || ? || ' hours')
-            GROUP BY strftime('%Y-%m-%d %H:00', timestamp)
+            WHERE timestamp >= NOW() - INTERVAL '1 hour' * $1
+            GROUP BY DATE_TRUNC('hour', timestamp)
             ORDER BY hour ASC
         `;
         return await this.all(sql, [hours]);
@@ -884,13 +885,13 @@ class DatabaseAccessLayer extends EventEmitter {
     async getWeeklyLogTrends(weeks = 4) {
         const sql = `
             SELECT 
-                strftime('%Y-W%W', timestamp) as week,
+                TO_CHAR(DATE_TRUNC('week', timestamp), 'IYYY-IW') as week,
                 COUNT(*) as count,
                 SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) as errors,
                 SUM(CASE WHEN level = 'warning' THEN 1 ELSE 0 END) as warnings
             FROM logs
-            WHERE timestamp >= datetime('now', 'localtime', '-' || ? || ' days')
-            GROUP BY strftime('%Y-W%W', timestamp)
+            WHERE timestamp >= NOW() - INTERVAL '1 day' * $1
+            GROUP BY DATE_TRUNC('week', timestamp)
             ORDER BY week ASC
         `;
         return await this.all(sql, [weeks * 7]);
@@ -915,7 +916,7 @@ class DatabaseAccessLayer extends EventEmitter {
     // Dashboard widget methods
     async createDashboardWidget(widgetData) {
         const sql = `INSERT INTO dashboard_widgets (dashboard_id, type, title, config, position_x, position_y, width, height, created_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`;
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`;
         const params = [
             widgetData.dashboard_id,
             widgetData.type,
@@ -967,8 +968,9 @@ class DatabaseAccessLayer extends EventEmitter {
 
     // Device management methods
     async registerDevice(deviceData) {
-        const sql = `INSERT OR REPLACE INTO devices (id, name, type, status, last_seen, metadata) 
-                     VALUES (?, ?, ?, ?, datetime('now'), ?)`;
+        const sql = `INSERT INTO devices (id, name, type, status, last_seen, metadata) 
+                     VALUES ($1, $2, $3, $4, NOW(), $5)
+                     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, type = EXCLUDED.type, status = EXCLUDED.status, last_seen = NOW(), metadata = EXCLUDED.metadata`;
         const params = [
             deviceData.id,
             deviceData.name,
@@ -990,7 +992,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async updateDeviceStatus(deviceId, status) {
-        const sql = `UPDATE devices SET status = ?, last_seen = datetime('now') WHERE id = ?`;
+        const sql = `UPDATE devices SET status = $1, last_seen = NOW() WHERE id = $2`;
         return await this.run(sql, [status, deviceId]);
     }
 
