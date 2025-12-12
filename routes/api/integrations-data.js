@@ -68,7 +68,7 @@ router.get('/stats', async (req, res) => {
                 SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed,
                 SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
              FROM integration_messages
-             WHERE created_at > datetime('now', '-24 hours')`
+             WHERE created_at > NOW() - INTERVAL '24 hours'`
         );
         res.json({ success: true, data: stats });
     } catch (error) {

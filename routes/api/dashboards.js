@@ -190,7 +190,7 @@ router.get('/data/:widgetType', async (req, res) => {
                 const logCounts = await dal.all(`
                     SELECT level, COUNT(*) as count 
                     FROM logs 
-                    WHERE timestamp >= datetime('now', '-' || ? || '') 
+                    WHERE timestamp >= NOW() - CAST(? AS INTERVAL) 
                     GROUP BY level
                 `, [safeTimeRange]);
                 data = {
@@ -204,7 +204,7 @@ router.get('/data/:widgetType', async (req, res) => {
                     SELECT source, COUNT(*) as requests, 
                            AVG(CAST(SUBSTR(message, INSTR(message, 'bytes:') + 6) AS INTEGER)) as avg_bytes
                     FROM logs 
-                    WHERE timestamp >= datetime('now', '-1 hour')
+                    WHERE timestamp >= NOW() - INTERVAL '1 hour'
                       AND message LIKE '%bytes:%'
                     GROUP BY source
                     ORDER BY requests DESC
@@ -226,11 +226,11 @@ router.get('/data/:widgetType', async (req, res) => {
                 const metricName = req.query.metric || 'response_time';
                 const metricData = await req.dal.all(`
                     SELECT 
-                        strftime('%Y-%m-%d %H:00', timestamp) as hour,
+                        TO_CHAR(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00') as hour,
                         COUNT(*) as count,
                         AVG(CAST(SUBSTR(message, INSTR(message, ':') + 1) AS REAL)) as avg_value
                     FROM logs 
-                    WHERE timestamp >= datetime('now', '-24 hours')
+                    WHERE timestamp >= NOW() - INTERVAL '24 hours'
                       AND message LIKE ?
                     GROUP BY hour
                     ORDER BY hour DESC
@@ -252,7 +252,7 @@ router.get('/data/:widgetType', async (req, res) => {
                 const recentAlerts = await req.dal.all(`
                     SELECT id, type, title, severity, status, created, resolved
                     FROM alerts
-                    WHERE created >= datetime('now', '-7 days')
+                    WHERE created >= NOW() - INTERVAL '7 days'
                     ORDER BY created DESC
                     LIMIT 50
                 `);
@@ -283,7 +283,7 @@ router.get('/data/:widgetType', async (req, res) => {
                     SELECT user_id, action, COUNT(*) as count,
                            MAX(created_at) as last_activity
                     FROM activity_log
-                    WHERE created_at >= datetime('now', '-24 hours')
+                    WHERE created_at >= NOW() - INTERVAL '24 hours'
                     GROUP BY user_id, action
                     ORDER BY count DESC
                     LIMIT 20
@@ -291,7 +291,7 @@ router.get('/data/:widgetType', async (req, res) => {
                 const uniqueUsers = await req.dal.get(`
                     SELECT COUNT(DISTINCT user_id) as count
                     FROM activity_log
-                    WHERE created_at >= datetime('now', '-24 hours')
+                    WHERE created_at >= NOW() - INTERVAL '24 hours'
                 `);
                 data = {
                     activities: userActivity.map(activity => ({

@@ -92,7 +92,7 @@ router.get('/stats', async (req, res) => {
         const deliveryStats = await req.dal.all(
             `SELECT status, COUNT(*) as count 
              FROM webhook_deliveries 
-             WHERE created_at > datetime('now', '-24 hours')
+             WHERE created_at > NOW() - INTERVAL '24 hours'
              GROUP BY status`
         );
         

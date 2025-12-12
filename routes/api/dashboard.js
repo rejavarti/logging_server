@@ -143,14 +143,14 @@ router.get('/refresh', async (req, res) => {
         const logLevelStats = await req.dal.all(`
             SELECT level, COUNT(*) as count 
             FROM logs 
-            WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+            WHERE timestamp >= NOW() - INTERVAL '24 hours'
             GROUP BY level
         `) || [];
 
         // Get hourly statistics
         const hourlyStats = await req.dal.all(`
             SELECT 
-                strftime('%H', timestamp) as hour,
+                EXTRACT(HOUR FROM timestamp) as hour,
                 COUNT(*) as count
             FROM logs 
             WHERE timestamp >= datetime('now', 'localtime', '-24 hours')

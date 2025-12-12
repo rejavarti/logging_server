@@ -3,7 +3,7 @@ const router = express.Router();
 const { isNonEmptyString } = require('../../utils/validate');
 
 async function ensureTable(dal){
-  await dal.run("CREATE TABLE IF NOT EXISTS bookmarks (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT NOT NULL, label TEXT NOT NULL, query TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)");
+  await dal.run("CREATE TABLE IF NOT EXISTS bookmarks (id SERIAL PRIMARY KEY, username TEXT NOT NULL, label TEXT NOT NULL, query TEXT, created_at TIMESTAMPTZ DEFAULT NOW())");
 }
 
 // GET /api/bookmarks

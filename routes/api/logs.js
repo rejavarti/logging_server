@@ -137,7 +137,7 @@ router.get('/analytics', async (req, res) => {
         // Get all logs for analysis
         const logs = await req.dal.all(`
             SELECT * FROM logs 
-            WHERE timestamp >= datetime('now', '-24 hours')
+            WHERE timestamp >= NOW() - INTERVAL '24 hours'
             ORDER BY timestamp DESC
         `) || [];
 
@@ -363,7 +363,7 @@ router.get('/stats', async (req, res) => {
         // Group by time periods
         if (groupBy === 'hour') {
             const query = `
-                SELECT strftime('%Y-%m-%d %H:00', timestamp) as period, COUNT(*) as count
+                SELECT TO_CHAR(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00') as period, COUNT(*) as count
                 FROM logs
                 ${whereClause}
                 GROUP BY period
@@ -377,7 +377,7 @@ router.get('/stats', async (req, res) => {
             return res.json({ success: true, labels, values, total: values.reduce((a, b) => a + b, 0) });
         } else if (groupBy === 'day') {
             const query = `
-                SELECT strftime('%Y-%m-%d', timestamp) as period, COUNT(*) as count
+                SELECT DATE(timestamp) as period, COUNT(*) as count
                 FROM logs
                 ${whereClause}
                 GROUP BY period

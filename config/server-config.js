@@ -48,6 +48,13 @@ class ServerConfig {
             authPassword: process.env.AUTH_PASSWORD || 'ChangeMe123!',
             sessionSecret: process.env.SESSION_SECRET || 'your-secret-key-here',
             
+            // Authentication
+            auth: {
+                saltRounds: 12,
+                jwtSecret: process.env.JWT_SECRET || 'change-me-in-production',
+                sessionTimeout: 24 * 60 * 60 * 1000 // 24 hours
+            },
+            
             // Database
             databasePath: process.env.DATABASE_PATH || path.join(__dirname, '..', 'data', 'logging.db'),
             

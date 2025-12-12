@@ -15,7 +15,7 @@ router.get('/ingestion/status', async (req, res) => {
         
         // Get real counts from database
         const totalLogs = db.prepare('SELECT COUNT(*) as count FROM logs').get();
-        const recentLogs = db.prepare('SELECT COUNT(*) as count FROM logs WHERE timestamp > datetime("now", "-1 hour")').get();
+        const recentLogs = db.prepare('SELECT COUNT(*) as count FROM logs WHERE timestamp > NOW() - INTERVAL \'1 hour\'').get();
         
         const status = {
             engines: [
@@ -285,7 +285,7 @@ router.get('/ingestion/stats', async (req, res) => {
         
         // Calculate hourly distribution
         const hourlyResult = await dal.all(
-            `SELECT strftime('%H', timestamp) as hour, COUNT(*) as messages 
+            `SELECT EXTRACT(HOUR FROM timestamp) as hour, COUNT(*) as messages 
              FROM logs WHERE timestamp >= ? GROUP BY hour ORDER BY hour`,
             [cutoffDate]
         );

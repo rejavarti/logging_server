@@ -237,7 +237,7 @@ router.get('/analytics', async (req, res) => {
                     query,
                     COUNT(*) as usage_count
                 FROM saved_searches 
-                WHERE created_at >= datetime('now', '-7 days')
+                WHERE created_at >= NOW() - INTERVAL '7 days'
                 GROUP BY query
                 ORDER BY usage_count DESC
                 LIMIT 10
@@ -248,7 +248,7 @@ router.get('/analytics', async (req, res) => {
             
             try {
                 const logStats = await req.dal.all(`
-                    SELECT COUNT(*) as total_searches FROM logs WHERE timestamp >= datetime('now', '-24 hours')
+                    SELECT COUNT(*) as total_searches FROM logs WHERE timestamp >= NOW() - INTERVAL '24 hours'
                 `);
                 
                 if (logStats && logStats[0]) {
