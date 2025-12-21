@@ -330,7 +330,7 @@ router.get('/suggest', async (req, res) => {
         const { prefix = '', limit = 10 } = req.query;
         if (!prefix) return res.json({ suggestions: [] });
         const rows = await req.dal.all(
-            "SELECT DISTINCT substr(message, 1, 60) as term FROM logs WHERE message LIKE $1 LIMIT $2",
+            "SELECT DISTINCT SUBSTRING(message, 1, 60) as term FROM logs WHERE message LIKE $1 LIMIT $2",
             [ `${prefix}%`, parseInt(limit) ]
         );
         res.json({ suggestions: rows.map(r=>r.term) });

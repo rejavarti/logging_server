@@ -202,7 +202,7 @@ router.get('/data/:widgetType', async (req, res) => {
                 // Network traffic monitoring from logs
                 const networkLogs = await req.dal.all(`
                     SELECT source, COUNT(*) as requests, 
-                           AVG(CAST(SUBSTR(message, INSTR(message, 'bytes:') + 6) AS INTEGER)) as avg_bytes
+                           AVG(CAST(SUBSTRING(message FROM POSITION('bytes:' IN message) + 6) AS INTEGER)) as avg_bytes
                     FROM logs 
                     WHERE timestamp >= NOW() - INTERVAL '1 hour'
                       AND message LIKE '%bytes:%'
@@ -228,7 +228,7 @@ router.get('/data/:widgetType', async (req, res) => {
                     SELECT 
                         TO_CHAR(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00') as hour,
                         COUNT(*) as count,
-                        AVG(CAST(SUBSTR(message, INSTR(message, ':') + 1) AS REAL)) as avg_value
+                        AVG(CAST(SUBSTRING(message FROM POSITION(':' IN message) + 1) AS REAL)) as avg_value
                     FROM logs 
                     WHERE timestamp >= NOW() - INTERVAL '24 hours'
                       AND message LIKE $1

@@ -54,15 +54,15 @@ router.get('/sessions', async (req, res) => {
             // Ensure user_sessions table exists
             await req.dal.run(`
                 CREATE TABLE IF NOT EXISTS user_sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id SERIAL PRIMARY KEY,
                     session_token TEXT UNIQUE NOT NULL,
                     user_id INTEGER NOT NULL,
                     ip_address TEXT,
                     user_agent TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_activity DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    expires_at DATETIME NOT NULL,
-                    is_active INTEGER DEFAULT 1,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    last_activity TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    is_active BOOLEAN DEFAULT true,
                     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
                 )
             `);
