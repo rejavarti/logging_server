@@ -26,12 +26,15 @@ router.get('/', async (req, res) => {
             "connect-src 'self' ws: wss: https: http:; "
         );
         // Disable caching AGGRESSIVELY + version parameter to force cache bust
+        const timestamp = Date.now();
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, s-maxage=0');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
         res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('ETag', `"dashboard-${timestamp}"`);
+        res.setHeader('Last-Modified', new Date(timestamp).toUTCString());
         // Add unique version to break browser cache
-        res.setHeader('X-Dashboard-Version', Date.now().toString());
+        res.setHeader('X-Dashboard-Version', timestamp.toString());
         
         // PERFORMANCE: Send HTML shell immediately, load data via AJAX
         // Only fetch critical data needed for initial render
