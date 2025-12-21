@@ -144,7 +144,7 @@ class WebhookManager {
         const recentDeliveries = await this.dal.all(`
             SELECT COUNT(*) as count, delivery_status 
             FROM webhook_deliveries 
-            WHERE attempted_at > datetime('now', '-24 hours')
+            WHERE attempted_at > NOW() - INTERVAL '24 hours'
             GROUP BY delivery_status
         `);
 

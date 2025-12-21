@@ -26,7 +26,7 @@ class LogLevelsWidget extends BaseWidget {
             const logLevelStats = await dal.all(`
                 SELECT level, COUNT(*) as count 
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours') 
+                WHERE timestamp >= NOW() - INTERVAL '24 hours' 
                 GROUP BY level 
                 ORDER BY count DESC
             `) || [];

@@ -872,9 +872,9 @@ async function initializeDefaultAdmin() {
             const bcrypt = require('bcrypt');
             const passwordHash = await bcrypt.hash(defaultPassword, config.auth.saltRounds);
             
-            // Use INSERT OR IGNORE to handle race conditions during parallel initialization
+            // Use INSERT ... ON CONFLICT DO NOTHING to handle race conditions during parallel initialization
             await dal.run(
-                'INSERT OR IGNORE INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)',
+                'INSERT INTO users (username, email, password_hash, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING',
                 ['admin', 'admin@enterprise.local', passwordHash, 'admin']
             );
             
@@ -1667,7 +1667,7 @@ function setupRoutes() {
                         const avgResult = await dal.get(`
                             SELECT AVG(response_time_ms) as avgTime
                             FROM request_metrics
-                            WHERE timestamp >= datetime('now', 'localtime', '-1 hour')
+                            WHERE timestamp >= NOW() - INTERVAL '1 hour'
                         `);
                         queryStats.avgQueryTime = avgResult && avgResult.avgTime ? 
                             Math.round(avgResult.avgTime) : 0;
@@ -1678,7 +1678,7 @@ function setupRoutes() {
                                 SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as hits,
                                 COUNT(*) as total
                             FROM request_metrics
-                            WHERE timestamp >= datetime('now', 'localtime', '-1 hour')
+                            WHERE timestamp >= NOW() - INTERVAL '1 hour'
                         `);
                         
                         if (cacheResult && cacheResult.total > 0) {
@@ -1720,19 +1720,19 @@ function setupRoutes() {
                 // Calculate time condition based on range
                 switch(timeRange) {
                     case '1h':
-                        timeCondition = "timestamp >= datetime('now', '-1 hour')";
+                        timeCondition = "timestamp >= NOW() - INTERVAL '1 hour'";
                         break;
                     case '24h':
-                        timeCondition = "timestamp >= datetime('now', '-1 day')";
+                        timeCondition = "timestamp >= NOW() - INTERVAL '1 day'";
                         break;
                     case '7d':
-                        timeCondition = "timestamp >= datetime('now', '-7 days')";
+                        timeCondition = "timestamp >= NOW() - INTERVAL '7 days'";
                         break;
                     case '30d':
-                        timeCondition = "timestamp >= datetime('now', '-30 days')";
+                        timeCondition = "timestamp >= NOW() - INTERVAL '30 days'";
                         break;
                     default:
-                        timeCondition = "timestamp >= datetime('now', '-1 day')";
+                        timeCondition = "timestamp >= NOW() - INTERVAL '1 day'";
                 }
                 
                 // Get request counts and statistics
@@ -1752,7 +1752,7 @@ function setupRoutes() {
                 const lastHourRequests = await dal.get(
                     `SELECT COUNT(*) as count
                      FROM request_metrics 
-                     WHERE timestamp >= datetime('now', '-1 hour')`
+                     WHERE timestamp >= NOW() - INTERVAL '1 hour'`
                 );
                 
                 // Top endpoints by request count
@@ -2098,7 +2098,7 @@ function setupRoutes() {
                         const avgTimeResult = await req.dal.get(`
                             SELECT AVG(response_time_ms) as avgTime
                             FROM request_metrics
-                            WHERE timestamp >= datetime('now', 'localtime', '-1 hour')
+                            WHERE timestamp >= NOW() - INTERVAL '1 hour'
                         `);
                         
                         if (avgTimeResult && avgTimeResult.avgTime) {

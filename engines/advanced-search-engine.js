@@ -527,13 +527,13 @@ class AdvancedSearchEngine {
             const field = histogramConfig.field || 'timestamp';
             const interval = histogramConfig.interval || '1h';
 
-            // Convert interval to SQLite date functions
+            // Convert interval to PostgreSQL date functions
             let dateFunction;
             switch (interval) {
-                case '1m': dateFunction = "strftime('%Y-%m-%d %H:%M', timestamp)"; break;
-                case '1h': dateFunction = "strftime('%Y-%m-%d %H', timestamp)"; break;
-                case '1d': dateFunction = "strftime('%Y-%m-%d', timestamp)"; break;
-                default: dateFunction = "strftime('%Y-%m-%d %H', timestamp)";
+                case '1m': dateFunction = "TO_CHAR(timestamp, 'YYYY-MM-DD HH24:MI')"; break;
+                case '1h': dateFunction = "TO_CHAR(timestamp, 'YYYY-MM-DD HH24')"; break;
+                case '1d': dateFunction = "TO_CHAR(timestamp, 'YYYY-MM-DD')"; break;
+                default: dateFunction = "TO_CHAR(timestamp, 'YYYY-MM-DD HH24')";
             }
 
             let sql = `SELECT ${dateFunction} as key, COUNT(*) as doc_count FROM log_events WHERE 1=1`;

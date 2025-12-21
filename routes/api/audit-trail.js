@@ -176,7 +176,7 @@ router.get('/audit-trail/stats', async (req, res) => {
         const topUsersRows = await dal.all(`
             SELECT COALESCE(u.username,'unknown') AS username, COUNT(*) AS entries
             FROM activity_log a LEFT JOIN users u ON a.user_id = u.id
-            WHERE a.created_at >= datetime('now','-30 days')
+            WHERE a.created_at >= NOW() - INTERVAL '30 days'
             GROUP BY COALESCE(u.username,'unknown')
             ORDER BY entries DESC
             LIMIT 10

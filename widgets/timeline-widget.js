@@ -25,11 +25,11 @@ class TimelineWidget extends BaseWidget {
         try {
             const hourlyStats = await dal.all(`
                 SELECT 
-                    strftime('%H:00', timestamp) as hour,
+                    TO_CHAR(timestamp, 'HH24:00') as hour,
                     COUNT(*) as count,
                     level
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+                WHERE timestamp >= NOW() - INTERVAL '24 hours'
                 GROUP BY hour, level
                 ORDER BY hour
             `) || [];

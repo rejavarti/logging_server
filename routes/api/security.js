@@ -62,7 +62,7 @@ function startQueueProcessor(dalGetter) {
         while (blockPersistQueue.length) {
             const entry = blockPersistQueue.shift();
             try {
-                await dal.run(`INSERT OR REPLACE INTO rate_limit_blocks (ip, reason, blocked_at, block_expires, blocked_by, duration_seconds) VALUES (?,?,?,?,?,?)`, [entry.ip, entry.reason, entry.blockedAt, entry.blockExpires, entry.blockedBy, entry.durationSeconds]);
+                await dal.run(`INSERT INTO rate_limit_blocks (ip, reason, blocked_at, block_expires, blocked_by, duration_seconds) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (ip) DO UPDATE SET reason = EXCLUDED.reason, blocked_at = EXCLUDED.blocked_at, block_expires = EXCLUDED.block_expires, blocked_by = EXCLUDED.blocked_by, duration_seconds = EXCLUDED.duration_seconds`, [entry.ip, entry.reason, entry.blockedAt, entry.blockExpires, entry.blockedBy, entry.durationSeconds]);
             } catch (err) {
                 blockPersistQueue.unshift(entry); // retry later
                 req?.app?.locals?.loggers?.api?.warn('Queue persist block failed: ' + err.message);
@@ -246,7 +246,7 @@ router.put('/rate-limits/settings', async (req, res) => {
         }
         await dal.run(`CREATE TABLE IF NOT EXISTS rate_limit_settings (id INTEGER PRIMARY KEY CHECK (id=1), settings TEXT, updated_at TEXT, updated_by TEXT)`);
         const now = new Date().toISOString();
-        await dal.run(`INSERT OR REPLACE INTO rate_limit_settings (id, settings, updated_at, updated_by) VALUES (1, ?, ?, ?)`, [JSON.stringify(settings), now, req.user ? req.user.username : 'system']);
+        await dal.run(`INSERT INTO rate_limit_settings (id, settings, updated_at, updated_by) VALUES (1, $1, $2, $3) ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`, [JSON.stringify(settings), now, req.user ? req.user.username : 'system']);
         req.app.locals?.loggers?.api?.info(`Rate limiting settings persisted by ${req.user ? req.user.username : 'system'}`);
         res.json({ success: true, message: 'Rate limiting settings updated', settings: { ...settings, updated: now, updatedBy: req.user ? req.user.username : 'system' } });
     } catch (error) {

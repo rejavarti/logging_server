@@ -589,10 +589,10 @@ class AnomalyDetectionEngine {
         // Get historical activity for this hour
         const historicalData = await this.db.all(`
             SELECT COUNT(*) as count, 
-                   strftime('%H', timestamp) as hour
+                   TO_CHAR(timestamp, 'HH24') as hour
             FROM logs 
             WHERE timestamp > NOW() - INTERVAL '\${params.min_history_days} days'
-            GROUP BY strftime('%H', timestamp)
+            GROUP BY TO_CHAR(timestamp, 'HH24')
         `);
 
         const hourlyStats = historicalData.reduce((acc, row) => {
@@ -606,8 +606,8 @@ class AnomalyDetectionEngine {
         const currentActivity = await this.db.get(`
             SELECT COUNT(*) as count 
             FROM logs 
-            WHERE strftime('%H', timestamp) = ?
-            AND date(timestamp) = date('now')
+            WHERE TO_CHAR(timestamp, 'HH24') = $1
+            AND DATE(timestamp) = CURRENT_DATE
         `, [currentHour.toString().padStart(2, '0')]);
 
         const actualCount = currentActivity.count;
@@ -687,10 +687,10 @@ class AnomalyDetectionEngine {
                 FROM (
                     SELECT COUNT(*) as hourly_count
                     FROM logs 
-                    WHERE (severity = ? OR level = ?)
+                    WHERE (severity = $1 OR level = $2)
                     AND timestamp > NOW() - INTERVAL '7 days'
                     AND timestamp <= NOW() - INTERVAL '1 day'
-                    GROUP BY strftime('%Y-%m-%d %H', timestamp)
+                    GROUP BY TO_CHAR(timestamp, 'YYYY-MM-DD HH24')
                 ) hourly_data
             `, [level, level]);
 
@@ -825,10 +825,10 @@ class AnomalyDetectionEngine {
 
             // Update hourly patterns
             const hourlyCounts = await this.db.all(`
-                SELECT strftime('%H', timestamp) as hour, COUNT(*) as count
+                SELECT TO_CHAR(timestamp, 'HH24') as hour, COUNT(*) as count
                 FROM logs 
-                WHERE timestamp > datetime('now', '-7 days')
-                GROUP BY strftime('%H', timestamp)
+                WHERE timestamp > NOW() - INTERVAL '7 days'
+                GROUP BY TO_CHAR(timestamp, 'HH24')
             `);
 
             for (const hourlyCount of hourlyCounts) {

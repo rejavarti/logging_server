@@ -1689,12 +1689,12 @@ class DatabaseAccessLayer extends EventEmitter {
             
             const sql = `
                 SELECT 
-                    strftime('%Y-%m-%d %H:00:00', timestamp) as hour,
+                    TO_CHAR(timestamp, 'YYYY-MM-DD HH24:00:00') as hour,
                     level,
                     COUNT(*) as count
                 FROM logs 
-                WHERE timestamp >= datetime('now', '-' || ? || ' hours')
-                GROUP BY strftime('%Y-%m-%d %H:00:00', timestamp), level
+                WHERE timestamp >= NOW() - ($1 || ' hours')::INTERVAL
+                GROUP BY TO_CHAR(timestamp, 'YYYY-MM-DD HH24:00:00'), level
                 ORDER BY hour DESC
             `;
             return await this.all(sql, [safeHours]);

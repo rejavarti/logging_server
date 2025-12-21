@@ -135,7 +135,7 @@ router.get('/refresh', async (req, res) => {
         const todayLogsResult = await req.dal.get(`
             SELECT COUNT(*) as count 
             FROM logs 
-            WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+            WHERE DATE(timestamp AT TIME ZONE 'America/Denver') = CURRENT_DATE
         `);
         stats.logsToday = todayLogsResult ? todayLogsResult.count : 0;
 
@@ -153,7 +153,7 @@ router.get('/refresh', async (req, res) => {
                 EXTRACT(HOUR FROM timestamp) as hour,
                 COUNT(*) as count
             FROM logs 
-            WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+            WHERE timestamp >= NOW() - INTERVAL '24 hours'
             GROUP BY hour
             ORDER BY hour
         `) || [];
@@ -293,10 +293,10 @@ router.get('/widget-data/:type', async (req, res) => {
         if (type === 'log_timeline') {
             const hourlyStats = await req.dal.all(`
                 SELECT 
-                    strftime('%H', timestamp) as hour,
+                    TO_CHAR(timestamp, 'HH24') as hour,
                     COUNT(*) as count
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+                WHERE timestamp >= NOW() - INTERVAL '24 hours'
                 GROUP BY hour
                 ORDER BY hour
             `) || [];
@@ -307,7 +307,7 @@ router.get('/widget-data/:type', async (req, res) => {
             const logLevelStats = await req.dal.all(`
                 SELECT level, COUNT(*) as count 
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+                WHERE timestamp >= NOW() - INTERVAL '24 hours'
                 GROUP BY level
             `) || [];
             return res.json({ success: true, distribution: logLevelStats || [] });
