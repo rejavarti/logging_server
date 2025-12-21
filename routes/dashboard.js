@@ -55,9 +55,6 @@ router.get('/', async (req, res) => {
     <script src="/vendor/echarts/echarts.min.js"></script>
     <script src="/vendor/leaflet/leaflet.js"></script>
     
-    <!-- Dashboard Main Script - External with cache busting -->
-    <script src="/js/dashboard-main.js?v=${Date.now()}"></script>
-    
     <!-- Widget System scripts moved below primary initialization script to ensure dependencies are defined first -->
         
     <style>
@@ -1603,6 +1600,10 @@ router.get('/', async (req, res) => {
         
         console.log('✅ First script block functions exposed globally');
         </script>
+        
+        <!-- Dashboard Main Script - External with cache busting - MUST load after inline script exposes functions -->
+        <script src="/js/dashboard-main.js?v=${Date.now()}"></script>
+        
         <!-- Deferred Widget System Scripts -->
         <script src="/js/widget-catalog.js"></script>
         <script src="/js/widget-marketplace.js"></script>
