@@ -143,7 +143,8 @@ function initializeGrid() {
     console.log('📦 Widget headers found:', document.querySelectorAll('.widget-header').length);
     
     console.log('🔧 [4] Creating Muuri instance...');
-    grid = new Muuri('.dashboard-grid', {
+    // Declare grid globally so inline script functions can access it
+    window.grid = new Muuri('.dashboard-grid', {
         dragEnabled: true,
         dragHandle: '.widget-header',
         dragSortHeuristics: {
@@ -173,6 +174,7 @@ function initializeGrid() {
         }
     });
     
+    const grid = window.grid; // Local reference for convenience
     console.log('✅ Muuri grid created, items:', grid.getItems().length);
     console.log('🎮 Drag enabled:', grid._settings.dragEnabled);
     console.log('🎮 Drag handle:', grid._settings.dragHandle);
@@ -219,7 +221,6 @@ function initializeGrid() {
         }
     });
     
-    window.grid = grid;
     console.log('✅ [5] Grid initialization completed successfully');
 }
 

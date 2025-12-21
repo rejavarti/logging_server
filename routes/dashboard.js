@@ -498,7 +498,7 @@ router.get('/', async (req, res) => {
         <script>
         // VERSION CHECK: ${Date.now()} - If you see this in console, cache is working!
         console.log('📦 Dashboard inline script loading... Version:', ${Date.now()});
-        let grid;
+        // NOTE: 'grid' variable is declared in external dashboard-main.js to avoid conflicts
         let charts = {};
         let isLocked = false;
         let resizeObserverReady = false; // Flag to prevent auto-save during initial load
@@ -1592,6 +1592,10 @@ router.get('/', async (req, res) => {
         window.logout = logout;
         window.toggleSidebar = toggleSidebar;
         window.toggleTheme = toggleTheme;
+        // Expose functions needed by external dashboard-main.js
+        window.initializeCharts = initializeCharts;
+        window.loadSavedLayout = loadSavedLayout;
+        window.setupResizeObservers = setupResizeObservers;
         
         console.log('✅ First script block functions exposed globally');
         </script>
