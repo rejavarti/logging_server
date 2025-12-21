@@ -68,8 +68,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     try {
-        if (typeof initializeCharts === 'function') {
-            initializeCharts();
+        if (typeof window.initializeCharts === 'function') {
+            window.initializeCharts();
         } else {
             console.warn('⚠️ initializeCharts function not found (expected in inline script)');
         }
@@ -80,8 +80,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // Load layout AFTER grid and charts are initialized
     setTimeout(() => {
         try {
-            if (typeof loadSavedLayout === 'function') {
-                loadSavedLayout();
+            if (typeof window.loadSavedLayout === 'function') {
+                window.loadSavedLayout();
             } else {
                 console.warn('⚠️ loadSavedLayout function not found');
             }
@@ -91,8 +91,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setTimeout(() => {
             try {
-                if (typeof setupResizeObservers === 'function') {
-                    setupResizeObservers();
+                if (typeof window.setupResizeObservers === 'function') {
+                    window.setupResizeObservers();
                 } else {
                     console.warn('⚠️ setupResizeObservers function not found');
                 }
