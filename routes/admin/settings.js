@@ -718,7 +718,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                         requestAnimationFrame(loadPortStatus);
                     }
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error loading settings:', error);
+                    console.error('Error loading settings:', error);
                     document.getElementById('settings-content').innerHTML = \`
                         <p style="text-align: center; color: var(--error-color); padding: 2rem;">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
@@ -1259,7 +1259,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                     showToast('Settings saved successfully!', 'success');
                     loadSettings(); // Reload to show updated values
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error saving settings:', error);
+                    console.error('Error saving settings:', error);
                     showToast('Failed to save settings', 'error');
                 }
             }
@@ -1543,7 +1543,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                     
                     renderBackups(data);
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error loading backups:', error);
+                    console.error('Error loading backups:', error);
                     document.getElementById('backups-content').innerHTML = \`
                         <p style="text-align: center; color: var(--error-color); padding: 2rem;">
                             <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
@@ -1702,7 +1702,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                     const metrics = await response.json();
                     updateMetricsDisplay(metrics);
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error fetching metrics:', error);
+                    console.error('Error fetching metrics:', error);
                 }
             }
 
@@ -1797,7 +1797,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                     updateGradientPreview();
                     updateColorPreview();
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error loading theme:', error);
+                    console.error('Error loading theme:', error);
                     // Initialize with defaults
                     renderGradientStops();
                     updateGradientPreview();
@@ -1964,7 +1964,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                     
                     showToast('Theme saved successfully! Changes will persist across sessions.', 'success');
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error saving theme:', error);
+                    console.error('Error saving theme:', error);
                     showToast('Failed to save theme', 'error');
                 }
             }
@@ -1982,7 +1982,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                     // Reload page after a short delay
                     setTimeout(() => window.location.reload(), 1000);
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error resetting theme:', error);
+                    console.error('Error resetting theme:', error);
                     showToast('Failed to reset theme', 'error');
                 }
             }
@@ -2002,7 +2002,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                         if (themeData.colors.text) root.style.setProperty('--text-primary', themeData.colors.text);
                     }
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Error applying theme:', error);
+                    console.error('Error applying theme:', error);
                 }
             }
 
@@ -2206,7 +2206,7 @@ TRACING_SERVICE_NAME=enterprise-logging-platform</code></pre>
                         }
                     }
                 } catch (error) {
-                    req.app.locals?.loggers?.admin?.error('Failed to load tracing config:', error);
+                    console.error('Failed to load tracing config:', error);
                 }
             }
             
