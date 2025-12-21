@@ -57,10 +57,13 @@ class PostgresAdapter {
             const pgSql = this.convertPlaceholders(sql);
             const result = await client.query(pgSql, params);
             
-            // VACUUM and other utility commands may not return result.rows
+            // VACUUM and other utility commands may return undefined/null for rows and rowCount
+            const rowCount = result && typeof result.rowCount === 'number' ? result.rowCount : 0;
+            const lastID = (result && result.rows && result.rows.length > 0 && result.rows[0]) ? result.rows[0].id : null;
+            
             return {
-                changes: result.rowCount || 0,
-                lastID: (result.rows && result.rows.length > 0 && result.rows[0]) ? result.rows[0].id : null
+                changes: rowCount,
+                lastID: lastID
             };
         } catch (error) {
             this.logger.error(`PostgreSQL run() error: ${error.message}`, {
