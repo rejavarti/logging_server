@@ -277,7 +277,7 @@ router.post('/system/backup', async (req, res) => {
             try {
                 await req.dal.run(
                     `INSERT INTO backups (filename, filepath, size_bytes, checksum, backup_type, created_by) 
-                     VALUES (?, ?, ?, ?, ?, ?)`,
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
                     [
                         backupFilename,
                         backupPath,

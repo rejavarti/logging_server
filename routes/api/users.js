@@ -57,7 +57,7 @@ router.post('/', async (req, res) => {
         
         // Check if username already exists
         const existingUser = await req.dal.get(
-            `SELECT id FROM users WHERE username = ?`,
+            `SELECT id FROM users WHERE username = $1`,
             [username]
         );
         
@@ -67,7 +67,7 @@ router.post('/', async (req, res) => {
         
         // Insert user
         const result = await req.dal.run(
-            `INSERT INTO users (username, email, password_hash, role, is_active) VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO users (username, email, password_hash, role, is_active) VALUES ($1, $2, $3, $4, $5)`,
             [username, email, password_hash, role || 'viewer', true]
         );
         
@@ -90,7 +90,7 @@ router.post('/', async (req, res) => {
             try {
                 await req.dal.run(
                     `INSERT INTO activity_log (user_id, action, resource_type, resource_id, details, ip_address, user_agent) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
                     [
                         req.user.id,
                         'create_user',
@@ -160,7 +160,7 @@ router.put('/:id', async (req, res) => {
         params.push(parseInt(id));
         
         const result = await req.dal.run(
-            `UPDATE users SET ${updateFields.join(', ')} WHERE id = ?`,
+            `UPDATE users SET ${updateFields.join(', ')} WHERE id = $${updateValues.length + 1}`,
             params
         );
         
@@ -169,7 +169,7 @@ router.put('/:id', async (req, res) => {
         }
         
         // Get updated user
-        const user = await req.dal.get(`SELECT * FROM users WHERE id = ?`, [parseInt(id)]);
+        const user = await req.dal.get(`SELECT * FROM users WHERE id = $1`, [parseInt(id)]);
         
         const updatedUser = {
             id: user.id,
@@ -188,7 +188,7 @@ router.put('/:id', async (req, res) => {
             try {
                 await req.dal.run(
                     `INSERT INTO activity_log (user_id, action, resource_type, resource_id, details, ip_address, user_agent) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
                     [
                         req.user.id,
                         'update_user',
@@ -228,7 +228,7 @@ router.delete('/:id', async (req, res) => {
         }
         
         // Check if user exists first
-        const user = await req.dal.get(`SELECT * FROM users WHERE id = ?`, [parseInt(id)]);
+        const user = await req.dal.get(`SELECT * FROM users WHERE id = $1`, [parseInt(id)]);
         if (!user) {
             return res.status(404).json({ success: false, error: 'User not found' });
         }
@@ -241,14 +241,14 @@ router.delete('/:id', async (req, res) => {
             });
         }
         
-        const result = await req.dal.run(`DELETE FROM users WHERE id = ?`, [parseInt(id)]);
+        const result = await req.dal.run(`DELETE FROM users WHERE id = $1`, [parseInt(id)]);
         
         // Log user deletion activity
         if (req.user) {
             try {
                 await req.dal.run(
                     `INSERT INTO activity_log (user_id, action, resource_type, resource_id, details, ip_address, user_agent) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
                     [
                         req.user.id,
                         'delete_user',

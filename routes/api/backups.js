@@ -224,7 +224,7 @@ router.post('/backups/create', async (req, res) => {
             try {
                 await req.dal.run(
                     `INSERT INTO backups (filename, filepath, size_bytes, backup_type, status, tables_included, created_by)
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
                     [backupName, backupPath, stats.size, type, 'completed', JSON.stringify(includes), req.user?.id || null]
                 );
             } catch (dbErr) {

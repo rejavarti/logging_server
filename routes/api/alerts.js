@@ -26,7 +26,7 @@ router.get('/alerts', async (req, res) => {
             params.push(status);
         }
         
-        query += ' ORDER BY created DESC LIMIT ?';
+        query += ' ORDER BY created DESC LIMIT $' + (params.length + 1);
         params.push(parseInt(limit));
         
         let alerts = [];

@@ -237,7 +237,7 @@ router.get('/search', async (req, res) => {
       }
     }
 
-    sql += ' ORDER BY timestamp DESC LIMIT ?';
+    sql += ' ORDER BY timestamp DESC LIMIT $' + (params.length + 1) + ';';
     params.push(parseInt(limit) || 100);
 
     const rows = await dal.db.all(sql, params);

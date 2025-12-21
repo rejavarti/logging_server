@@ -16,7 +16,7 @@ async function handleGetCurrentTheme(req, res) {
         let userThemeId = null;
         if (req.user && req.dal) {
             try {
-                const user = await req.dal.get('SELECT preferences FROM users WHERE id = ?', [req.user.id]);
+                const user = await req.dal.get('SELECT preferences FROM users WHERE id = $1', [req.user.id]);
                 if (user && user.preferences) {
                     try {
                         const prefs = JSON.parse(user.preferences);
@@ -34,7 +34,7 @@ async function handleGetCurrentTheme(req, res) {
         // Try to get theme from database
         if (req.dal) {
             try {
-                theme = await req.dal.get('SELECT * FROM themes WHERE id = ?', [themeId]);
+                theme = await req.dal.get('SELECT * FROM themes WHERE id = $1', [themeId]);
             } catch (e) {
                 req.app.locals?.loggers?.api?.warn('Failed to get theme from database:', e.message);
             }
@@ -210,7 +210,7 @@ router.get('/themes/list', async (req, res) => {
 router.get('/themes/:themeId', async (req, res) => {
     try {
         const theme = await req.dal.get(
-            'SELECT * FROM themes WHERE id = ?',
+            'SELECT * FROM themes WHERE id = $1',
             [req.params.themeId]
         );
         
@@ -274,7 +274,7 @@ router.post('/themes/save', async (req, res) => {
         
         // Check if theme name already exists
         const existing = await req.dal.get(
-            'SELECT id FROM themes WHERE name = ? AND is_builtin = false',
+            'SELECT id FROM themes WHERE name = $1 AND is_builtin = false',
             [name]
         );
         
@@ -282,8 +282,8 @@ router.post('/themes/save', async (req, res) => {
             // Update existing custom theme
             await req.dal.run(
                 `UPDATE themes 
-                 SET data = ?, updated_at = CURRENT_TIMESTAMP 
-                 WHERE id = ?`,
+                 SET data = $1, updated_at = CURRENT_TIMESTAMP 
+                 WHERE id = $2`,
                 [themeData, existing.id]
             );
             
@@ -300,7 +300,7 @@ router.post('/themes/save', async (req, res) => {
             // Create new custom theme
             const result = await req.dal.run(
                 `INSERT INTO themes (name, data, created_by, is_builtin)
-                 VALUES (?, ?, ?, 0)`,
+                 VALUES ($1, $2, $3, 0)`,
                 [name, themeData, userId]
             );
             
@@ -330,7 +330,7 @@ router.delete('/themes/:themeId', async (req, res) => {
         
         // Check if theme exists and is not built-in
         const theme = await req.dal.get(
-            'SELECT id, name, is_builtin FROM themes WHERE id = ?',
+            'SELECT id, name, is_builtin FROM themes WHERE id = $1',
             [themeId]
         );
         
@@ -348,7 +348,7 @@ router.delete('/themes/:themeId', async (req, res) => {
             });
         }
         
-        await req.dal.run('DELETE FROM themes WHERE id = ?', [themeId]);
+        await req.dal.run('DELETE FROM themes WHERE id = $1', [themeId]);
         
         req.app.locals.loggers?.security?.warn(
             `Theme deleted: ${theme.name} (${themeId}) by ${req.user?.username || 'unknown'}`
@@ -372,7 +372,7 @@ router.post('/themes/reset', async (req, res) => {
     try {
         if (req.user) {
             // Update user preferences to use default theme
-            const user = await req.dal.get('SELECT preferences FROM users WHERE id = ?', [req.user.id]);
+            const user = await req.dal.get('SELECT preferences FROM users WHERE id = $1', [req.user.id]);
             let preferences = {};
             if (user && user.preferences) {
                 try {
@@ -383,7 +383,7 @@ router.post('/themes/reset', async (req, res) => {
             preferences.theme = { themeId: 1 }; // Default Light
             
             await req.dal.run(
-                'UPDATE users SET preferences = ? WHERE id = ?',
+                'UPDATE users SET preferences = $1 WHERE id = $2',
                 [JSON.stringify(preferences), req.user.id]
             );
         }

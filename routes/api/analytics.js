@@ -187,7 +187,7 @@ router.get('/geolocation', async (req, res) => {
     const limit = Math.min(Math.max(limitRaw, 50), 5000); // clamp
     // Fetch recent logs (ensure timestamp ordering)
     // PostgreSQL: ip is inet type, can't compare to empty string. Use CAST to text for the check.
-    const rows = await req.dal.all("SELECT ip, timestamp FROM logs WHERE ip IS NOT NULL AND CAST(ip AS TEXT) != '' ORDER BY timestamp DESC LIMIT ?", [limit]) || [];
+    const rows = await req.dal.all("SELECT ip, timestamp FROM logs WHERE ip IS NOT NULL AND CAST(ip AS TEXT) != '' ORDER BY timestamp DESC LIMIT $1", [limit]) || [];
     if (!rows.length) return res.json({ success: true, totalLogs: 0, uniqueIPs: 0, externalIPs: 0, locations: [], byCountry: {}, message: 'No IP data in logs' });
 
     // Helper to determine if IP is private/local

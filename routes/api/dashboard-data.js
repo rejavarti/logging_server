@@ -192,7 +192,7 @@ router.get('/geolocation', async (req, res) => {
             WHERE (metadata::text LIKE '%latitude%' OR metadata::text LIKE '%longitude%')
               AND timestamp >= NOW() - INTERVAL '7 days'
             GROUP BY source, metadata, ip
-            LIMIT ?
+            LIMIT $1
         `, [limit]) || [];
         
         // Parse geolocation data

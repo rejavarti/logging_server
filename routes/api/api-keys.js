@@ -237,7 +237,7 @@ router.post('/api-keys/:id/toggle', async (req, res) => {
 router.post('/api-keys/:id/test', async (req, res) => {
     try {
         const { id } = req.params;
-        const row = await req.dal.get(`SELECT id, is_active, expires_at FROM api_keys WHERE id = ?`, [id]);
+        const row = await req.dal.get(`SELECT id, is_active, expires_at FROM api_keys WHERE id = $1`, [id]);
         if (!row) return res.json({ success: true, test: { keyId: id, valid: false, status: 'not_found' } });
         const now = Date.now();
         const expiresOk = !row.expires_at || new Date(row.expires_at).getTime() > now;

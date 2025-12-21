@@ -1747,7 +1747,7 @@ router.get('/logs/:id', async (req, res) => {
         
         try {
             const integration = await req.dal.get(
-                'SELECT * FROM integration_health WHERE id = ?',
+                'SELECT * FROM integration_health WHERE id = $1',
                 [integrationId]
             );
             
@@ -2188,25 +2188,25 @@ router.post('/api/health/:name/test', async (req, res) => {
         try {
             await req.dal.run(
                 `UPDATE integrations 
-                 SET status = ?,
-                     last_sync = CASE WHEN ? = 'online' THEN CURRENT_TIMESTAMP ELSE last_sync END,
-                     error_count = CASE WHEN ? != 'online' THEN error_count + 1 ELSE 0 END,
-                     last_error = CASE WHEN ? != 'online' THEN ? ELSE NULL END,
+                 SET status = $1,
+                     last_sync = CASE WHEN $2 = 'online' THEN CURRENT_TIMESTAMP ELSE last_sync END,
+                     error_count = CASE WHEN $3 != 'online' THEN error_count + 1 ELSE 0 END,
+                     last_error = CASE WHEN $4 != 'online' THEN $5 ELSE NULL END,
                      updated_at = CURRENT_TIMESTAMP
-                 WHERE name = ?`,
+                 WHERE name = $6`,
                 [newStatus, result.status, result.status, result.status, result.message || '', target.name]
             );
             
             // Also update integration_health table for consistency
             await req.dal.run(
                 `UPDATE integration_health 
-                 SET status = ?, 
+                 SET status = $1, 
                      last_check = CURRENT_TIMESTAMP,
-                     response_time = ?,
-                     last_success = CASE WHEN ? = 'online' THEN CURRENT_TIMESTAMP ELSE last_success END,
-                     error_count = CASE WHEN ? != 'online' THEN error_count + 1 ELSE 0 END,
-                     last_error = ?
-                 WHERE integration_name = ?`,
+                     response_time = $2,
+                     last_success = CASE WHEN $3 = 'online' THEN CURRENT_TIMESTAMP ELSE last_success END,
+                     error_count = CASE WHEN $4 != 'online' THEN error_count + 1 ELSE 0 END,
+                     last_error = $5
+                 WHERE integration_name = $6`,
                 [result.status, result.latencyMs || 0, result.status, result.status, result.message || '', name]
             );
             

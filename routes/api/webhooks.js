@@ -90,7 +90,7 @@ router.get('/deliveries/:deliveryId', async (req, res) => {
                 d.event_type as event
             FROM webhook_deliveries d
             LEFT JOIN webhooks w ON d.webhook_id = w.id
-            WHERE d.id = ?
+            WHERE d.id = $1
         `, [req.params.deliveryId]);
 
         if (!delivery) {
@@ -117,7 +117,7 @@ router.post('/deliveries/:deliveryId/retry', async (req, res) => {
         
         // Get the original delivery
         const delivery = await req.dal.get(
-            `SELECT * FROM webhook_deliveries WHERE id = ?`,
+            `SELECT * FROM webhook_deliveries WHERE id = $1`,
             [deliveryId]
         );
         
@@ -127,7 +127,7 @@ router.post('/deliveries/:deliveryId/retry', async (req, res) => {
         
         // Get the webhook configuration
         const webhook = await req.dal.get(
-            `SELECT * FROM webhooks WHERE id = ?`,
+            `SELECT * FROM webhooks WHERE id = $1`,
             [delivery.webhook_id]
         );
         
@@ -166,7 +166,7 @@ router.post('/deliveries/:deliveryId/retry', async (req, res) => {
         // Create new delivery record for retry
         const result = await req.dal.run(
             `INSERT INTO webhook_deliveries (webhook_id, delivery_status, response_code, request_payload, response_body, error_message, retry_count, response_time_ms)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [
                 delivery.webhook_id,
                 retryResult.status,
@@ -219,7 +219,7 @@ router.post('/deliveries/:deliveryId/retry', async (req, res) => {
 router.put('/:id', async (req, res) => {
     try {
         // Check if webhook exists first
-        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = $1', [req.params.id]);
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Webhook not found' });
         }
@@ -251,7 +251,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     try {
         // Check if webhook exists first
-        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = $1', [req.params.id]);
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Webhook not found' });
         }
@@ -316,7 +316,7 @@ router.post('/:id/test', async (req, res) => {
         const { id } = req.params;
         
         // Get webhook from database
-        const webhook = await req.dal.get('SELECT * FROM webhooks WHERE id = ?', [id]);
+        const webhook = await req.dal.get('SELECT * FROM webhooks WHERE id = $1', [id]);
         
         if (!webhook) {
             return res.status(404).json({ 
@@ -363,7 +363,7 @@ router.get('/:id/deliveries', async (req, res) => {
                    delivery_status as status, attempted_at as timestamp,
                    delivered_at, retry_count as retries
             FROM webhook_deliveries
-            WHERE webhook_id = ?
+            WHERE webhook_id = $1
             ORDER BY attempted_at DESC
             LIMIT 50
         `, [req.params.id]);

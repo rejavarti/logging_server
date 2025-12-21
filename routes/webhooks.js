@@ -1193,7 +1193,7 @@ router.get('/api/:id', async (req, res) => {
 router.put('/api/:id', async (req, res) => {
     try {
         // Check if webhook exists first
-        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = $1', [req.params.id]);
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Webhook not found' });
         }
@@ -1209,7 +1209,7 @@ router.put('/api/:id', async (req, res) => {
 router.delete('/api/:id', async (req, res) => {
     try {
         // Check if webhook exists first
-        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = ?', [req.params.id]);
+        const existing = await req.dal.get('SELECT id FROM webhooks WHERE id = $1', [req.params.id]);
         if (!existing) {
             return res.status(404).json({ success: false, error: 'Webhook not found' });
         }

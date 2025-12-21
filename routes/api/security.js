@@ -529,7 +529,7 @@ router.post('/audit-trail/search', async (req, res) => {
         const countSql = sql.replace('SELECT a.*, u.username AS username', 'SELECT COUNT(*) AS total');
         const countRow = await dal.get(countSql, params);
         const total = countRow?.total || 0;
-        sql += ' ORDER BY a.created_at DESC LIMIT ? OFFSET ?';
+        sql += ' ORDER BY a.created_at DESC LIMIT $' + (params.length + 1) + ' OFFSET $' + (params.length + 2) + ';';
         const rows = await dal.all(sql, [...params, parseInt(limit), parseInt(offset)]);
         const results = (rows || []).map(r => ({ id: r.id, timestamp: r.created_at, username: r.username || null, action: r.action, resource: r.resource_type, details: r.details }));
         securityMetrics.searches++;
