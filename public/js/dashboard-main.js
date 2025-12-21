@@ -207,7 +207,11 @@ function initializeGrid() {
         if (!isLocked) {
             setTimeout(function() {
                 console.log('⏱️ Calling autoSaveLayout after dragEnd (50ms delay)');
-                autoSaveLayout();
+                if (typeof window.autoSaveLayout === 'function') {
+                    window.autoSaveLayout();
+                } else {
+                    console.error('❌ autoSaveLayout function not found on window object');
+                }
             }, 50);
         } else {
             console.log('🔒 Layout is locked, skipping auto-save');
