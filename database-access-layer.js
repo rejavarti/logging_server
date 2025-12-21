@@ -1014,8 +1014,12 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async setSetting(key, value, description = null) {
         try {
-            const sql = `INSERT OR REPLACE INTO system_settings (setting_key, setting_value, description, updated_at) 
-                         VALUES (?, ?, ?, NOW())`;
+            const sql = `INSERT INTO system_settings (setting_key, setting_value, description, updated_at) 
+                         VALUES (?, ?, ?, NOW())
+                         ON CONFLICT (setting_key) 
+                         DO UPDATE SET setting_value = EXCLUDED.setting_value, 
+                                      description = EXCLUDED.description, 
+                                      updated_at = NOW()`;
             const result = await this.run(sql, [key, value, description]);
             return result.changes > 0 || result.lastID > 0;
         } catch (error) {

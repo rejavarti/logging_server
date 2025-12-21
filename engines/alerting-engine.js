@@ -395,9 +395,15 @@ class AlertingEngine {
 
         // Save to database
         this.db.run(`
-            INSERT OR REPLACE INTO notification_channels 
+            INSERT INTO notification_channels 
             (id, name, type, config, enabled, rate_limit) 
             VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                name = EXCLUDED.name,
+                type = EXCLUDED.type,
+                config = EXCLUDED.config,
+                enabled = EXCLUDED.enabled,
+                rate_limit = EXCLUDED.rate_limit
         `, [
             channel.id,
             channel.name,

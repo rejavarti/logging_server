@@ -816,10 +816,14 @@ class AnomalyDetectionEngine {
 
             for (const sourceCount of sourceCounts) {
                 await this.db.run(`
-                    INSERT OR REPLACE INTO anomaly_patterns (
+                    INSERT INTO anomaly_patterns (
                         pattern_type, pattern_signature, frequency_normal, 
                         last_seen, occurrence_count, is_baseline
                     ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 1)
+                    ON CONFLICT (pattern_type, pattern_signature) DO UPDATE SET
+                        frequency_normal = EXCLUDED.frequency_normal,
+                        last_seen = CURRENT_TIMESTAMP,
+                        occurrence_count = EXCLUDED.occurrence_count
                 `, ['source', sourceCount.source, sourceCount.count, sourceCount.count]);
             }
 
@@ -833,10 +837,14 @@ class AnomalyDetectionEngine {
 
             for (const hourlyCount of hourlyCounts) {
                 await this.db.run(`
-                    INSERT OR REPLACE INTO anomaly_patterns (
+                    INSERT INTO anomaly_patterns (
                         pattern_type, pattern_signature, frequency_normal,
                         last_seen, occurrence_count, is_baseline
                     ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 1)
+                    ON CONFLICT (pattern_type, pattern_signature) DO UPDATE SET
+                        frequency_normal = EXCLUDED.frequency_normal,
+                        last_seen = CURRENT_TIMESTAMP,
+                        occurrence_count = EXCLUDED.occurrence_count
                 `, ['hourly', hourlyCount.hour, hourlyCount.count, hourlyCount.count]);
             }
 
@@ -1050,9 +1058,15 @@ class AnomalyDetectionEngine {
     async storeModel(modelName, modelData, accuracy) {
         try {
             await this.db.run(`
-                INSERT OR REPLACE INTO anomaly_models (
+                INSERT INTO anomaly_models (
                     model_name, model_type, model_data, accuracy_score, validation_score
                 ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT (model_name) DO UPDATE SET
+                    model_type = EXCLUDED.model_type,
+                    model_data = EXCLUDED.model_data,
+                    accuracy_score = EXCLUDED.accuracy_score,
+                    validation_score = EXCLUDED.validation_score,
+                    updated_at = NOW()
             `, [
                 modelName,
                 modelData.type,
