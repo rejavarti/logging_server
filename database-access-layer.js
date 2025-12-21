@@ -1169,7 +1169,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getActiveWebhooks() {
         try {
-            const sql = `SELECT * FROM webhooks WHERE active = 1 ORDER BY created_at DESC`;
+            const sql = `SELECT * FROM webhooks WHERE active = true ORDER BY created_at DESC`;
             return await this.db.all(sql);
         } catch (error) {
             this.logger.warn('Failed to get webhooks:', error.message);

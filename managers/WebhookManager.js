@@ -11,7 +11,7 @@ class WebhookManager {
         try {
             // Get all active webhooks for this event type
             const webhooks = await this.dal.all(
-                'SELECT * FROM webhooks WHERE active = 1 AND (events = ? OR events LIKE ? OR events LIKE ? OR events LIKE ?)',
+                'SELECT * FROM webhooks WHERE active = true AND (events = ? OR events LIKE ? OR events LIKE ? OR events LIKE ?)',
                 [eventType, `%${eventType}%`, `${eventType},%`, `%,${eventType}`]
             );
 

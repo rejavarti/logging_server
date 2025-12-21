@@ -274,7 +274,7 @@ router.post('/themes/save', async (req, res) => {
         
         // Check if theme name already exists
         const existing = await req.dal.get(
-            'SELECT id FROM themes WHERE name = ? AND is_builtin = 0',
+            'SELECT id FROM themes WHERE name = ? AND is_builtin = false',
             [name]
         );
         

@@ -1089,7 +1089,7 @@ class AnomalyDetectionEngine {
             // Delete old resolved anomalies (keep for 90 days)
             await this.db.run(`
                 DELETE FROM anomaly_detections 
-                WHERE resolved = 1 
+                WHERE resolved = true 
                 AND resolved_at < NOW() - INTERVAL '90 days'
             `);
 

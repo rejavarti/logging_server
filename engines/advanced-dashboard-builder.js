@@ -328,7 +328,7 @@ class AdvancedDashboardBuilder {
     async getUserDashboards(userId) {
         try {
             const dashboards = await this.dal.all(
-                'SELECT * FROM dashboards WHERE user_id = ? OR is_public = 1 ORDER BY created_at DESC', 
+                'SELECT * FROM dashboards WHERE user_id = ? OR is_public = true ORDER BY created_at DESC', 
                 [userId]
             );
 
