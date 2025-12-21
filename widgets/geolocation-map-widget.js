@@ -30,9 +30,9 @@ class GeolocationMapWidget extends BaseWidget {
                     metadata,
                     COUNT(*) as count
                 FROM logs 
-                WHERE metadata LIKE '%latitude%' 
-                  OR metadata LIKE '%longitude%'
-                  OR metadata LIKE '%ip%'
+                WHERE metadata::text LIKE '%latitude%' 
+                  OR metadata::text LIKE '%longitude%'
+                  OR metadata::text LIKE '%ip%'
                 GROUP BY source
                 LIMIT 100
             `) || [];

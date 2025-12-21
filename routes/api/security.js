@@ -244,7 +244,7 @@ router.put('/rate-limits/settings', async (req, res) => {
         if (!dal || typeof dal.run !== 'function' || typeof dal.get !== 'function') {
             return res.status(503).json({ success:false, error:'Database unavailable for settings persistence' });
         }
-        await dal.run(`CREATE TABLE IF NOT EXISTS rate_limit_settings (id INTEGER PRIMARY KEY CHECK (id=1), settings TEXT, updated_at TEXT, updated_by TEXT)`);
+        await dal.run(`CREATE TABLE IF NOT EXISTS rate_limit_settings (id INTEGER PRIMARY KEY CHECK (id=1), settings TEXT, updated_at TIMESTAMPTZ, updated_by TEXT)`);
         const now = new Date().toISOString();
         await dal.run(`INSERT INTO rate_limit_settings (id, settings, updated_at, updated_by) VALUES (1, $1, $2, $3) ON CONFLICT (id) DO UPDATE SET settings = EXCLUDED.settings, updated_at = EXCLUDED.updated_at, updated_by = EXCLUDED.updated_by`, [JSON.stringify(settings), now, req.user ? req.user.username : 'system']);
         req.app.locals?.loggers?.api?.info(`Rate limiting settings persisted by ${req.user ? req.user.username : 'system'}`);

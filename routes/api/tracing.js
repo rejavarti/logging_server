@@ -78,8 +78,8 @@ router.get('/dependencies', async (req, res) => {
               metadata,
               COUNT(*) as count,
               AVG(CASE 
-                WHEN json_extract(metadata, '$.duration') IS NOT NULL 
-                THEN CAST(json_extract(metadata, '$.duration') AS INTEGER)
+                WHEN metadata::jsonb ? 'duration' 
+                THEN CAST(metadata::jsonb->>'duration' AS INTEGER)
                 ELSE 0 
               END) as avgDuration,
               SUM(CASE WHEN level = 'error' THEN 1 ELSE 0 END) as errors
@@ -224,15 +224,15 @@ router.get('/search', async (req, res) => {
       params.push(`%${operation}%`);
     }
     if (tags) {
-      sql += ' AND metadata LIKE ?';
+      sql += ' AND metadata::text LIKE $' + (params.length + 1);
       params.push(`%${tags}%`);
     }
     // Min duration filter (extract JSON field duration/elapsed)
     if (minDuration) {
       const minDurNum = parseInt(minDuration, 10);
       if (!isNaN(minDurNum)) {
-        // Use json_extract; if metadata not JSON or field missing treat as 0
-        sql += " AND (CASE WHEN json_valid(metadata) THEN CAST(COALESCE(json_extract(metadata, '$.duration'), json_extract(metadata, '$.elapsed'), 0) AS INTEGER) ELSE 0 END) >= ?";
+        // PostgreSQL JSONB: check if field exists and extract value
+        sql += " AND (CASE WHEN metadata::jsonb IS NOT NULL THEN CAST(COALESCE(metadata::jsonb->>'duration', metadata::jsonb->>'elapsed', '0') AS INTEGER) ELSE 0 END) >= $" + (params.length + 1);
         params.push(minDurNum);
       }
     }

@@ -47,7 +47,7 @@ router.get('/system/metrics', async (req, res) => {
 
         // Persist hourly disk usage for trend (lazy create table)
         try {
-            await req.dal.run("CREATE TABLE IF NOT EXISTS disk_usage_history (ts INTEGER PRIMARY KEY, used_mb INTEGER, percent INTEGER)");
+            await req.dal.run("CREATE TABLE IF NOT EXISTS disk_usage_history (ts BIGINT PRIMARY KEY, used_mb INTEGER, percent INTEGER)");
             const now = Date.now();
             const hourBucket = Math.floor(now / 3600000) * 3600000; // start of hour
             const existing = await req.dal.get("SELECT ts FROM disk_usage_history WHERE ts = ?", [hourBucket]);
