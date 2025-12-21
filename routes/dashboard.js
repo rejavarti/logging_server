@@ -144,7 +144,7 @@ router.get('/', async (req, res) => {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 16px;
+            padding: 6px 12px;
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-secondary);
             border-radius: 12px 12px 0 0;
@@ -158,8 +158,9 @@ router.get('/', async (req, res) => {
         .widget-header h3 {
             margin: 0;
             color: var(--text-primary);
-            font-size: 1rem;
+            font-size: 0.875rem;
             font-weight: 600;
+            line-height: 1.2;
         }
         
         .widget-actions {
@@ -1280,68 +1281,85 @@ router.get('/', async (req, res) => {
                 const data = await res.json();
                 if (res.ok && data.success && Array.isArray(data.layout) && data.layout.length) {
                     layout = data.layout;
-                    console.log('Loaded layout from server:', layout.length, 'widgets');
+                    console.log('✅ Loaded layout from server:', layout.length, 'widgets', layout);
+                } else {
+                    console.log('⚠️ Server returned no layout:', data);
                 }
-            } catch {}
+            } catch (err) {
+                console.error('❌ Failed to load layout from server:', err);
+            }
 
             // Fallback to localStorage if server has nothing
-            if (!layout) {
+            if (!layout || !Array.isArray(layout) || layout.length === 0) {
                 const saved = localStorage.getItem('dashboardLayout');
                 if (saved) {
                     try { 
                         layout = JSON.parse(saved);
-                        console.log('Loaded layout from localStorage:', layout.length, 'widgets');
-                    } catch {}
+                        console.log('💾 Loaded layout from localStorage:', layout.length, 'widgets');
+                    } catch (err) {
+                        console.error('❌ Failed to parse localStorage layout:', err);
+                    }
                 }
             }
+            
             if (!layout || !Array.isArray(layout) || layout.length === 0) {
-                console.log('No saved layout found, using default positions');
+                console.log('ℹ️ No saved layout found, using default positions');
                 return;
             }
 
             const items = grid.getItems();
-            console.log('Applying layout to', items.length, 'grid items');
+            console.log('🔧 Applying saved positions to', items.length, 'grid items');
             
-            // Apply saved positions directly to elements BEFORE Muuri processes them
+            let appliedCount = 0;
+            
+            // Apply saved positions to widgets
             layout.forEach(savedItem => {
                 const item = items.find(i => i.getElement().getAttribute('data-widget-id') === savedItem.id);
                 if (!item) {
-                    console.warn('Widget not found in grid:', savedItem.id);
+                    console.warn('⚠️ Widget not found in grid:', savedItem.id);
                     return;
                 }
                 
                 const el = item.getElement();
+                const content = el.querySelector('.widget-item-content');
                 
                 // Set size if saved
                 if (savedItem.width && savedItem.height) {
-                    el.style.width = savedItem.width + 'px';
-                    el.style.height = savedItem.height + 'px';
+                    if (content) {
+                        content.style.width = savedItem.width + 'px';
+                        content.style.height = savedItem.height + 'px';
+                    }
                 }
                 
-                // Apply position using Muuri's internal structure
-                const left = savedItem.left || 0;
-                const top = savedItem.top || 0;
+                // Apply position - use Muuri's positioning API
+                const left = typeof savedItem.left === 'number' ? savedItem.left : 0;
+                const top = typeof savedItem.top === 'number' ? savedItem.top : 0;
                 
-                console.log('Positioning ' + savedItem.id + ' at (' + left + ', ' + top + ')');
+                console.log('📍 Positioning', savedItem.id, 'at (left=' + left + ', top=' + top + ')');
                 
-                // Set transform directly
+                // Set transform on the outer element
                 el.style.transform = 'translate(' + left + 'px, ' + top + 'px)';
                 
-                // Update Muuri's internal tracking
+                // Update Muuri's internal position tracking
                 item._left = left;
                 item._top = top;
                 
-                // Mark as positioned
-                if (!el.classList.contains('muuri-item-positioning')) {
-                    el.classList.add('muuri-item-positioned');
-                }
+                appliedCount++;
             });
             
-            // Force Muuri to recognize the positions without re-layout
+            console.log('✅ Applied positions to', appliedCount, 'widgets');
+            
+            // Force Muuri to update without re-layout
             grid.refreshItems();
             
+            // Refresh charts after positioning
             setTimeout(() => {
-                try { Object.values(charts).forEach(c => c && c.resize && c.resize()); } catch (err) { /* Chart resize non-critical */ }
+                try { 
+                    Object.values(charts).forEach(c => c && c.resize && c.resize()); 
+                    console.log('📊 Charts refreshed');
+                } catch (err) { 
+                    console.warn('Chart resize error:', err);
+                }
             }, 100);
         }
         
