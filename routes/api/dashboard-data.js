@@ -113,8 +113,9 @@ router.get('/integrations', async (req, res) => {
  */
 router.get('/all', async (req, res) => {
     try {
-        const [stats, recentLogs, logLevelStats, hourlyStats, integrations] = await Promise.all([
+        const [stats, health, recentLogs, logLevelStats, hourlyStats, integrations] = await Promise.all([
             req.dal.getSystemStats().catch(() => ({})),
+            req.dal.getSystemHealth().catch(() => ({ cpu: 0, memory: 0, disk: 0 })),
             req.dal.getRecentLogs(20).catch(() => []),
             req.dal.all(`
                 SELECT level, COUNT(*) as count 
@@ -135,6 +136,14 @@ router.get('/all', async (req, res) => {
             `).catch(() => []),
             req.dal.all(`SELECT name, type, enabled FROM integrations WHERE enabled = true`).catch(() => [])
         ]);
+        
+        // Merge stats with health metrics
+        const mergedStats = { 
+            ...stats, 
+            cpu: health.cpu || 0, 
+            memory: health.memory || 0, 
+            disk: health.disk || 0 
+        };
 
         let integrationStats = [];
         if (integrations.length > 0) {
@@ -150,7 +159,7 @@ router.get('/all', async (req, res) => {
         res.json({
             success: true,
             data: {
-                stats,
+                stats: mergedStats,
                 recentLogs,
                 logLevelStats,
                 hourlyStats,
