@@ -190,7 +190,7 @@ router.get('/data/:widgetType', async (req, res) => {
                 const logCounts = await dal.all(`
                     SELECT level, COUNT(*) as count 
                     FROM logs 
-                    WHERE timestamp >= NOW() - CAST(? AS INTERVAL) 
+                    WHERE timestamp >= NOW() - CAST($1 AS INTERVAL) 
                     GROUP BY level
                 `, [safeTimeRange]);
                 data = {
