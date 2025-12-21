@@ -25,10 +25,13 @@ router.get('/', async (req, res) => {
             "font-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.gstatic.com https://use.fontawesome.com https://cdnjs.cloudflare.com data:; " +
             "connect-src 'self' ws: wss: https: http:; "
         );
-        // Disable caching to ensure latest code is always loaded
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        // Disable caching AGGRESSIVELY + version parameter to force cache bust
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0, s-maxage=0');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        // Add unique version to break browser cache
+        res.setHeader('X-Dashboard-Version', Date.now().toString());
         
         // PERFORMANCE: Send HTML shell immediately, load data via AJAX
         // Only fetch critical data needed for initial render
