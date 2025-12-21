@@ -3,14 +3,13 @@
 // Variables are declared in inline script, accessed via window object
 // window.grid, window.charts, window.isLocked, window.resizeObserverReady
 
-// Timezone-aware timestamp formatter
-const USER_TIMEZONE = 'America/Edmonton';
+// Timezone formatter function (uses USER_TIMEZONE from inline script)
 function formatTimestamp(timestamp, options = {}) {
     if (!timestamp) return 'N/A';
     try {
         const date = new Date(timestamp);
         const defaultOptions = {
-            timeZone: USER_TIMEZONE,
+            timeZone: window.USER_TIMEZONE,
             year: 'numeric',
             month: 'short',
             day: 'numeric',
@@ -31,7 +30,7 @@ function formatTime(timestamp) {
     try {
         const date = new Date(timestamp);
         return date.toLocaleTimeString('en-US', {
-            timeZone: USER_TIMEZONE,
+            timeZone: window.USER_TIMEZONE,
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit',

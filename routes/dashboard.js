@@ -1600,6 +1600,7 @@ router.get('/', async (req, res) => {
         // Expose variables needed by external script
         window.isLocked = isLocked;
         window.charts = charts;
+        window.USER_TIMEZONE = USER_TIMEZONE;
         
         console.log('✅ First script block functions exposed globally');
         </script>
