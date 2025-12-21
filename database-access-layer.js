@@ -740,7 +740,7 @@ class DatabaseAccessLayer extends EventEmitter {
         try {
             // Only return unacknowledged notifications - acknowledged ones are "cleared"
             // Order by created_at DESC, then id DESC for deterministic ordering when timestamps are equal
-            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors WHERE acknowledged = 0 ORDER BY created_at DESC, id DESC LIMIT ?`;
+            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors WHERE acknowledged = FALSE ORDER BY created_at DESC, id DESC LIMIT ?`;
             return await this.all(sql, [limit]);
         } catch (error) {
             this.logger.warn('Failed to get recent parse errors:', error.message);
@@ -750,7 +750,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getUnreadParseErrorCount() {
         try {
-            const row = await this.get(`SELECT COUNT(*) as cnt FROM parse_errors WHERE acknowledged = 0`, []);
+            const row = await this.get(`SELECT COUNT(*) as cnt FROM parse_errors WHERE acknowledged = FALSE`, []);
             return row?.cnt || 0;
         } catch (error) {
             this.logger.warn('Failed to count unread parse errors:', error.message);
@@ -760,7 +760,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async acknowledgeParseError(id) {
         try {
-            const sql = `UPDATE parse_errors SET acknowledged = 1 WHERE id = ? AND acknowledged = 0`;
+            const sql = `UPDATE parse_errors SET acknowledged = TRUE WHERE id = ? AND acknowledged = FALSE`;
             return await this.run(sql, [id]);
         } catch (error) {
             this.logger.warn('Failed to acknowledge parse error:', error.message);
