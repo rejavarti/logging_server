@@ -155,10 +155,14 @@ router.put('/', async (req, res) => {
                             const settingKey = `${category}.${key}`;
                             const valueStr = typeof value === 'object' ? JSON.stringify(value) : String(value);
                             
-                            // Use INSERT OR REPLACE to update or create setting
+                            // PostgreSQL UPSERT - INSERT with ON CONFLICT UPDATE
                             const result = await req.dal.run(
-                                `INSERT OR REPLACE INTO system_settings (setting_key, setting_value, description, updated_at)
-                                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+                                `INSERT INTO system_settings (setting_key, setting_value, description, updated_at)
+                                 VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                                 ON CONFLICT (setting_key) DO UPDATE SET
+                                   setting_value = EXCLUDED.setting_value,
+                                   description = EXCLUDED.description,
+                                   updated_at = CURRENT_TIMESTAMP`,
                                 [settingKey, valueStr, category]
                             );
                             
@@ -398,8 +402,12 @@ router.put('/settings/:key', async (req, res) => {
                 const categoryStr = category || 'system';
                 
                 await req.dal.run(
-                    `INSERT OR REPLACE INTO settings (setting_key, setting_value, category, updated_at)
-                     VALUES (?, ?, ?, CURRENT_TIMESTAMP)`,
+                    `INSERT INTO settings (setting_key, setting_value, category, updated_at)
+                     VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+                     ON CONFLICT (setting_key) DO UPDATE SET
+                       setting_value = EXCLUDED.setting_value,
+                       category = EXCLUDED.category,
+                       updated_at = CURRENT_TIMESTAMP`,
                     [key, valueStr, categoryStr]
                 );
             } catch (dbErr) {
