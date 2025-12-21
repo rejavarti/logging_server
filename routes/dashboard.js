@@ -1596,6 +1596,7 @@ router.get('/', async (req, res) => {
         window.initializeCharts = initializeCharts;
         window.loadSavedLayout = loadSavedLayout;
         window.setupResizeObservers = setupResizeObservers;
+        window.autoSaveLayout = autoSaveLayout;
         
         console.log('✅ First script block functions exposed globally');
         </script>
