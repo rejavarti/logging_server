@@ -213,9 +213,9 @@ router.get('/geolocation', async (req, res) => {
     // Check for server location BEFORE early return (per Copilot instructions)
     let serverLocation = null;
     try {
-      const latRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = ?', ['system.server_latitude']) || {};
-      const lonRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = ?', ['system.server_longitude']) || {};
-      const cityRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = ?', ['system.server_city']) || {};
+      const latRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = $1', ['system.server_latitude']) || {};
+      const lonRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = $1', ['system.server_longitude']) || {};
+      const cityRow = await req.dal.get('SELECT setting_value FROM system_settings WHERE setting_key = $1', ['system.server_city']) || {};
       const manualLat = latRow.setting_value ? parseFloat(latRow.setting_value) : null;
       const manualLon = lonRow.setting_value ? parseFloat(lonRow.setting_value) : null;
       const manualCity = cityRow.setting_value || 'Server Location';

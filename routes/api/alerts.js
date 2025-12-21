@@ -81,10 +81,10 @@ router.post('/alerts', async (req, res) => {
         const now = new Date().toISOString();
         try {
             const result = await dal.run(
-                `INSERT INTO alerts (name, condition, enabled, status, created, data) VALUES (?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO alerts (name, condition, enabled, status, created, data) VALUES ($1, $2, $3, $4, $5, $6)`,
                 [name, condition, enabled ? 1 : 0, 'open', now, null]
             );
-            const created = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [result.lastID]);
+            const created = await dal.get(`SELECT * FROM alerts WHERE id = $1`, [result.lastID]);
             if (created && created.data) {
                 try { created.data = JSON.parse(created.data); } catch (_) { created.data = null; }
             }
@@ -157,7 +157,7 @@ router.post('/alerts/rules', async (req, res) => {
         }
         const ruleData = req.body || {};
         const result = await req.dal.createAlertRule(ruleData);
-        const rule = await req.dal.get(`SELECT * FROM alert_rules WHERE id = ?`, [result.lastID]);
+        const rule = await req.dal.get(`SELECT * FROM alert_rules WHERE id = $1`, [result.lastID]);
         if (rule && rule.notification_channels) {
             try { rule.notification_channels = JSON.parse(rule.notification_channels); } catch (_) { /* ignore */ }
         }
@@ -205,7 +205,7 @@ router.put('/alerts/rules/:id', async (req, res) => {
         }
         
         values.push(id);
-        const query = `UPDATE alert_rules SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+        const query = `UPDATE alert_rules SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`;
         
         const result = await dal.run(query, values);
         
@@ -213,7 +213,7 @@ router.put('/alerts/rules/:id', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Alert rule not found' });
         }
         
-        const rule = await dal.get('SELECT * FROM alert_rules WHERE id = ?', [id]);
+        const rule = await dal.get('SELECT * FROM alert_rules WHERE id = $1', [id]);
         res.json({ success: true, rule });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error updating alert rule:', error);
@@ -231,7 +231,7 @@ router.delete('/alerts/rules/:id', async (req, res) => {
             return res.status(503).json({ success: false, error: 'Database unavailable' });
         }
         
-        const result = await dal.run('DELETE FROM alert_rules WHERE id = ?', [id]);
+        const result = await dal.run('DELETE FROM alert_rules WHERE id = $1', [id]);
         
         if (result.changes === 0) {
             return res.status(404).json({ success: false, error: 'Alert rule not found' });
@@ -281,10 +281,10 @@ router.post('/alerts/channels', async (req, res) => {
         
         const result = await dal.run(`
             INSERT INTO alert_channels (name, type, config, enabled, created_at, updated_at)
-            VALUES (?, ?, ?, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            VALUES ($1, $2, $3, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         `, [name, type, JSON.stringify(config || {})]);
         
-        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = ?', [result.lastID]);
+        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = $1', [result.lastID]);
         res.json({ success: true, channel });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error creating alert channel:', error);
@@ -328,13 +328,13 @@ router.put('/alerts/channels/:id', async (req, res) => {
         }
         
         values.push(id);
-        const result = await dal.run(`UPDATE alert_channels SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, values);
+        const result = await dal.run(`UPDATE alert_channels SET ${fields.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = $${values.length}`, values);
         
         if (result.changes === 0) {
             return res.status(404).json({ success: false, error: 'Alert channel not found' });
         }
         
-        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = ?', [id]);
+        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = $1', [id]);
         res.json({ success: true, channel });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error updating alert channel:', error);
@@ -352,7 +352,7 @@ router.delete('/alerts/channels/:id', async (req, res) => {
             return res.status(503).json({ success: false, error: 'Database unavailable' });
         }
         
-        const result = await dal.run('DELETE FROM alert_channels WHERE id = ?', [id]);
+        const result = await dal.run('DELETE FROM alert_channels WHERE id = $1', [id]);
         
         if (result.changes === 0) {
             return res.status(404).json({ success: false, error: 'Alert channel not found' });
@@ -375,7 +375,7 @@ router.post('/alerts/channels/:id/test', async (req, res) => {
             return res.status(503).json({ success: false, error: 'Database unavailable' });
         }
         
-        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = ?', [id]);
+        const channel = await dal.get('SELECT * FROM alert_channels WHERE id = $1', [id]);
         
         if (!channel) {
             return res.status(404).json({ success: false, error: 'Alert channel not found' });
@@ -416,13 +416,13 @@ router.post('/alerts/:id/acknowledge', async (req, res) => {
         }
 
         const result = await dal.run(
-            `UPDATE alerts SET acknowledged = 1, status = CASE WHEN resolved = 1 THEN status ELSE 'acknowledged' END WHERE id = ?`,
+            `UPDATE alerts SET acknowledged = 1, status = CASE WHEN resolved = 1 THEN status ELSE 'acknowledged' END WHERE id = $1`,
             [id]
         );
         if (!result || !result.changes) {
             return res.status(404).json({ success: false, error: 'Alert not found' });
         }
-        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
+        const alert = await dal.get(`SELECT * FROM alerts WHERE id = $1`, [id]);
         if (alert && alert.data) {
             try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
         }
@@ -457,13 +457,13 @@ router.post('/alerts/:id/resolve', async (req, res) => {
         }
 
         const result = await dal.run(
-            `UPDATE alerts SET resolved = 1, status = 'resolved' WHERE id = ?`,
+            `UPDATE alerts SET resolved = 1, status = 'resolved' WHERE id = $1`,
             [id]
         );
         if (!result || !result.changes) {
             return res.status(404).json({ success: false, error: 'Alert not found' });
         }
-        const alert = await dal.get(`SELECT * FROM alerts WHERE id = ?`, [id]);
+        const alert = await dal.get(`SELECT * FROM alerts WHERE id = $1`, [id]);
         if (alert && alert.data) {
             try { alert.data = JSON.parse(alert.data); } catch (_) { alert.data = null; }
         }
@@ -495,7 +495,7 @@ router.delete('/alerts/:id', async (req, res) => {
             return res.status(503).json({ success: false, error: 'Database unavailable' });
         }
         
-        const result = await dal.run('DELETE FROM alerts WHERE id = ?', [id]);
+        const result = await dal.run('DELETE FROM alerts WHERE id = $1', [id]);
         
         if (result.changes === 0) {
             return res.status(404).json({ success: false, error: 'Alert not found' });

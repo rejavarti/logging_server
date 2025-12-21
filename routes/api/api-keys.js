@@ -222,10 +222,10 @@ router.post('/api-keys/:id/regenerate', async (req, res) => {
 router.post('/api-keys/:id/toggle', async (req, res) => {
     try {
         const { id } = req.params;
-        const row = await req.dal.get(`SELECT is_active FROM api_keys WHERE id = ?`, [id]);
+        const row = await req.dal.get(`SELECT is_active FROM api_keys WHERE id = $1`, [id]);
         if (!row) return res.status(404).json({ success: false, error: 'API key not found' });
         const next = row.is_active ? 0 : 1;
-        await req.dal.run(`UPDATE api_keys SET is_active = ? WHERE id = ?`, [next, id]);
+        await req.dal.run(`UPDATE api_keys SET is_active = $1 WHERE id = $2`, [next, id]);
         res.json({ success: true, id, is_active: !!next });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error toggling API key status:', error);
