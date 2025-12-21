@@ -12,21 +12,27 @@ const path = require('path');
 // Get system metrics
 router.get('/system/metrics', async (req, res) => {
     try {
-        // Get metrics from MetricsManager if available
-        const metricsManager = req.app.locals.metricsManager;
+        // Get system stats (log counts, sources, error rate)
+        const stats = await req.dal.getSystemStats?.() || {};
         
-        if (metricsManager && typeof metricsManager.getSystemMetrics === 'function') {
-            const metrics = metricsManager.getSystemMetrics();
-            return res.json(metrics);
-        }
+        // Get system health (CPU, memory, disk, uptime)
+        const health = await req.dal.getSystemHealth?.() || {};
         
-        // Fallback to basic system metrics
-        const uptime = process.uptime();
+        // Get log sources for active sources count
+        const sources = await req.dal.getLogSources?.() || [];
+        
+        // Calculate error rate
+        const totalLogs = stats.totalLogs || 0;
+        const errorCount = stats.errorCount || 0;
+        const errorRate = totalLogs > 0 ? ((errorCount / totalLogs) * 100) : 0;
+        
+        // Fallback to basic system metrics if needed
+        const uptime = health.uptime || process.uptime();
         const memUsage = process.memoryUsage();
         const cpuUsage = os.loadavg();
         
         const memoryUsageMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-        const cpuPercent = Math.min(Math.round((cpuUsage[0] / os.cpus().length) * 100), 100);
+        const cpuPercent = health.cpu || Math.min(Math.round((cpuUsage[0] / os.cpus().length) * 100), 100);
         
         // Get total requests from metrics manager or use default
         let totalRequests = 0;
@@ -35,15 +41,9 @@ router.get('/system/metrics', async (req, res) => {
         }
         
         // Disk usage (from DAL health for consistency)
-        let diskUsedMB = 0, diskTotalMB = 0, diskPercent = 0;
-        try {
-            const healthRaw = await req.dal.getSystemHealth?.();
-            if (healthRaw) {
-                diskPercent = healthRaw.disk || 0;
-                diskUsedMB = healthRaw.diskUsedMB || 0;
-                diskTotalMB = healthRaw.diskTotalMB || 0;
-            }
-        } catch(e) { req.app.locals?.loggers?.api?.debug?.('System health fetch warning:', e.message); }
+        let diskUsedMB = health.diskUsedMB || 0;
+        let diskTotalMB = health.diskTotalMB || 0;
+        let diskPercent = health.disk || 0;
 
         // Persist hourly disk usage for trend (lazy create table)
         try {
@@ -63,9 +63,14 @@ router.get('/system/metrics', async (req, res) => {
         }
 
         const metrics = {
+            // System overview widget fields
+            totalLogs: totalLogs,
+            errorRate: errorRate,
+            uptime: Math.round(uptime),
+            activeSources: sources.length || 0,
+            // Additional metrics
             memoryUsage: memoryUsageMB,
             cpuUsage: cpuPercent,
-            uptime: Math.round(uptime),
             totalRequests: totalRequests,
             diskUsedMB,
             diskTotalMB,
