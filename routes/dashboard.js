@@ -547,8 +547,31 @@ router.get('/', async (req, res) => {
                     setupResizeObservers();
                 }, 1000);
             }, 500);
+            // Start refreshing system stats every 30 seconds
+            refreshSystemStats();
+            setInterval(refreshSystemStats, 30000);
             console.log('🎨 Muuri Dashboard initialized');
         });
+        
+        // Refresh system stats widget
+        async function refreshSystemStats() {
+            try {
+                const response = await fetch('/api/system/metrics', { credentials: 'same-origin' });
+                if (!response.ok) return;
+                const data = await response.json();
+                
+                // Update the stat values in the DOM
+                const totalLogsEl = document.getElementById('totalLogs');
+                const logsTodayEl = document.getElementById('logsToday');
+                const sourcesEl = document.getElementById('sources');
+                
+                if (totalLogsEl) totalLogsEl.textContent = (data.totalLogs || 0).toLocaleString();
+                if (logsTodayEl && data.logsToday !== undefined) logsTodayEl.textContent = (data.logsToday || 0).toLocaleString();
+                if (sourcesEl) sourcesEl.textContent = (data.activeSources || 0).toLocaleString();
+            } catch (error) {
+                console.error('Failed to refresh system stats:', error);
+            }
+        }
         
         // Initialize Muuri Grid
         function initializeGrid() {

@@ -68,6 +68,7 @@ router.get('/system/metrics', async (req, res) => {
             errorRate: errorRate,
             uptime: Math.round(uptime),
             activeSources: sources.length || 0,
+            logsToday: stats.logsToday || 0,
             // Additional metrics
             memoryUsage: memoryUsageMB,
             cpuUsage: cpuPercent,
