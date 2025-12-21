@@ -67,50 +67,72 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error('Stack:', error.stack);
     }
     
-    try {
-        if (typeof window.initializeCharts === 'function') {
-            window.initializeCharts();
-        } else {
-            console.warn('⚠️ initializeCharts function not found (expected in inline script)');
-        }
-    } catch (error) {
-        console.error('❌ initializeCharts failed:', error);
+    // Wait for inline script to expose functions
+    function waitForInlineScriptFunctions(callback, maxAttempts = 50) {
+        let attempts = 0;
+        const checkInterval = setInterval(() => {
+            attempts++;
+            if (typeof window.initializeCharts === 'function' && 
+                typeof window.loadSavedLayout === 'function' && 
+                typeof window.setupResizeObservers === 'function' &&
+                typeof window.autoSaveLayout === 'function') {
+                clearInterval(checkInterval);
+                console.log('✅ All inline script functions found after', attempts, 'attempts');
+                callback();
+            } else if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                console.error('❌ Timeout waiting for inline script functions');
+                callback(); // Continue anyway
+            }
+        }, 20);
     }
     
-    // Load layout AFTER grid and charts are initialized
-    setTimeout(() => {
+    waitForInlineScriptFunctions(() => {
         try {
-            if (typeof window.loadSavedLayout === 'function') {
-                window.loadSavedLayout();
+            if (typeof window.initializeCharts === 'function') {
+                window.initializeCharts();
             } else {
-                console.warn('⚠️ loadSavedLayout function not found');
+                console.warn('⚠️ initializeCharts function not found (expected in inline script)');
             }
         } catch (error) {
-            console.error('❌ loadSavedLayout failed:', error);
+            console.error('❌ initializeCharts failed:', error);
         }
         
+        // Load layout AFTER grid and charts are initialized
         setTimeout(() => {
             try {
-                if (typeof window.setupResizeObservers === 'function') {
-                    window.setupResizeObservers();
+                if (typeof window.loadSavedLayout === 'function') {
+                    window.loadSavedLayout();
                 } else {
-                    console.warn('⚠️ setupResizeObservers function not found');
+                    console.warn('⚠️ loadSavedLayout function not found');
                 }
             } catch (error) {
-                console.error('❌ setupResizeObservers failed:', error);
+                console.error('❌ loadSavedLayout failed:', error);
             }
-        }, 1000);
-    }, 500);
-    
-    // Start refreshing system stats every 30 seconds
-    try {
-        refreshSystemStats();
-        setInterval(refreshSystemStats, 30000);
-    } catch (error) {
-        console.error('❌ refreshSystemStats failed:', error);
-    }
-    
-    console.log('🎨 Muuri Dashboard initialized');
+            
+            setTimeout(() => {
+                try {
+                    if (typeof window.setupResizeObservers === 'function') {
+                        window.setupResizeObservers();
+                    } else {
+                        console.warn('⚠️ setupResizeObservers function not found');
+                    }
+                } catch (error) {
+                    console.error('❌ setupResizeObservers failed:', error);
+                }
+            }, 1000);
+        }, 500);
+        
+        // Start refreshing system stats every 30 seconds
+        try {
+            refreshSystemStats();
+            setInterval(refreshSystemStats, 30000);
+        } catch (error) {
+            console.error('❌ refreshSystemStats failed:', error);
+        }
+        
+        console.log('🎨 Muuri Dashboard initialized');
+    }); // Close waitForInlineScriptFunctions callback
 });
 
 // Refresh system stats widget
