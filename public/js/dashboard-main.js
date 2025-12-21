@@ -155,7 +155,7 @@ function initializeGrid() {
         layoutDuration: 0,
         layoutEasing: 'ease-out',
         dragRelease: {
-            duration: 300,
+            duration: 0,
             easing: 'ease-out'
         },
         dragSort: false,
