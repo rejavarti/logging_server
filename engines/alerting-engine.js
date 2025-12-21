@@ -103,24 +103,65 @@ class AlertingEngine {
 
     async loadAlertRulesFromDB() {
         try {
-            // Use DAL 'all' method for querying alert rules
-            const rows = await this.dal.all('SELECT * FROM alert_rules WHERE enabled = true');
+            // Use DAL 'all' method for querying alert rules (PostgreSQL: enabled = TRUE)
+            const rows = await this.dal.all('SELECT * FROM alert_rules WHERE enabled = TRUE');
             
             if (rows && rows.length > 0) {
-                this.rules = rows.map(row => ({
-                    id: row.id,
-                    name: row.name,
-                    description: row.description,
-                    type: row.type,
-                    condition: JSON.parse(row.condition || '{}'),
-                    channels: JSON.parse(row.channels || '[]'),
-                    severity: row.severity,
-                    enabled: Boolean(row.enabled),
-                    cooldown: row.cooldown,
-                    escalationRules: row.escalation_rules ? JSON.parse(row.escalation_rules) : null,
-                    lastTriggered: row.last_triggered,
-                    triggerCount: row.trigger_count || 0
-                }));
+                this.rules = rows.map(row => {
+                    // Safely parse JSON fields with fallbacks
+                    let condition = {};
+                    let channels = [];
+                    let escalationRules = null;
+                    
+                    try {
+                        // Handle both text and jsonb types
+                        if (row.condition && typeof row.condition === 'string') {
+                            condition = JSON.parse(row.condition);
+                        } else if (row.condition && typeof row.condition === 'object') {
+                            condition = row.condition;
+                        } else if (row.conditions) {
+                            // Use conditions (jsonb) if condition (text) is empty
+                            condition = row.conditions;
+                        }
+                    } catch (e) {
+                        this.loggers.system.warn(`Failed to parse condition for rule ${row.id}: ${e.message}`);
+                    }
+                    
+                    try {
+                        if (row.channels && typeof row.channels === 'string') {
+                            channels = JSON.parse(row.channels);
+                        } else if (row.channels && typeof row.channels === 'object') {
+                            channels = row.channels;
+                        }
+                    } catch (e) {
+                        this.loggers.system.warn(`Failed to parse channels for rule ${row.id}: ${e.message}`);
+                    }
+                    
+                    try {
+                        if (row.escalation_rules && typeof row.escalation_rules === 'string') {
+                            escalationRules = JSON.parse(row.escalation_rules);
+                        } else if (row.escalation_rules && typeof row.escalation_rules === 'object') {
+                            escalationRules = row.escalation_rules;
+                        }
+                    } catch (e) {
+                        this.loggers.system.warn(`Failed to parse escalation_rules for rule ${row.id}: ${e.message}`);
+                    }
+                    
+                    return {
+                        id: row.id,
+                        name: row.name,
+                        description: row.description,
+                        type: row.type,
+                        condition: condition,
+                        channels: channels,
+                        severity: row.severity,
+                        enabled: Boolean(row.enabled),
+                        cooldown: row.cooldown,
+                        escalationRules: escalationRules,
+                        lastTriggered: row.last_triggered,
+                        triggerCount: row.trigger_count || 0
+                    };
+                });
                 this.loggers.system.info(`📋 Loaded ${this.rules.length} alert rules from database`);
             } else {
                 this.loggers.system.info('No alert rules in database, creating default rules...');
