@@ -11,7 +11,7 @@ class WebhookManager {
         try {
             // Get all active webhooks for this event type
             const webhooks = await this.dal.all(
-                'SELECT * FROM webhooks WHERE active = true AND (events = ? OR events LIKE ? OR events LIKE ? OR events LIKE ?)',
+                'SELECT * FROM webhooks WHERE active = true AND (events = $1 OR events LIKE $2 OR events LIKE $3 OR events LIKE $4)',
                 [eventType, `%${eventType}%`, `${eventType},%`, `%,${eventType}`]
             );
 
@@ -90,7 +90,7 @@ class WebhookManager {
             if (response.status >= 200 && response.status < 300) {
                 // Update success metrics
                 await this.dal.run(
-                    'UPDATE webhooks SET success_count = success_count + 1, last_triggered = CURRENT_TIMESTAMP WHERE id = ?',
+                    'UPDATE webhooks SET success_count = success_count + 1, last_triggered = CURRENT_TIMESTAMP WHERE id = $1',
                     [webhook.id]
                 );
 
@@ -113,7 +113,7 @@ class WebhookManager {
             
             // Update failure metrics
             await this.dal.run(
-                'UPDATE webhooks SET failure_count = failure_count + 1, last_triggered = CURRENT_TIMESTAMP WHERE id = ?',
+                'UPDATE webhooks SET failure_count = failure_count + 1, last_triggered = CURRENT_TIMESTAMP WHERE id = $1',
                 [webhook.id]
             );
 
