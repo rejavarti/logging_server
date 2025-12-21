@@ -537,7 +537,13 @@ router.get('/', async (req, res) => {
         
         // Initialize Dashboard
         document.addEventListener('DOMContentLoaded', function() {
-            initializeGrid();
+            console.log('🚀 DOMContentLoaded fired, starting initialization...');
+            try {
+                initializeGrid();
+                console.log('✅ initializeGrid() completed');
+            } catch (error) {
+                console.error('❌ initializeGrid() failed:', error);
+            }
             initializeCharts();
             // Load layout AFTER grid and charts are initialized
             // Increased timeout to ensure Muuri completes layout calculation
@@ -576,12 +582,17 @@ router.get('/', async (req, res) => {
         
         // Initialize Muuri Grid
         function initializeGrid() {
-            console.log('🔧 Initializing Muuri grid...');
-            console.log('📦 Grid container exists:', !!document.querySelector('.dashboard-grid'));
-            console.log('📦 Widget items found:', document.querySelectorAll('.widget-item').length);
-            console.log('📦 Widget headers found:', document.querySelectorAll('.widget-header').length);
-            
-            grid = new Muuri('.dashboard-grid', {
+            try {
+                console.log('🔧 [1] Starting initializeGrid function...');
+                console.log('🔧 [2] Checking for grid container...');
+                const container = document.querySelector('.dashboard-grid');
+                console.log('🔧 [3] Grid container:', container);
+                console.log('📦 Grid container exists:', !!container);
+                console.log('📦 Widget items found:', document.querySelectorAll('.widget-item').length);
+                console.log('📦 Widget headers found:', document.querySelectorAll('.widget-header').length);
+                
+                console.log('🔧 [4] Creating Muuri instance...');
+                grid = new Muuri('.dashboard-grid', {
                 dragEnabled: true,
                 dragHandle: '.widget-header',
                 dragSortHeuristics: {
@@ -655,6 +666,12 @@ router.get('/', async (req, res) => {
             
             // Expose grid globally immediately for external scripts
             window.grid = grid;
+            console.log('✅ [5] Grid initialization completed successfully');
+            } catch (error) {
+                console.error('❌ Error in initializeGrid:', error);
+                console.error('Stack trace:', error.stack);
+                throw error;
+            }
         }
 
         // Resize Observer to react when user resizes widgets (CSS resize)
