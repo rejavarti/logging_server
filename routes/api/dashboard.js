@@ -198,10 +198,14 @@ router.get('/positions', async (req, res) => {
 // POST /api/dashboard/positions - Save widget layout/positions
 router.post('/positions', async (req, res) => {
     try {
+        console.log('[Dashboard] POST /positions called with body:', JSON.stringify(req.body).substring(0, 200));
         const layout = Array.isArray(req.body?.layout) ? req.body.layout : [];
-        await req.dal.setSetting('dashboard_positions', JSON.stringify(layout), 'Dashboard widget positions');
+        console.log('[Dashboard] Saving layout with', layout.length, 'widgets');
+        const result = await req.dal.setSetting('dashboard_positions', JSON.stringify(layout), 'Dashboard widget positions');
+        console.log('[Dashboard] setSetting result:', result);
         res.json({ success: true, saved: layout.length });
     } catch (error) {
+        console.error('[Dashboard] Save error:', error);
         req.app.locals?.loggers?.api?.error('API dashboard positions save error:', error);
         res.status(500).json({ success: false, error: 'Failed to save dashboard positions' });
     }
