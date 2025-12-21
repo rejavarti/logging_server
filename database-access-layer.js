@@ -1243,7 +1243,7 @@ class DatabaseAccessLayer extends EventEmitter {
             setClauses.push('updated_at = datetime(\'now\')');
             params.push(webhookId);
             
-            const sql = `UPDATE webhooks SET ${setClauses.join(', ')} WHERE id = ?`;
+            const sql = `UPDATE webhooks SET ${setClauses.join(', ')} WHERE id = $${params.length}`;
             return await this.run(sql, params);
         } catch (error) {
             this.logger.error('Failed to update webhook:', error);
@@ -1253,7 +1253,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async deleteWebhook(webhookId) {
         try {
-            const sql = `DELETE FROM webhooks WHERE id = ?`;
+            const sql = `DELETE FROM webhooks WHERE id = $1`;
             return await this.run(sql, [webhookId]);
         } catch (error) {
             this.logger.error('Failed to delete webhook:', error);
@@ -1264,12 +1264,12 @@ class DatabaseAccessLayer extends EventEmitter {
     async toggleWebhook(webhookId) {
         try {
             // Fetch current active state
-            const row = await this.get(`SELECT id, active FROM webhooks WHERE id = ?`, [webhookId]);
+            const row = await this.get(`SELECT id, active FROM webhooks WHERE id = $1`, [webhookId]);
             if (!row) {
                 return { success: false, error: 'Webhook not found', id: Number(webhookId), enabled: false };
             }
             const newActive = row.active ? 0 : 1;
-            await this.run(`UPDATE webhooks SET active = ?, updated_at = NOW() WHERE id = ?`, [newActive, webhookId]);
+            await this.run(`UPDATE webhooks SET active = $1, updated_at = NOW() WHERE id = $2`, [newActive, webhookId]);
             return { success: true, id: Number(webhookId), enabled: Boolean(newActive) };
         } catch (error) {
             this.logger.error('Failed to toggle webhook:', error);
@@ -1321,7 +1321,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
                 // Update last_tested
                 await this.run(
-                    `UPDATE webhooks SET last_tested = NOW(), updated_at = NOW() WHERE id = ?`,
+                    `UPDATE webhooks SET last_tested = NOW(), updated_at = NOW() WHERE id = $1`,
                     [webhookId]
                 );
 
@@ -1421,7 +1421,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async logActivity(activityData) {
         const sql = `INSERT INTO activity_log (user_id, action, resource_type, resource_id, 
                      details, ip_address, user_agent, timestamp) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`;
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`;
         
         // Handle details field - avoid double-stringifying
         let detailsValue = null;
@@ -1480,11 +1480,11 @@ class DatabaseAccessLayer extends EventEmitter {
         const params = [];
         
         if (userId) {
-            sql += ` WHERE a.user_id = ?`;
+            sql += ` WHERE a.user_id = $1`;
             params.push(userId);
         }
         
-        sql += ` ORDER BY a.created_at DESC LIMIT ? OFFSET ?`;
+        sql += ` ORDER BY a.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
         params.push(limit, offset);
 
         return await this.all(sql, params);
@@ -1529,7 +1529,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getRecentLogs(limit = 20) {
         try {
-            const sql = `SELECT * FROM logs ORDER BY timestamp DESC LIMIT ?`;
+            const sql = `SELECT * FROM logs ORDER BY timestamp DESC LIMIT $1`;
             return await this.all(sql, [limit]);
         } catch (error) {
             this.logger.warn('Failed to get recent logs:', error.message);
@@ -1675,7 +1675,7 @@ class DatabaseAccessLayer extends EventEmitter {
     // Enhanced log entry methods
     async getRecentLogsByLevel(level, limit = 50) {
         try {
-            const sql = `SELECT * FROM logs WHERE level = ? ORDER BY timestamp DESC LIMIT ?`;
+            const sql = `SELECT * FROM logs WHERE level = $1 ORDER BY timestamp DESC LIMIT $2`;
             return await this.all(sql, [level, limit]);
         } catch (error) {
             this.logger.warn(`Failed to get recent ${level} logs:`, error.message);
@@ -1716,7 +1716,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 WHERE level = 'error' AND timestamp >= (NOW() - INTERVAL '24 hours')
                 GROUP BY message 
                 ORDER BY count DESC 
-                LIMIT ?
+                LIMIT $1
             `;
             return await this.all(sql, [limit]);
         } catch (error) {
@@ -1756,7 +1756,7 @@ class DatabaseAccessLayer extends EventEmitter {
             const sql = `SELECT a.*, u.username, a.created_at as timestamp
                          FROM activity_log a 
                          LEFT JOIN users u ON a.user_id = u.id
-                         WHERE a.id = ?`;
+                         WHERE a.id = $1`;
             return await this.db.get(sql, [activityId]);
         } catch (error) {
             this.logger.warn('Failed to get activity by ID:', error.message);
@@ -1769,7 +1769,7 @@ class DatabaseAccessLayer extends EventEmitter {
             const sql = `SELECT a.*, u.username, a.created_at as timestamp
                          FROM activity_log a 
                          LEFT JOIN users u ON a.user_id = u.id
-                         WHERE a.created_at >= ? 
+                         WHERE a.created_at >= $1 
                          ORDER BY a.created_at DESC`;
             return await this.db.all(sql, [timestamp]);
         } catch (error) {
@@ -1787,30 +1787,30 @@ class DatabaseAccessLayer extends EventEmitter {
             const params = [];
 
             if (filters.user_id) {
-                sql += ` AND a.user_id = ?`;
+                sql += ` AND a.user_id = $${params.length + 1}`;
                 params.push(filters.user_id);
             }
             if (filters.action) {
-                sql += ` AND a.action = ?`;
+                sql += ` AND a.action = $${params.length + 1}`;
                 params.push(filters.action);
             }
             if (filters.resource_type) {
-                sql += ` AND a.resource_type = ?`;
+                sql += ` AND a.resource_type = $${params.length + 1}`;
                 params.push(filters.resource_type);
             }
             if (filters.start_date) {
-                sql += ` AND a.created_at >= ?`;
+                sql += ` AND a.created_at >= $${params.length + 1}`;
                 params.push(filters.start_date);
             }
             if (filters.end_date) {
-                sql += ` AND a.created_at <= ?`;
+                sql += ` AND a.created_at <= $${params.length + 1}`;
                 params.push(filters.end_date);
             }
 
             sql += ` ORDER BY a.created_at DESC`;
             
             if (filters.limit) {
-                sql += ` LIMIT ?`;
+                sql += ` LIMIT $${params.length + 1}`;
                 params.push(filters.limit);
             }
 
@@ -1830,30 +1830,30 @@ class DatabaseAccessLayer extends EventEmitter {
             const params = [];
 
             if (filters.user_id) {
-                sql += ` AND a.user_id = ?`;
+                sql += ` AND a.user_id = $${params.length + 1}`;
                 params.push(filters.user_id);
             }
             if (filters.action) {
-                sql += ` AND a.action = ?`;
+                sql += ` AND a.action = $${params.length + 1}`;
                 params.push(filters.action);
             }
             if (filters.resource_type) {
-                sql += ` AND a.resource_type = ?`;
+                sql += ` AND a.resource_type = $${params.length + 1}`;
                 params.push(filters.resource_type);
             }
             if (filters.start_date) {
-                sql += ` AND a.created_at >= ?`;
+                sql += ` AND a.created_at >= $${params.length + 1}`;
                 params.push(filters.start_date);
             }
             if (filters.end_date) {
-                sql += ` AND a.created_at <= ?`;
+                sql += ` AND a.created_at <= $${params.length + 1}`;
                 params.push(filters.end_date);
             }
 
             sql += ` ORDER BY a.created_at DESC`;
             
             if (filters.limit) {
-                sql += ` LIMIT ?`;
+                sql += ` LIMIT $${params.length + 1}`;
                 params.push(parseInt(filters.limit));
             }
 
@@ -1868,7 +1868,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async createSavedSearch(searchData) {
         try {
             const sql = `INSERT INTO saved_searches (user_id, name, query, filters, created_at) 
-                         VALUES (?, ?, ?, ?, NOW())`;
+                         VALUES ($1, $2, $3, $4, NOW())`;
             const params = [
                 searchData.user_id,
                 searchData.name,
@@ -1884,7 +1884,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getSavedSearchById(searchId, userId) {
         try {
-            const sql = `SELECT * FROM saved_searches WHERE id = ? AND user_id = ?`;
+            const sql = `SELECT * FROM saved_searches WHERE id = $1 AND user_id = $2`;
             return await this.db.get(sql, [searchId, userId]);
         } catch (error) {
             this.logger.warn('Failed to get saved search:', error.message);
@@ -1895,7 +1895,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async getSavedSearches(userId) {
         try {
             const sql = userId 
-                ? `SELECT * FROM saved_searches WHERE user_id = ? ORDER BY created_at DESC`
+                ? `SELECT * FROM saved_searches WHERE user_id = $1 ORDER BY created_at DESC`
                 : `SELECT * FROM saved_searches ORDER BY created_at DESC`;
             const params = userId ? [userId] : [];
             return await this.db.all(sql, params);
@@ -1907,7 +1907,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async deleteSavedSearch(searchId, userId) {
         try {
-            const sql = `DELETE FROM saved_searches WHERE id = ? AND user_id = ?`;
+            const sql = `DELETE FROM saved_searches WHERE id = $1 AND user_id = $2`;
             return await this.run(sql, [searchId, userId]);
         } catch (error) {
             this.logger.error('Failed to delete saved search:', error);
@@ -1928,7 +1928,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getIntegration(integrationId) {
         try {
-            const sql = `SELECT * FROM integrations WHERE id = ?`;
+            const sql = `SELECT * FROM integrations WHERE id = $1`;
             return await this.db.get(sql, [integrationId]);
         } catch (error) {
             this.logger.warn('Failed to get integration:', error.message);
@@ -1940,7 +1940,7 @@ class DatabaseAccessLayer extends EventEmitter {
         try {
             // Check if integration with same name already exists
             const existing = await this.get(
-                `SELECT id FROM integrations WHERE name = ?`,
+                `SELECT id FROM integrations WHERE name = $1`,
                 [integrationData.name]
             );
             
@@ -1959,7 +1959,7 @@ class DatabaseAccessLayer extends EventEmitter {
             
             // Create new integration
             const sql = `INSERT INTO integrations (name, type, config, enabled, status, created_at) 
-                         VALUES (?, ?, ?, ?, ?, NOW())`;
+                         VALUES ($1, $2, $3, $4, $5, NOW())`;
             const params = [
                 integrationData.name,
                 integrationData.type,
@@ -1983,34 +1983,34 @@ class DatabaseAccessLayer extends EventEmitter {
             const params = [];
             
             if (updates.name !== undefined) {
-                setClauses.push('name = ?');
+                setClauses.push(`name = $${params.length + 1}`);
                 params.push(updates.name);
             }
             if (updates.type !== undefined) {
-                setClauses.push('type = ?');
+                setClauses.push(`type = $${params.length + 1}`);
                 params.push(updates.type);
             }
             if (updates.config !== undefined) {
-                setClauses.push('config = ?');
+                setClauses.push(`config = $${params.length + 1}`);
                 // Config may already be stringified by the route handler
                 params.push(typeof updates.config === 'string' 
                     ? updates.config 
                     : JSON.stringify(updates.config));
             }
             if (updates.enabled !== undefined) {
-                setClauses.push('enabled = ?');
+                setClauses.push(`enabled = $${params.length + 1}`);
                 params.push(updates.enabled);
                 // Keep status in sync with enabled
-                setClauses.push('status = ?');
+                setClauses.push(`status = $${params.length + 1}`);
                 params.push(updates.enabled ? 'enabled' : 'disabled');
             }
             if (updates.status !== undefined && updates.enabled === undefined) {
                 // If status provided independently, infer enabled when not explicitly set
                 const normalized = String(updates.status).toLowerCase();
                 const inferredEnabled = normalized === 'enabled' || normalized === 'active' ? 1 : 0;
-                setClauses.push('status = ?');
+                setClauses.push(`status = $${params.length + 1}`);
                 params.push(updates.status);
-                setClauses.push('enabled = ?');
+                setClauses.push(`enabled = $${params.length + 1}`);
                 params.push(inferredEnabled);
             }
             
@@ -2022,7 +2022,7 @@ class DatabaseAccessLayer extends EventEmitter {
             setClauses.push('updated_at = datetime(\'now\')');
             params.push(integrationId);
             
-            const sql = `UPDATE integrations SET ${setClauses.join(', ')} WHERE id = ?`;
+            const sql = `UPDATE integrations SET ${setClauses.join(', ')} WHERE id = $${params.length}`;
             return await this.run(sql, params);
         } catch (error) {
             this.logger.error('Failed to update integration:', error);
@@ -2032,7 +2032,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async deleteIntegration(integrationId) {
         try {
-            const sql = `DELETE FROM integrations WHERE id = ?`;
+            const sql = `DELETE FROM integrations WHERE id = $1`;
             return await this.run(sql, [integrationId]);
         } catch (error) {
             this.logger.error('Failed to delete integration:', error);
@@ -2042,13 +2042,13 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async toggleIntegration(integrationId) {
         try {
-            const row = await this.get(`SELECT id, enabled FROM integrations WHERE id = ?`, [integrationId]);
+            const row = await this.get(`SELECT id, enabled FROM integrations WHERE id = $1`, [integrationId]);
             if (!row) {
                 return { success: false, error: 'Integration not found', id: Number(integrationId), enabled: false };
             }
             const newEnabled = row.enabled ? 0 : 1;
             const newStatus = newEnabled ? 'enabled' : 'disabled';
-            await this.run(`UPDATE integrations SET enabled = ?, status = ?, updated_at = NOW() WHERE id = ?`, [newEnabled, newStatus, integrationId]);
+            await this.run(`UPDATE integrations SET enabled = $1, status = $2, updated_at = NOW() WHERE id = $3`, [newEnabled, newStatus, integrationId]);
             return { success: true, id: Number(integrationId), enabled: Boolean(newEnabled) };
         } catch (error) {
             this.logger.error('Failed to toggle integration:', error);
@@ -2124,12 +2124,12 @@ class DatabaseAccessLayer extends EventEmitter {
             
             await this.run(
                 `UPDATE integrations 
-                 SET status = ?,
-                     last_sync = CASE WHEN ? = 1 THEN datetime('now') ELSE last_sync END,
-                     error_count = CASE WHEN ? = 0 THEN error_count + 1 ELSE 0 END,
-                     last_error = CASE WHEN ? = 0 THEN ? ELSE NULL END,
-                     updated_at = datetime('now') 
-                 WHERE id = ?`,
+                 SET status = $1,
+                     last_sync = CASE WHEN $2 = 1 THEN NOW() ELSE last_sync END,
+                     error_count = CASE WHEN $3 = 0 THEN error_count + 1 ELSE 0 END,
+                     last_error = CASE WHEN $4 = 0 THEN $5 ELSE NULL END,
+                     updated_at = NOW() 
+                 WHERE id = $6`,
                 [newStatus, testResult.success ? 1 : 0, testResult.success ? 1 : 0, testResult.success ? 1 : 0, testResult.message || '', integrationId]
             );
 
@@ -2289,7 +2289,7 @@ class DatabaseAccessLayer extends EventEmitter {
         // Return documentation for specific integration type
         // This would typically come from a docs table or be hardcoded
         try {
-            const sql = `SELECT * FROM integration_docs WHERE type = ?`;
+            const sql = `SELECT * FROM integration_docs WHERE type = $1`;
             const result = await this.db.get(sql, [integrationType]);
             return result || { type: integrationType, docs: 'Documentation not available' };
         } catch (error) {
@@ -2321,35 +2321,35 @@ class DatabaseAccessLayer extends EventEmitter {
                 if (regex) {
                     // PostgreSQL regex support with ~ operator
                     const regexOp = caseSensitive ? '~' : '~*';
-                    sql += ` AND (message ${regexOp} ? OR source ${regexOp} ?)`;
+                    sql += ` AND (message ${regexOp} $${params.length + 1} OR source ${regexOp} $${params.length + 2})`;
                     params.push(query, query);
                 } else {
                     // Use ILIKE for case-insensitive, LIKE for case-sensitive
                     const likeOp = caseSensitive ? 'LIKE' : 'ILIKE';
-                    sql += ` AND (message ${likeOp} ? OR source ${likeOp} ?)`;
+                    sql += ` AND (message ${likeOp} $${params.length + 1} OR source ${likeOp} $${params.length + 2})`;
                     params.push(`%${query}%`, `%${query}%`);
                 }
             }
 
             // Level filter
             if (level) {
-                sql += ` AND level = ?`;
+                sql += ` AND level = $${params.length + 1}`;
                 params.push(level);
             }
 
             // Source filter
             if (source) {
-                sql += ` AND source = ?`;
+                sql += ` AND source = $${params.length + 1}`;
                 params.push(source);
             }
 
             // Date range
             if (startDate) {
-                sql += ` AND timestamp >= ?`;
+                sql += ` AND timestamp >= $${params.length + 1}`;
                 params.push(startDate);
             }
             if (endDate) {
-                sql += ` AND timestamp <= ?`;
+                sql += ` AND timestamp <= $${params.length + 1}`;
                 params.push(endDate);
             }
 
@@ -2359,7 +2359,7 @@ class DatabaseAccessLayer extends EventEmitter {
             const total = countResult?.count || 0;
 
             // Add ordering and pagination
-            sql += ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
+            sql += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
             params.push(limit, offset);
 
             const results = await this.all(sql, params);
@@ -2385,20 +2385,20 @@ class DatabaseAccessLayer extends EventEmitter {
     async storeEncryptedSecret(keyName, encryptedValue, metadata = null) {
         try {
             const existing = await this.get(
-                `SELECT id FROM encrypted_secrets WHERE key_name = ?`,
+                `SELECT id FROM encrypted_secrets WHERE key_name = $1`,
                 [keyName]
             );
             
             if (existing) {
                 // Update existing
                 await this.run(
-                    `UPDATE encrypted_secrets SET encrypted_value = ?, updated_at = NOW(), metadata = ? WHERE key_name = ?`,
+                    `UPDATE encrypted_secrets SET encrypted_value = $1, updated_at = NOW(), metadata = $2 WHERE key_name = $3`,
                     [encryptedValue, metadata ? JSON.stringify(metadata) : null, keyName]
                 );
             } else {
                 // Insert new
                 await this.run(
-                    `INSERT INTO encrypted_secrets (key_name, encrypted_value, metadata) VALUES (?, ?, ?)`,
+                    `INSERT INTO encrypted_secrets (key_name, encrypted_value, metadata) VALUES ($1, $2, $3)`,
                     [keyName, encryptedValue, metadata ? JSON.stringify(metadata) : null]
                 );
             }
@@ -2412,14 +2412,14 @@ class DatabaseAccessLayer extends EventEmitter {
     async getEncryptedSecret(keyName) {
         try {
             const result = await this.get(
-                `SELECT encrypted_value, metadata, created_at, updated_at FROM encrypted_secrets WHERE key_name = ?`,
+                `SELECT encrypted_value, metadata, created_at, updated_at FROM encrypted_secrets WHERE key_name = $1`,
                 [keyName]
             );
             
             if (result) {
                 // Update last_accessed timestamp
                 await this.run(
-                    `UPDATE encrypted_secrets SET last_accessed = NOW() WHERE key_name = ?`,
+                    `UPDATE encrypted_secrets SET last_accessed = NOW() WHERE key_name = $1`,
                     [keyName]
                 );
                 
@@ -2439,7 +2439,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async deleteEncryptedSecret(keyName) {
         try {
-            await this.run(`DELETE FROM encrypted_secrets WHERE key_name = ?`, [keyName]);
+            await this.run(`DELETE FROM encrypted_secrets WHERE key_name = $1`, [keyName]);
             return { success: true };
         } catch (error) {
             this.logger.error('Failed to delete encrypted secret:', error);
@@ -2498,7 +2498,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 INSERT INTO transaction_log (
                     transaction_id, operation_type, table_name, record_ids, sql_statement,
                     status, error_message, retry_count, user_id, ip_address
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             `, [transaction_id, operation_type, table_name, record_ids ? JSON.stringify(record_ids) : null, sql_statement, status, error_message, retry_count, user_id, ip_address]);
         } catch (error) {
             this.logger.error('Failed to log transaction:', error);
@@ -2508,7 +2508,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async updateTransactionStatus(transaction_id, status, error_message = null) {
         try {
-            await this.run(`UPDATE transaction_log SET status = ?, error_message = ?, completed_at = NOW() WHERE transaction_id = ?`, [status, error_message, transaction_id]);
+            await this.run(`UPDATE transaction_log SET status = $1, error_message = $2, completed_at = NOW() WHERE transaction_id = $3`, [status, error_message, transaction_id]);
         } catch (error) {
             this.logger.error('Failed to update transaction status:', error);
         }
@@ -2531,7 +2531,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 INSERT INTO failed_operations_queue (
                     operation_type, payload, error_message, error_code, retry_count, max_retries,
                     next_retry_at, status, priority
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             `, [operation_type, JSON.stringify(payload), error_message, error_code, retry_count, max_retries, next_retry_at, status, priority]);
         } catch (error) {
             this.logger.error('Failed to queue failed operation:', error);
@@ -2543,8 +2543,8 @@ class DatabaseAccessLayer extends EventEmitter {
             const nowIso = new Date().toISOString();
             return await this.all(`
                 SELECT * FROM failed_operations_queue 
-                WHERE status = 'queued' AND (next_retry_at IS NULL OR next_retry_at <= ?) 
-                ORDER BY priority ASC, failed_at ASC LIMIT ?
+                WHERE status = 'queued' AND (next_retry_at IS NULL OR next_retry_at <= $1) 
+                ORDER BY priority ASC, failed_at ASC LIMIT $2
             `, [nowIso, limit]);
         } catch (error) {
             this.logger.error('Failed to fetch retryable failed operations:', error);
@@ -2556,11 +2556,11 @@ class DatabaseAccessLayer extends EventEmitter {
         const sets = [];
         const params = [];
         for (const [k, v] of Object.entries(fields)) {
-            sets.push(`${k} = ?`);
+            sets.push(`${k} = $${params.length + 1}`);
             params.push(v);
         }
         params.push(id);
-        await this.run(`UPDATE failed_operations_queue SET ${sets.join(', ')} WHERE id = ?`, params);
+        await this.run(`UPDATE failed_operations_queue SET ${sets.join(', ')} WHERE id = $${params.length}`, params);
     }
 
     async logSystemError(entry) {
@@ -2581,7 +2581,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 INSERT INTO system_error_log (
                     error_category, error_code, error_message, stack_trace, affected_component,
                     affected_function, severity, user_id, ip_address, request_id
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             `, [error_category, error_code, error_message, stack_trace, affected_component, affected_function, severity, user_id, ip_address, request_id]);
         } catch (error) {
             this.logger.error('Failed to log system error:', error);
@@ -2610,7 +2610,7 @@ class DatabaseAccessLayer extends EventEmitter {
                     database_size_mb, table_count, total_records, logs_table_records,
                     corruption_detected, integrity_check_passed, vacuum_last_run, backup_last_run,
                     avg_query_time_ms, slow_queries_count, disk_space_available_mb, wal_size_mb, checks_performed
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             `, [database_size_mb, table_count, total_records, logs_table_records, corruption_detected, integrity_check_passed, vacuum_last_run, backup_last_run, avg_query_time_ms, slow_queries_count, disk_space_available_mb, wal_size_mb, checks_performed ? JSON.stringify(checks_performed) : null]);
         } catch (error) {
             this.logger.error('Failed to log database health snapshot:', error);
