@@ -25,9 +25,10 @@ router.get('/', async (req, res) => {
             "font-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.gstatic.com https://use.fontawesome.com https://cdnjs.cloudflare.com data:; " +
             "connect-src 'self' ws: wss: https: http:; "
         );
-        // Allow short-term caching for better performance (5 minutes)
-        res.setHeader('Cache-Control', 'private, max-age=300');
-        res.setHeader('ETag', '"v20251210-fast"');
+        // Disable caching to ensure latest code is always loaded
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
         
         // PERFORMANCE: Send HTML shell immediately, load data via AJAX
         // Only fetch critical data needed for initial render
