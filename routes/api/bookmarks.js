@@ -11,7 +11,7 @@ router.get('/', async (req,res)=>{
   try {
     await ensureTable(req.dal);
     const user = req.session?.user?.username || 'anonymous';
-    const rows = await req.dal.all("SELECT id, label, query, created_at FROM bookmarks WHERE username = ? ORDER BY created_at DESC LIMIT 300", [user]);
+    const rows = await req.dal.all("SELECT id, label, query, created_at FROM bookmarks WHERE username = $1 ORDER BY created_at DESC LIMIT 300", [user]);
     res.json({ success:true, bookmarks: rows });
   } catch(err){
     req.app.locals?.loggers?.api?.error('bookmarks list error', err);
@@ -29,7 +29,7 @@ router.post('/', express.json(), async (req,res)=>{
     if(!isNonEmptyString(label)) return res.status(400).json({ success:false, error:'label required' });
     if(label.length > 200) return res.status(400).json({ success:false, error:'label too long' });
     if(query.length > 2000) return res.status(400).json({ success:false, error:'query too long' });
-    const result = await req.dal.run("INSERT INTO bookmarks (username, label, query) VALUES (?, ?, ?)",[user,label,query]);
+    const result = await req.dal.run("INSERT INTO bookmarks (username, label, query) VALUES ($1, $2, $3)",[user,label,query]);
     res.json({ success:true, id: result.lastID });
   } catch(err){
     req.app.locals?.loggers?.api?.error('bookmark create error', err);
@@ -44,9 +44,9 @@ router.delete('/:id', async (req,res)=>{
     const user = req.session?.user?.username || 'anonymous';
     const id = parseInt(req.params.id,10);
     if(!id) return res.status(400).json({ success:false, error:'invalid id' });
-    const existing = await req.dal.get("SELECT id FROM bookmarks WHERE id = ? AND username = ?", [id,user]);
+    const existing = await req.dal.get("SELECT id FROM bookmarks WHERE id = $1 AND username = $2", [id,user]);
     if(!existing) return res.status(404).json({ success:false, error:'not found' });
-    await req.dal.run("DELETE FROM bookmarks WHERE id = ?", [id]);
+    await req.dal.run("DELETE FROM bookmarks WHERE id = $1", [id]);
     res.json({ success:true, deleted:id });
   } catch(err){
     req.app.locals?.loggers?.api?.error('bookmark delete error', err);

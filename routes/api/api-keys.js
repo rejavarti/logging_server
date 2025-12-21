@@ -90,7 +90,7 @@ router.post('/api-keys', async (req, res) => {
 
         const result = await req.dal.run(
             `INSERT INTO api_keys (name, key_value, description, permissions, is_active, expires_at, created_by, created_at)
-             VALUES (?, ?, ?, ?, 1, ?, ?, CURRENT_TIMESTAMP)`,
+             VALUES ($1, $2, $3, $4, 1, $5, $6, CURRENT_TIMESTAMP)`,
             [name.trim(), keyValue, description || null, permissionsStr, expiresAt, userId]
         );
 
@@ -99,7 +99,7 @@ router.post('/api-keys', async (req, res) => {
                     u.username AS created_by_username
              FROM api_keys ak
              LEFT JOIN users u ON ak.created_by = u.id
-             WHERE ak.id = ?`,
+             WHERE ak.id = $1`,
             [result.lastID]
         );
 
@@ -138,7 +138,7 @@ router.put('/api-keys/:id', async (req, res) => {
         }
 
         await req.dal.run(
-            `UPDATE api_keys SET is_active = ? WHERE id = ?`,
+            `UPDATE api_keys SET is_active = $1 WHERE id = $2`,
             [is_active ? 1 : 0, keyId]
         );
 
@@ -156,10 +156,10 @@ router.delete('/api-keys/:id', async (req, res) => {
         const keyId = req.params.id;
 
         // Get key name for logging
-        const key = await req.dal.get(`SELECT name FROM api_keys WHERE id = ?`, [keyId]);
+        const key = await req.dal.get(`SELECT name FROM api_keys WHERE id = $1`, [keyId]);
 
         // Delete from database
-        await req.dal.run(`DELETE FROM api_keys WHERE id = ?`, [keyId]);
+        await req.dal.run(`DELETE FROM api_keys WHERE id = $1`, [keyId]);
 
         req.app.locals.loggers?.security?.warn(`API key "${key?.name || keyId}" revoked by ${req.user?.username || 'unknown'}`);
         res.json({ success: true, message: 'API key revoked' });
@@ -178,8 +178,8 @@ router.post('/api-keys/:id/regenerate', async (req, res) => {
 
         await req.dal.run(
             `UPDATE api_keys 
-             SET key_value = ?
-             WHERE id = ?`,
+             SET key_value = $1
+             WHERE id = $2`,
             [newKeyValue, keyId]
         );
 
@@ -188,7 +188,7 @@ router.post('/api-keys/:id/regenerate', async (req, res) => {
                     u.username AS created_by_username
              FROM api_keys ak
              LEFT JOIN users u ON ak.created_by = u.id
-             WHERE ak.id = ?`,
+             WHERE ak.id = $1`,
             [keyId]
         );
 

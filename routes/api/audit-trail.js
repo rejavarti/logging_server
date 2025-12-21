@@ -31,11 +31,11 @@ router.get('/audit-trail', async (req, res) => {
         // Build base SQL with LEFT JOIN to include usernames without N+1 queries
         let baseSql = `SELECT a.*, u.username AS username FROM activity_log a LEFT JOIN users u ON a.user_id = u.id WHERE 1=1`;
         const params = [];
-        if (user_id) { baseSql += ' AND a.user_id = ?'; params.push(user_id); }
-        if (action) { baseSql += ' AND a.action = ?'; params.push(action); }
-        if (resource_type) { baseSql += ' AND a.resource_type = ?'; params.push(resource_type); }
-        if (start_date) { baseSql += ' AND a.created_at >= ?'; params.push(start_date); }
-        if (end_date) { baseSql += ' AND a.created_at <= ?'; params.push(end_date); }
+        if (user_id) { baseSql += ` AND a.user_id = $${params.length + 1}`; params.push(user_id); }
+        if (action) { baseSql += ` AND a.action = $${params.length + 1}`; params.push(action); }
+        if (resource_type) { baseSql += ` AND a.resource_type = $${params.length + 1}`; params.push(resource_type); }
+        if (start_date) { baseSql += ` AND a.created_at >= $${params.length + 1}`; params.push(start_date); }
+        if (end_date) { baseSql += ` AND a.created_at <= $${params.length + 1}`; params.push(end_date); }
 
         // Count total
         const countSql = baseSql.replace('SELECT a.*, u.username AS username', 'SELECT COUNT(*) AS total');
@@ -43,7 +43,7 @@ router.get('/audit-trail', async (req, res) => {
         const total = countRow?.total || 0;
 
         // Apply ordering and pagination
-        const dataSql = `${baseSql} ORDER BY a.created_at DESC LIMIT ? OFFSET ?`;
+        const dataSql = `${baseSql} ORDER BY a.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
         const rows = await dal.all(dataSql, [...params, pageSize, offset]);
 
         const entries = (rows || []).map(row => ({
@@ -366,21 +366,21 @@ router.post('/audit-trail/search', async (req, res) => {
         let sql = `SELECT a.*, u.username AS username FROM activity_log a LEFT JOIN users u ON a.user_id = u.id WHERE 1=1`;
         const params = [];
         if (query && String(query).trim()) {
-            sql += ` AND (a.action LIKE ? OR a.resource_type LIKE ? OR a.details LIKE ?)`;
+            sql += ` AND (a.action LIKE $${params.length + 1} OR a.resource_type LIKE $${params.length + 2} OR a.details LIKE $${params.length + 3})`;
             const q = `%${query}%`;
             params.push(q, q, q);
         }
-        if (filters.user_id) { sql += ' AND a.user_id = ?'; params.push(filters.user_id); }
-        if (filters.action) { sql += ' AND a.action = ?'; params.push(filters.action); }
-        if (filters.resource_type) { sql += ' AND a.resource_type = ?'; params.push(filters.resource_type); }
-        if (filters.start_date) { sql += ' AND a.created_at >= ?'; params.push(filters.start_date); }
-        if (filters.end_date) { sql += ' AND a.created_at <= ?'; params.push(filters.end_date); }
+        if (filters.user_id) { sql += ` AND a.user_id = $${params.length + 1}`; params.push(filters.user_id); }
+        if (filters.action) { sql += ` AND a.action = $${params.length + 1}`; params.push(filters.action); }
+        if (filters.resource_type) { sql += ` AND a.resource_type = $${params.length + 1}`; params.push(filters.resource_type); }
+        if (filters.start_date) { sql += ` AND a.created_at >= $${params.length + 1}`; params.push(filters.start_date); }
+        if (filters.end_date) { sql += ` AND a.created_at <= $${params.length + 1}`; params.push(filters.end_date); }
 
         const countSql = sql.replace('SELECT a.*, u.username AS username', 'SELECT COUNT(*) AS total');
         const countRow = await dal.get(countSql, params);
         const total = countRow?.total || 0;
 
-        sql += ' ORDER BY a.created_at DESC LIMIT ? OFFSET ?';
+        sql += ` ORDER BY a.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
         const rows = await dal.all(sql, [...params, parseInt(limit), parseInt(offset)]);
 
         const results = (rows || []).map(r => ({
