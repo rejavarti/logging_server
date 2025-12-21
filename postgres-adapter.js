@@ -60,6 +60,14 @@ class PostgresAdapter {
                 changes: result.rowCount,
                 lastID: result.rows[0]?.id || null
             };
+        } catch (error) {
+            this.logger.error(`PostgreSQL run() error: ${error.message}`, {
+                sql: sql,
+                pgSql: this.convertPlaceholders(sql),
+                params: params,
+                error: error.stack
+            });
+            throw error;
         } finally {
             client.release();
         }
@@ -71,6 +79,14 @@ class PostgresAdapter {
             const pgSql = this.convertPlaceholders(sql);
             const result = await client.query(pgSql, params);
             return result.rows[0] || null;
+        } catch (error) {
+            this.logger.error(`PostgreSQL get() error: ${error.message}`, {
+                sql: sql,
+                pgSql: this.convertPlaceholders(sql),
+                params: params,
+                error: error.stack
+            });
+            throw error;
         } finally {
             client.release();
         }
@@ -82,6 +98,14 @@ class PostgresAdapter {
             const pgSql = this.convertPlaceholders(sql);
             const result = await client.query(pgSql, params);
             return result.rows;
+        } catch (error) {
+            this.logger.error(`PostgreSQL all() error: ${error.message}`, {
+                sql: sql,
+                pgSql: this.convertPlaceholders(sql),
+                params: params,
+                error: error.stack
+            });
+            throw error;
         } finally {
             client.release();
         }
