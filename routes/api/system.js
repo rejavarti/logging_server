@@ -50,9 +50,9 @@ router.get('/system/metrics', async (req, res) => {
             await req.dal.run("CREATE TABLE IF NOT EXISTS disk_usage_history (ts BIGINT PRIMARY KEY, used_mb INTEGER, percent INTEGER)");
             const now = Date.now();
             const hourBucket = Math.floor(now / 3600000) * 3600000; // start of hour
-            const existing = await req.dal.get("SELECT ts FROM disk_usage_history WHERE ts = ?", [hourBucket]);
+            const existing = await req.dal.get("SELECT ts FROM disk_usage_history WHERE ts = $1", [hourBucket]);
             if (!existing) {
-                await req.dal.run("INSERT INTO disk_usage_history (ts, used_mb, percent) VALUES (?, ?, ?)", [hourBucket, Math.round(diskUsedMB), Math.round(diskPercent)]);
+                await req.dal.run("INSERT INTO disk_usage_history (ts, used_mb, percent) VALUES ($1, $2, $3)", [hourBucket, Math.round(diskUsedMB), Math.round(diskPercent)]);
             }
             // Fetch last 72 hours
             const trendRows = await req.dal.all("SELECT ts, used_mb, percent FROM disk_usage_history ORDER BY ts DESC LIMIT 72");
