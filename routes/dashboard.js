@@ -1597,6 +1597,9 @@ router.get('/', async (req, res) => {
         window.loadSavedLayout = loadSavedLayout;
         window.setupResizeObservers = setupResizeObservers;
         window.autoSaveLayout = autoSaveLayout;
+        // Expose variables needed by external script
+        window.isLocked = isLocked;
+        window.charts = charts;
         
         console.log('✅ First script block functions exposed globally');
         </script>

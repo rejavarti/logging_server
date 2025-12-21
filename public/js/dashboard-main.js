@@ -1,10 +1,7 @@
 /** Dashboard Main JavaScript - Version 2024-12-21 */
 
-let grid;
-let charts = {};
-let isLocked = false;
-let resizeObserverReady = false; // Flag to prevent auto-save during initial load
-const DEBUG_LAYOUT_LOG = true; // Detailed per-widget layout logging
+// Variables are declared in inline script, accessed via window object
+// window.grid, window.charts, window.isLocked, window.resizeObserverReady
 
 // Timezone-aware timestamp formatter
 const USER_TIMEZONE = 'America/Edmonton';
@@ -226,7 +223,7 @@ function initializeGrid() {
     grid.on('dragEnd', function(item) {
         console.log('🔴 dragEnd event fired for', item.getElement().getAttribute('data-widget-id'));
         // Auto-save on dragEnd since dragReleaseEnd isn't firing
-        if (!isLocked) {
+        if (!window.isLocked) {
             setTimeout(function() {
                 console.log('⏱️ Calling autoSaveLayout after dragEnd (50ms delay)');
                 if (typeof window.autoSaveLayout === 'function') {
@@ -245,7 +242,7 @@ function initializeGrid() {
     });
     
     grid.on('dragReleaseEnd', function(item) {
-        console.log('🎯 dragReleaseEnd event fired for', item.getElement().getAttribute('data-widget-id'), 'isLocked:', isLocked);
+        console.log('🎯 dragReleaseEnd event fired for', item.getElement().getAttribute('data-widget-id'), 'isLocked:', window.isLocked);
     });
     
     console.log('✅ [5] Grid initialization completed successfully');
