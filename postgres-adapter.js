@@ -57,8 +57,8 @@ class PostgresAdapter {
             const pgSql = this.convertPlaceholders(sql);
             const result = await client.query(pgSql, params);
             return {
-                changes: result.rowCount,
-                lastID: result.rows[0]?.id || null
+                changes: result.rowCount || 0,
+                lastID: result.rows && result.rows[0] ? result.rows[0].id : null
             };
         } catch (error) {
             this.logger.error(`PostgreSQL run() error: ${error.message}`, {
