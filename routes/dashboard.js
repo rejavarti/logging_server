@@ -576,6 +576,11 @@ router.get('/', async (req, res) => {
         
         // Initialize Muuri Grid
         function initializeGrid() {
+            console.log('🔧 Initializing Muuri grid...');
+            console.log('📦 Grid container exists:', !!document.querySelector('.dashboard-grid'));
+            console.log('📦 Widget items found:', document.querySelectorAll('.widget-item').length);
+            console.log('📦 Widget headers found:', document.querySelectorAll('.widget-header').length);
+            
             grid = new Muuri('.dashboard-grid', {
                 dragEnabled: true,
                 dragHandle: '.widget-header',
@@ -607,6 +612,17 @@ router.get('/', async (req, res) => {
                     });
                     if (callback) callback(layout);
                 }
+            });
+            
+            console.log('✅ Muuri grid created, items:', grid.getItems().length);
+            console.log('🎮 Drag enabled:', grid._settings.dragEnabled);
+            console.log('🎮 Drag handle:', grid._settings.dragHandle);
+            
+            // Test: Check if drag handles are clickable
+            const headers = document.querySelectorAll('.widget-header');
+            headers.forEach((header, i) => {
+                const styles = window.getComputedStyle(header);
+                console.log(`Header ${i}: cursor=${styles.cursor}, pointer-events=${styles.pointerEvents}, z-index=${styles.zIndex}`);
             });
             
             // Debug: Monitor all drag events
