@@ -56,9 +56,11 @@ class PostgresAdapter {
             // Convert ? placeholders to PostgreSQL $1, $2, etc
             const pgSql = this.convertPlaceholders(sql);
             const result = await client.query(pgSql, params);
+            
+            // VACUUM and other utility commands may not return result.rows
             return {
                 changes: result.rowCount || 0,
-                lastID: result.rows && result.rows[0] ? result.rows[0].id : null
+                lastID: (result.rows && result.rows.length > 0 && result.rows[0]) ? result.rows[0].id : null
             };
         } catch (error) {
             this.logger.error(`PostgreSQL run() error: ${error.message}`, {
