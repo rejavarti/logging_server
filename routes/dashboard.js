@@ -609,6 +609,19 @@ router.get('/', async (req, res) => {
                 }
             });
             
+            // Debug: Monitor all drag events
+            grid.on('dragStart', function(item) {
+                console.log('🟢 dragStart event fired for', item.getElement().getAttribute('data-widget-id'));
+            });
+            
+            grid.on('dragEnd', function(item) {
+                console.log('🔴 dragEnd event fired for', item.getElement().getAttribute('data-widget-id'));
+            });
+            
+            grid.on('dragReleaseStart', function(item) {
+                console.log('🟡 dragReleaseStart event fired for', item.getElement().getAttribute('data-widget-id'));
+            });
+            
             // Save layout on drag end - but wait for drag release animation to complete
             grid.on('dragReleaseEnd', function(item) {
                 console.log('🎯 dragReleaseEnd event fired for', item.getElement().getAttribute('data-widget-id'), 'isLocked:', isLocked);
