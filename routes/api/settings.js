@@ -393,7 +393,7 @@ router.put('/settings/:key', async (req, res) => {
             try {
                 // Fetch existing value for diff recording
                 const existing = await req.dal.get(
-                    `SELECT setting_value FROM settings WHERE setting_key = ?`,
+                    `SELECT setting_value FROM settings WHERE setting_key = $1`,
                     [key]
                 );
                 oldValue = existing ? existing.setting_value : undefined;

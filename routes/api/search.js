@@ -188,7 +188,7 @@ router.post('/fuzzy', async (req, res) => {
         }
         
         const rows = await req.dal.all(
-            `SELECT * FROM logs WHERE ${field} LIKE ? ORDER BY timestamp DESC LIMIT 100`,
+            `SELECT * FROM logs WHERE ${field} LIKE $1 ORDER BY timestamp DESC LIMIT 100`,
             [`%${pattern}%`]
         );
         
@@ -289,7 +289,7 @@ router.get('/simple', async (req, res) => {
         const safeField = validSortFields.includes(sortField) ? sortField : 'timestamp';
         
         const rows = await req.dal.all(
-            `SELECT * FROM logs WHERE message LIKE ? ORDER BY ${safeField} ${orderClause} LIMIT ?`,
+            `SELECT * FROM logs WHERE message LIKE $1 ORDER BY ${safeField} ${orderClause} LIMIT $2`,
             [ `%${q}%`, parseInt(size) ]
         );
         
@@ -330,7 +330,7 @@ router.get('/suggest', async (req, res) => {
         const { prefix = '', limit = 10 } = req.query;
         if (!prefix) return res.json({ suggestions: [] });
         const rows = await req.dal.all(
-            "SELECT DISTINCT substr(message, 1, 60) as term FROM logs WHERE message LIKE ? LIMIT ?",
+            "SELECT DISTINCT substr(message, 1, 60) as term FROM logs WHERE message LIKE $1 LIMIT $2",
             [ `${prefix}%`, parseInt(limit) ]
         );
         res.json({ suggestions: rows.map(r=>r.term) });

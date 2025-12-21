@@ -52,39 +52,39 @@ router.get('/', async (req, res) => {
         } else {
             // Fall back to legacy filters
             if (level) {
-                query += ' AND level = ?';
-                countQuery += ' AND level = ?';
+                query += ` AND level = $${params.length + 1}`;
+                countQuery += ` AND level = $${params.length + 1}`;
                 params.push(level);
             }
             if (source) {
-                query += ' AND source = ?';
-                countQuery += ' AND source = ?';
+                query += ` AND source = $${params.length + 1}`;
+                countQuery += ` AND source = $${params.length + 1}`;
                 params.push(source);
             }
             if (search) {
-                query += ' AND (message LIKE ? OR source LIKE ?)';
-                countQuery += ' AND (message LIKE ? OR source LIKE ?)';
+                query += ` AND (message LIKE $${params.length + 1} OR source LIKE $${params.length + 2})`;
+                countQuery += ` AND (message LIKE $${params.length + 1} OR source LIKE $${params.length + 2})`;
                 params.push(`%${search}%`, `%${search}%`);
             }
             if (startDate) {
-                query += ' AND timestamp >= ?';
-                countQuery += ' AND timestamp >= ?';
+                query += ` AND timestamp >= $${params.length + 1}`;
+                countQuery += ` AND timestamp >= $${params.length + 1}`;
                 params.push(startDate);
             }
             if (endDate) {
-                query += ' AND timestamp <= ?';
-                countQuery += ' AND timestamp <= ?';
+                query += ` AND timestamp <= $${params.length + 1}`;
+                countQuery += ` AND timestamp <= $${params.length + 1}`;
                 params.push(endDate);
             }
             if (category) {
                 // Map legacy 'category' filter to 'source'
-                query += ' AND source = ?';
-                countQuery += ' AND source = ?';
+                query += ` AND source = $${params.length + 1}`;
+                countQuery += ` AND source = $${params.length + 1}`;
                 params.push(category);
             }
         }
 
-    query += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
+    query += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     params.push(filters.limit, filters.offset);
 
         const logs = await req.dal.all(query, params);
@@ -231,7 +231,7 @@ router.get('/export', async (req, res) => {
             `SELECT id, timestamp, level, source, ip, message, metadata
              FROM logs
              ORDER BY timestamp DESC
-             LIMIT ?`,
+             LIMIT $1`,
             [limit]
         );
 
@@ -352,11 +352,11 @@ router.get('/stats', async (req, res) => {
         const startTime = new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
         
         // Base query with time filter
-        let whereClause = 'WHERE timestamp >= ?';
+        let whereClause = 'WHERE timestamp >= $1';
         let params = [startTime];
         
         if (level) {
-            whereClause += ' AND level = ?';
+            whereClause += ' AND level = $2';
             params.push(level);
         }
         
@@ -449,7 +449,7 @@ router.get('/:id', async (req, res) => {
             });
         }
         
-        const log = await req.dal.get('SELECT * FROM logs WHERE id = ?', [id]);
+        const log = await req.dal.get('SELECT * FROM logs WHERE id = $1', [id]);
         
         if (!log) {
             return res.status(404).json({ 
@@ -502,7 +502,7 @@ router.post('/', async (req, res) => {
             req.app.locals?.loggers?.api?.debug(`Enqueued log entry (batch size now: ${req.dal.logBatch?.length || 0})`);
         } else {
             const result = await req.dal.run(
-                `INSERT INTO logs (level, message, source, ip, timestamp) VALUES (?, ?, ?, ?, ?)`,
+                `INSERT INTO logs (level, message, source, ip, timestamp) VALUES ($1, $2, $3, $4, $5)`,
                 [level, message, source, req.ip || 'unknown', ts]
             );
             insertedId = result.lastID;
@@ -539,7 +539,7 @@ router.delete('/:id', async (req, res) => {
         }
         
         // Check if log exists first
-        const log = await req.dal.get('SELECT id FROM logs WHERE id = ?', [id]);
+        const log = await req.dal.get('SELECT id FROM logs WHERE id = $1', [id]);
         if (!log) {
             return res.status(404).json({ 
                 success: false, 
@@ -548,7 +548,7 @@ router.delete('/:id', async (req, res) => {
         }
         
         // Delete the log entry
-        const result = await req.dal.run('DELETE FROM logs WHERE id = ?', [id]);
+        const result = await req.dal.run('DELETE FROM logs WHERE id = $1', [id]);
         
         // Broadcast deletion to WebSocket subscribers
         if (typeof global.broadcastToSubscribers === 'function') {
@@ -586,7 +586,7 @@ router.get('/geolocation', async (req, res) => {
             WHERE (metadata::text LIKE '%latitude%' OR metadata::text LIKE '%longitude%')
               AND timestamp >= NOW() - INTERVAL '7 days'
             GROUP BY source, metadata, ip
-            LIMIT ?
+            LIMIT $1
         `, [limit]) || [];
         
         // Parse geolocation data

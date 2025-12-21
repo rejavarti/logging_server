@@ -209,7 +209,7 @@ router.post('/ingestion/test-parse', async (req, res) => {
                 if (dal && typeof dal.run === 'function') {
                     await dal.run(
                     `INSERT INTO logs (level, message, source, ip, timestamp, hostname, raw_data) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
                     [
                         parsed.severity || 'info',
                         parsed.message || parsed.short_message || message,
@@ -268,17 +268,17 @@ router.get('/ingestion/stats', async (req, res) => {
         
         // Query real statistics from database
         const totalResult = await dal.get(
-            `SELECT COUNT(*) as total FROM logs WHERE timestamp >= ?`,
+            `SELECT COUNT(*) as total FROM logs WHERE timestamp >= $1`,
             [cutoffDate]
         );
         
         const bySourceResult = await dal.all(
-            `SELECT source, COUNT(*) as count FROM logs WHERE timestamp >= ? GROUP BY source`,
+            `SELECT source, COUNT(*) as count FROM logs WHERE timestamp >= $1 GROUP BY source`,
             [cutoffDate]
         );
         
         const topHostsResult = await dal.all(
-            `SELECT hostname, COUNT(*) as messages FROM logs WHERE timestamp >= ? 
+            `SELECT hostname, COUNT(*) as messages FROM logs WHERE timestamp >= $1 
              GROUP BY hostname ORDER BY messages DESC LIMIT 5`,
             [cutoffDate]
         );
@@ -286,7 +286,7 @@ router.get('/ingestion/stats', async (req, res) => {
         // Calculate hourly distribution
         const hourlyResult = await dal.all(
             `SELECT EXTRACT(HOUR FROM timestamp) as hour, COUNT(*) as messages 
-             FROM logs WHERE timestamp >= ? GROUP BY hour ORDER BY hour`,
+             FROM logs WHERE timestamp >= $1 GROUP BY hour ORDER BY hour`,
             [cutoffDate]
         );
         

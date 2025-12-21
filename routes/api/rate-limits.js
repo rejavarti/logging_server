@@ -45,8 +45,8 @@ router.get('/rate-limits/stats', async (req, res) => {
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
         
         const [totalRow, uniqueIPRow] = await Promise.all([
-            dal.get(`SELECT COUNT(*) as count FROM activity_log WHERE created_at >= ?`, [oneDayAgo]),
-            dal.get(`SELECT COUNT(DISTINCT ip_address) as count FROM activity_log WHERE created_at >= ? AND ip_address IS NOT NULL`, [oneDayAgo])
+            dal.get(`SELECT COUNT(*) as count FROM activity_log WHERE created_at >= $1`, [oneDayAgo]),
+            dal.get(`SELECT COUNT(DISTINCT ip_address) as count FROM activity_log WHERE created_at >= $1 AND ip_address IS NOT NULL`, [oneDayAgo])
         ]);
 
         const stats = {

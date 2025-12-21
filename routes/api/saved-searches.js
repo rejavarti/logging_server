@@ -36,12 +36,12 @@ router.post('/saved-searches', async (req, res) => {
         }
         
         const result = await req.dal.run(
-            `INSERT INTO saved_searches (name, description, query_data, created_by) VALUES (?, ?, ?, ?)`,
+            `INSERT INTO saved_searches (name, description, query_data, created_by) VALUES ($1, $2, $3, $4)`,
             [name, description || null, queryData, userId]
         );
         
         const created = await req.dal.get(
-            `SELECT * FROM saved_searches WHERE id = ?`,
+            `SELECT * FROM saved_searches WHERE id = $1`,
             [result.lastID]
         );
         
@@ -67,23 +67,23 @@ router.put('/saved-searches/:id', async (req, res) => {
         const params = [];
         
         if (name !== undefined) {
-            updates.push('name = ?');
+            updates.push(`name = $${params.length + 1}`);
             params.push(name);
         }
         if (description !== undefined) {
-            updates.push('description = ?');
+            updates.push(`description = $${params.length + 1}`);
             params.push(description);
         }
         if (query !== undefined || filters !== undefined) {
             // Get current query_data to merge
-            const current = await req.dal.get(`SELECT query_data FROM saved_searches WHERE id = ?`, [id]);
+            const current = await req.dal.get(`SELECT query_data FROM saved_searches WHERE id = $1`, [id]);
             if (current) {
                 const currentData = JSON.parse(current.query_data);
                 const newData = {
                     query: query !== undefined ? query : currentData.query,
                     filters: filters !== undefined ? filters : currentData.filters
                 };
-                updates.push('query_data = ?');
+                updates.push(`query_data = $${params.length + 1}`);
                 params.push(JSON.stringify(newData));
             }
         }
@@ -96,7 +96,7 @@ router.put('/saved-searches/:id', async (req, res) => {
         params.push(id);
         
         const result = await req.dal.run(
-            `UPDATE saved_searches SET ${updates.join(', ')} WHERE id = ?`,
+            `UPDATE saved_searches SET ${updates.join(', ')} WHERE id = $${params.length}`,
             params
         );
         
@@ -104,7 +104,7 @@ router.put('/saved-searches/:id', async (req, res) => {
             return res.status(404).json({ success: false, error: 'Saved search not found' });
         }
         
-        const updated = await req.dal.get(`SELECT * FROM saved_searches WHERE id = ?`, [id]);
+        const updated = await req.dal.get(`SELECT * FROM saved_searches WHERE id = $1`, [id]);
         res.json({ success: true, search: updated });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Error updating saved search:', error);
@@ -121,7 +121,7 @@ router.delete('/saved-searches/:id', async (req, res) => {
             return res.status(500).json({ success: false, error: 'Database not available' });
         }
         
-        const result = await req.dal.run(`DELETE FROM saved_searches WHERE id = ?`, [id]);
+        const result = await req.dal.run(`DELETE FROM saved_searches WHERE id = $1`, [id]);
         
         if (result.changes === 0) {
             return res.status(404).json({ success: false, error: 'Saved search not found' });
@@ -144,7 +144,7 @@ router.post('/saved-searches/:id/use', async (req, res) => {
         }
         
         // Get the saved search
-        const search = await req.dal.get(`SELECT * FROM saved_searches WHERE id = ?`, [id]);
+        const search = await req.dal.get(`SELECT * FROM saved_searches WHERE id = $1`, [id]);
         if (!search) {
             return res.status(404).json({ success: false, error: 'Saved search not found' });
         }
@@ -157,25 +157,25 @@ router.post('/saved-searches/:id/use', async (req, res) => {
         const params = [];
         
         if (queryData.query) {
-            query += ` AND (message LIKE ? OR source LIKE ?)`;
+            query += ` AND (message LIKE $${params.length + 1} OR source LIKE $${params.length + 2})`;
             params.push(`%${queryData.query}%`, `%${queryData.query}%`);
         }
         
         if (queryData.filters) {
             if (queryData.filters.level) {
-                query += ` AND level = ?`;
+                query += ` AND level = $${params.length + 1}`;
                 params.push(queryData.filters.level);
             }
             if (queryData.filters.source) {
-                query += ` AND source = ?`;
+                query += ` AND source = $${params.length + 1}`;
                 params.push(queryData.filters.source);
             }
             if (queryData.filters.startDate) {
-                query += ` AND timestamp >= ?`;
+                query += ` AND timestamp >= $${params.length + 1}`;
                 params.push(queryData.filters.startDate);
             }
             if (queryData.filters.endDate) {
-                query += ` AND timestamp <= ?`;
+                query += ` AND timestamp <= $${params.length + 1}`;
                 params.push(queryData.filters.endDate);
             }
         }
@@ -186,7 +186,7 @@ router.post('/saved-searches/:id/use', async (req, res) => {
         
         // Update usage stats
         await req.dal.run(
-            `UPDATE saved_searches SET use_count = use_count + 1, last_used = CURRENT_TIMESTAMP WHERE id = ?`,
+            `UPDATE saved_searches SET use_count = use_count + 1, last_used = CURRENT_TIMESTAMP WHERE id = $1`,
             [id]
         );
         

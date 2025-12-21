@@ -136,13 +136,13 @@ router.post('/integrations', async (req, res) => {
         
         try {
             const healthExists = await req.dal.get(
-                `SELECT id FROM integration_health WHERE integration_name = ?`,
+                `SELECT id FROM integration_health WHERE integration_name = $1`,
                 [name.toLowerCase().replace(/\s+/g, '_')]
             );
             
             if (!healthExists) {
                 await req.dal.run(
-                    `INSERT INTO integration_health (integration_name, status, metadata) VALUES (?, ?, ?)`,
+                    `INSERT INTO integration_health (integration_name, status, metadata) VALUES ($1, $2, $3)`,
                     [
                         name.toLowerCase().replace(/\s+/g, '_'),
                         'unknown',
@@ -158,7 +158,7 @@ router.post('/integrations', async (req, res) => {
             req.app.locals?.loggers?.api?.error('Failed to create health entry:', healthError);
         }
         
-        const created = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [result.lastID]);
+        const created = await req.dal.get(`SELECT * FROM integrations WHERE id = $1`, [result.lastID]);
         res.json({ success: true, integration: parseConfigRow(created), message: 'Integration created successfully' });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Integration creation error:', error);
@@ -206,7 +206,7 @@ router.post('/integrations/custom', async (req, res) => {
         const { name, config } = req.body;
         if (!name) return res.status(400).json({ success: false, error: 'Name is required' });
         const result = await req.dal.createIntegration({ name, type: 'custom', config, enabled: true });
-        const created = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [result.lastID]);
+        const created = await req.dal.get(`SELECT * FROM integrations WHERE id = $1`, [result.lastID]);
         if (created && created.config) { try { created.config = JSON.parse(created.config); } catch (_) { created.config = {}; } }
         res.json({ success: true, integration: created });
     } catch (error) {
@@ -235,13 +235,13 @@ router.post('/integrations/configs', async (req, res) => {
                 config: normalizedSettings,
                 enabled: enabled === undefined ? true : !!enabled
             });
-            existing = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [createResult.lastID]);
+            existing = await req.dal.get(`SELECT * FROM integrations WHERE id = $1`, [createResult.lastID]);
         } else {
             await req.dal.updateIntegration(existing.id, {
                 config: normalizedSettings,
                 enabled: enabled === undefined ? existing.enabled : !!enabled
             });
-            existing = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [existing.id]);
+            existing = await req.dal.get(`SELECT * FROM integrations WHERE id = $1`, [existing.id]);
         }
         let parsedConfig = {};
         if (existing && existing.config) {
@@ -398,7 +398,7 @@ router.put('/integrations/custom/:id', async (req, res) => {
         if ((result?.changes || 0) === 0) {
             return res.status(404).json({ success: false, error: 'Integration not found' });
         }
-        const updated = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [id]);
+        const updated = await req.dal.get(`SELECT * FROM integrations WHERE id = $1`, [id]);
         if (updated && updated.config) { try { updated.config = JSON.parse(updated.config); } catch (_) { updated.config = {}; } }
         res.json({ success: true, integration: updated });
     } catch (error) {
@@ -524,7 +524,7 @@ router.put('/integrations/:id', async (req, res) => {
         if ((result?.changes || 0) === 0) {
             return res.status(404).json({ success: false, error: 'Integration not found' });
         }
-        const updated = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [id]);
+        const updated = await req.dal.get(`SELECT * FROM integrations WHERE id = $1`, [id]);
         res.json({ success: true, integration: parseConfigRow(updated) });
     } catch (error) {
         req.app.locals?.loggers?.api?.error('Integration update error:', error);
@@ -568,7 +568,7 @@ router.post('/integrations/:id/test', async (req, res) => {
     try {
         const { id } = req.params;
         if (!req.dal) return res.status(503).json({ success: false, error: 'Database not available' });
-        const row = await req.dal.get(`SELECT * FROM integrations WHERE id = ?`, [id]);
+        const row = await req.dal.get(`SELECT * FROM integrations WHERE id = $1`, [id]);
         if (!row) return res.status(404).json({ success: false, error: 'Integration not found' });
         const mgr = req.app.locals.getManagers?.()?.integrationManager;
         const status = mgr ? mgr.getStatus() : {};
@@ -602,7 +602,7 @@ router.get('/integrations/:name/history', async (req, res) => {
         const { limit = 50, offset = 0 } = req.query;
         if (!req.dal) return res.status(503).json({ success: false, error: 'Database not available' });
         const rows = await req.dal.all(
-            `SELECT id, timestamp, level, source, message FROM logs WHERE source = ? OR source LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?`,
+            `SELECT id, timestamp, level, source, message FROM logs WHERE source = $1 OR source LIKE $2 ORDER BY id DESC LIMIT $3 OFFSET $4`,
             [name, `${name}/%`, parseInt(limit), parseInt(offset)]
         );
         res.json({ success: true, history: rows, pagination: { limit: parseInt(limit), offset: parseInt(offset), total: rows.length } });

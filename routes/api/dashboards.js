@@ -231,7 +231,7 @@ router.get('/data/:widgetType', async (req, res) => {
                         AVG(CAST(SUBSTR(message, INSTR(message, ':') + 1) AS REAL)) as avg_value
                     FROM logs 
                     WHERE timestamp >= NOW() - INTERVAL '24 hours'
-                      AND message LIKE ?
+                      AND message LIKE $1
                     GROUP BY hour
                     ORDER BY hour DESC
                     LIMIT 24
