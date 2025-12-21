@@ -1131,7 +1131,7 @@ class DatabaseAccessLayer extends EventEmitter {
     // System metrics methods  
     async recordMetric(metricName, value, metricType = 'gauge', tags = {}) {
         const sql = `INSERT INTO system_metrics (metric_name, metric_value, metric_type, tags, timestamp) 
-                     VALUES (?, ?, ?, ?, datetime('now'))`;
+                     VALUES (?, ?, ?, ?, NOW())`;
         const params = [metricName, value, metricType, JSON.stringify(tags)];
         return await this.run(sql, params);
     }
@@ -1189,7 +1189,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async createWebhook(webhookData) {
         const sql = `INSERT INTO webhooks (name, url, method, headers, active, created_at) 
-                     VALUES (?, ?, ?, ?, ?, datetime('now'))`;
+                     VALUES (?, ?, ?, ?, ?, NOW())`;
         const params = [
             webhookData.name,
             webhookData.url,
@@ -1421,7 +1421,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async logActivity(activityData) {
         const sql = `INSERT INTO activity_log (user_id, action, resource_type, resource_id, 
                      details, ip_address, user_agent, timestamp) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`;
+                     VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`;
         
         // Handle details field - avoid double-stringifying
         let detailsValue = null;
@@ -1661,7 +1661,7 @@ class DatabaseAccessLayer extends EventEmitter {
             const sql = `
                 SELECT source, COUNT(*) as count, MAX(timestamp) as last_seen 
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+                WHERE timestamp >= (NOW() - INTERVAL '24 hours')
                 GROUP BY source 
                 ORDER BY count DESC
             `;
@@ -1713,7 +1713,7 @@ class DatabaseAccessLayer extends EventEmitter {
             const sql = `
                 SELECT message, COUNT(*) as count, MAX(timestamp) as last_seen
                 FROM logs 
-                WHERE level = 'error' AND timestamp >= datetime('now', '-24 hours')
+                WHERE level = 'error' AND timestamp >= (NOW() - INTERVAL '24 hours')
                 GROUP BY message 
                 ORDER BY count DESC 
                 LIMIT ?
@@ -1868,7 +1868,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async createSavedSearch(searchData) {
         try {
             const sql = `INSERT INTO saved_searches (user_id, name, query, filters, created_at) 
-                         VALUES (?, ?, ?, ?, datetime('now'))`;
+                         VALUES (?, ?, ?, ?, NOW())`;
             const params = [
                 searchData.user_id,
                 searchData.name,
@@ -1959,7 +1959,7 @@ class DatabaseAccessLayer extends EventEmitter {
             
             // Create new integration
             const sql = `INSERT INTO integrations (name, type, config, enabled, status, created_at) 
-                         VALUES (?, ?, ?, ?, ?, datetime('now'))`;
+                         VALUES (?, ?, ?, ?, ?, NOW())`;
             const params = [
                 integrationData.name,
                 integrationData.type,
@@ -2048,7 +2048,7 @@ class DatabaseAccessLayer extends EventEmitter {
             }
             const newEnabled = row.enabled ? 0 : 1;
             const newStatus = newEnabled ? 'enabled' : 'disabled';
-            await this.run(`UPDATE integrations SET enabled = ?, status = ?, updated_at = datetime('now') WHERE id = ?`, [newEnabled, newStatus, integrationId]);
+            await this.run(`UPDATE integrations SET enabled = ?, status = ?, updated_at = NOW() WHERE id = ?`, [newEnabled, newStatus, integrationId]);
             return { success: true, id: Number(integrationId), enabled: Boolean(newEnabled) };
         } catch (error) {
             this.logger.error('Failed to toggle integration:', error);
@@ -2392,7 +2392,7 @@ class DatabaseAccessLayer extends EventEmitter {
             if (existing) {
                 // Update existing
                 await this.run(
-                    `UPDATE encrypted_secrets SET encrypted_value = ?, updated_at = datetime('now'), metadata = ? WHERE key_name = ?`,
+                    `UPDATE encrypted_secrets SET encrypted_value = ?, updated_at = NOW(), metadata = ? WHERE key_name = ?`,
                     [encryptedValue, metadata ? JSON.stringify(metadata) : null, keyName]
                 );
             } else {
@@ -2419,7 +2419,7 @@ class DatabaseAccessLayer extends EventEmitter {
             if (result) {
                 // Update last_accessed timestamp
                 await this.run(
-                    `UPDATE encrypted_secrets SET last_accessed = datetime('now') WHERE key_name = ?`,
+                    `UPDATE encrypted_secrets SET last_accessed = NOW() WHERE key_name = ?`,
                     [keyName]
                 );
                 
@@ -2508,7 +2508,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async updateTransactionStatus(transaction_id, status, error_message = null) {
         try {
-            await this.run(`UPDATE transaction_log SET status = ?, error_message = ?, completed_at = datetime('now') WHERE transaction_id = ?`, [status, error_message, transaction_id]);
+            await this.run(`UPDATE transaction_log SET status = ?, error_message = ?, completed_at = NOW() WHERE transaction_id = ?`, [status, error_message, transaction_id]);
         } catch (error) {
             this.logger.error('Failed to update transaction status:', error);
         }

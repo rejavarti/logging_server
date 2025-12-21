@@ -810,7 +810,7 @@ class AnomalyDetectionEngine {
             const sourceCounts = await this.db.all(`
                 SELECT source, COUNT(*) as count
                 FROM logs 
-                WHERE timestamp > datetime('now', '-24 hours')
+                WHERE timestamp > NOW() - INTERVAL '24 hours'
                 GROUP BY source
             `);
 

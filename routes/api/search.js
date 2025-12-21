@@ -128,8 +128,9 @@ router.post('/query', async (req, res) => {
                     } else if (condition.range) {
                         const [field, range] = Object.entries(condition.range)[0];
                         if (range.gte) {
-                            sql += ` AND ${field} >= datetime(?)`;
-                            params.push(range.gte.replace('now', 'now'));
+                            // PostgreSQL: Direct timestamp comparison, no datetime() wrapper needed
+                            sql += ` AND ${field} >= ?`;
+                            params.push(range.gte);
                         }
                     } else if (condition.match) {
                         const [field, value] = Object.entries(condition.match)[0];
