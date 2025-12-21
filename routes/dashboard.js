@@ -1125,41 +1125,28 @@ router.get('/', async (req, res) => {
                 const elem = item.getElement();
                 const rect = elem.getBoundingClientRect();
 
-                // Use Muuri's internal _left/_top properties - these are the actual positions
-                // Muuri stores positions internally and updates them after drag release
-                let left = typeof item._left === 'number' ? item._left : 0;
-                let top = typeof item._top === 'number' ? item._top : 0;
+                // Parse CSS transform to get actual current position
+                // The transform is updated immediately during drag, even before Muuri updates internal properties
+                let left = 0;
+                let top = 0;
                 
-                // If internal properties are 0, try getPosition() as backup
-                if (left === 0 && top === 0) {
-                    const pos = item.getPosition();
-                    if (pos && (pos.left !== 0 || pos.top !== 0)) {
-                        left = pos.left;
-                        top = pos.top;
+                const computedTransform = window.getComputedStyle(elem).transform;
+                if (computedTransform && computedTransform !== 'none') {
+                    // matrix(a, b, c, d, tx, ty) - tx and ty are the translations
+                    const matrixMatch = computedTransform.match(/matrix\\(([^)]+)\\)/);
+                    if (matrixMatch) {
+                        const values = matrixMatch[1].split(',').map(v => parseFloat(v.trim()));
+                        if (values.length >= 6) {
+                            left = values[4];  // tx
+                            top = values[5];   // ty
+                        }
                     }
                 }
                 
-                // Last resort: parse CSS transform (ALWAYS check if still 0,0)
+                // Fallback to Muuri's internal properties if transform parsing failed
                 if (left === 0 && top === 0) {
-                    var styleTransform = window.getComputedStyle(elem).transform || elem.style.transform || '';
-                    if (styleTransform && styleTransform !== 'none') {
-                        // matrix(a, b, c, d, tx, ty) - tx and ty are at positions 5 and 6
-                        var matrixMatch = styleTransform.match(/matrix\\(([^)]+)\\)/);
-                        if (matrixMatch) {
-                            var values = matrixMatch[1].split(',').map(function(v) { return parseFloat(v.trim()); });
-                            if (values.length >= 6) {
-                                left = values[4];
-                                top = values[5];
-                            }
-                        } else {
-                            // Try translate format
-                            var translateMatch = styleTransform.match(/translate[^(]*\\(([^,]+),\\s*([^)]+)\\)/);
-                            if (translateMatch) {
-                                left = parseFloat(translateMatch[1]);
-                                top = parseFloat(translateMatch[2]);
-                            }
-                        }
-                    }
+                    left = typeof item._left === 'number' ? item._left : 0;
+                    top = typeof item._top === 'number' ? item._top : 0;
                 }
 
                 return {
