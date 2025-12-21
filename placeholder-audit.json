@@ -1,0 +1,138 @@
+{
+  "summary": {
+    "scannedFiles": 69,
+    "filesWithPlaceholders": 5,
+    "totalPlaceholders": 5,
+    "totalCodePlaceholders": 5,
+    "totalFormAttributePlaceholders": 0,
+    "totalCssPlaceholderSelectors": 0
+  },
+  "details": [
+    {
+      "file": "routes/dashboard.js",
+      "placeholderCount": 1,
+      "codePlaceholderCount": 1,
+      "formPlaceholderCount": 0,
+      "cssPlaceholderCount": 0,
+      "placeholders": [
+        {
+          "line": 2487,
+          "pattern": "no\\s+data\\s+available",
+          "text": "chart.innerHTML = '<div style=\"text-align: center; padding: 2rem; color: var(--text-muted);\">No data available</div>';",
+          "category": "code"
+        }
+      ],
+      "referencedEndpoints": [
+        "/api/alerts?status=active",
+        "/api/analytics/anomalies",
+        "/api/analytics/categories",
+        "/api/analytics/geolocation?limit=800",
+        "/api/analytics/heatmap/severity-time",
+        "/api/analytics/histogram/hourly?hours=24",
+        "/api/analytics/severities",
+        "/api/analytics/stats",
+        "/api/analytics/top-sources?limit=10",
+        "/api/analytics/top-sources?limit=15",
+        "/api/audit-trail?limit=20",
+        "/api/auth/logout",
+        "/api/backups",
+        "/api/bookmarks",
+        "/api/bookmarks/",
+        "/api/dashboard-data/all",
+        "/api/dashboard/positions",
+        "/api/integrations/status",
+        "/api/logs/count?level=error",
+        "/api/logs/export?format=",
+        "/api/logs/stats?period=24h",
+        "/api/logs/stats?period=24h&groupBy=hour",
+        "/api/logs/stats?period=24h&groupBy=hour&level=error",
+        "/api/logs/stats?period=24h&groupBy=level",
+        "/api/logs/stats?period=7d",
+        "/api/logs/stats?period=7d&groupBy=day",
+        "/api/logs?level=error&limit=10&groupBy=message",
+        "/api/logs?level=error&limit=20&sort=desc",
+        "/api/logs?limit=1",
+        "/api/logs?limit=100&sort=desc",
+        "/api/logs?limit=50",
+        "/api/logs?limit=50&sort=desc",
+        "/api/logs?limit=500&hours=24",
+        "/api/notes",
+        "/api/notes/",
+        "/api/saved-searches?limit=10",
+        "/api/settings",
+        "/api/system/health",
+        "/api/system/metrics",
+        "/api/users",
+        "/api/webhooks/test",
+        "/health"
+      ]
+    },
+    {
+      "file": "configs/templates/base.js",
+      "placeholderCount": 1,
+      "codePlaceholderCount": 1,
+      "formPlaceholderCount": 0,
+      "cssPlaceholderCount": 0,
+      "placeholders": [
+        {
+          "line": 2079,
+          "pattern": "coming\\s+soon",
+          "text": "message = message.replace(/\\b(mock|placeholder|not implemented|coming soon|todo)\\b/gi, 'feature unavailable');",
+          "category": "code"
+        }
+      ],
+      "referencedEndpoints": [
+        "/api/activity/latest",
+        "/api/auth/logout"
+      ]
+    },
+    {
+      "file": "public/vendor/chart.js/chart.umd.js",
+      "placeholderCount": 1,
+      "codePlaceholderCount": 1,
+      "formPlaceholderCount": 0,
+      "cssPlaceholderCount": 0,
+      "placeholders": [
+        {
+          "line": 13,
+          "pattern": "not\\s+implemented",
+          "text": "*/function _t(t){return t+.5|0}const yt=(t,e,i)=>Math.max(Math.min(t,i),e);function vt(t){return yt(_t(2.55*t),0,255)}function Mt(t){return yt(_t(255*t),0,255)}function wt(t){return yt(_t(t/2.55)/100,0,1)}function kt(t){return yt(_t(100*t),",
+          "category": "code"
+        }
+      ],
+      "referencedEndpoints": []
+    },
+    {
+      "file": "public/vendor/chart.js/chart.umd.min.js",
+      "placeholderCount": 1,
+      "codePlaceholderCount": 1,
+      "formPlaceholderCount": 0,
+      "cssPlaceholderCount": 0,
+      "placeholders": [
+        {
+          "line": 13,
+          "pattern": "not\\s+implemented",
+          "text": "*/function _t(t){return t+.5|0}const yt=(t,e,i)=>Math.max(Math.min(t,i),e);function vt(t){return yt(_t(2.55*t),0,255)}function Mt(t){return yt(_t(255*t),0,255)}function wt(t){return yt(_t(t/2.55)/100,0,1)}function kt(t){return yt(_t(100*t),",
+          "category": "code"
+        }
+      ],
+      "referencedEndpoints": []
+    },
+    {
+      "file": "public/vendor/echarts/echarts.min.js",
+      "placeholderCount": 1,
+      "codePlaceholderCount": 1,
+      "formPlaceholderCount": 0,
+      "cssPlaceholderCount": 0,
+      "placeholders": [
+        {
+          "line": 45,
+          "pattern": "not\\s+implemented",
+          "text": "var Fr={},Gr={};var Wr,Hr=function(){function t(t,e,n){var i=this;this._sleepAfterStill=10,this._stillFrameAccum=0,this._needsRefresh=!0,this._needsRefreshHover=!0,this._darkMode=!1,n=n||{},this.dom=e,this.id=t;var o=new rn,a=n.renderer||\"c",
+          "category": "code"
+        }
+      ],
+      "referencedEndpoints": []
+    }
+  ]
+}

@@ -525,7 +525,7 @@ class AnomalyDetectionEngine {
         const recentActivity = await this.db.get(`
             SELECT COUNT(*) as count 
             FROM logs 
-            WHERE source = ? AND timestamp > datetime('now', '-1 hour')
+            WHERE source = ? AND timestamp > NOW() - INTERVAL '1 hour'
         `, [source]);
 
         const expectedFrequency = sourcePattern.frequency_normal;
@@ -558,7 +558,7 @@ class AnomalyDetectionEngine {
         // Get recent similar messages for comparison
         const recentMessages = await this.db.all(`
             SELECT message FROM logs 
-            WHERE timestamp > datetime('now', '-1 hour')
+            WHERE timestamp > NOW() - INTERVAL '1 hour'
             ORDER BY timestamp DESC 
             LIMIT ?
         `, [params.pattern_window]);
@@ -591,7 +591,7 @@ class AnomalyDetectionEngine {
             SELECT COUNT(*) as count, 
                    strftime('%H', timestamp) as hour
             FROM logs 
-            WHERE timestamp > datetime('now', '-${params.min_history_days} days')
+            WHERE timestamp > NOW() - INTERVAL '\${params.min_history_days} days'
             GROUP BY strftime('%H', timestamp)
         `);
 
@@ -688,8 +688,8 @@ class AnomalyDetectionEngine {
                     SELECT COUNT(*) as hourly_count
                     FROM logs 
                     WHERE (severity = ? OR level = ?)
-                    AND timestamp > datetime('now', '-7 days')
-                    AND timestamp <= datetime('now', '-1 day')
+                    AND timestamp > NOW() - INTERVAL '7 days'
+                    AND timestamp <= NOW() - INTERVAL '1 day'
                     GROUP BY strftime('%Y-%m-%d %H', timestamp)
                 ) hourly_data
             `, [level, level]);
@@ -902,7 +902,7 @@ class AnomalyDetectionEngine {
                 FROM logs l
                 JOIN anomaly_detections ad ON l.id = ad.log_id
                 WHERE ad.false_positive = 0
-                AND ad.timestamp > datetime('now', '-30 days')
+                AND ad.timestamp > NOW() - INTERVAL '30 days'
                 LIMIT 500
             `);
 
@@ -911,7 +911,7 @@ class AnomalyDetectionEngine {
                 SELECT l.* FROM logs l
                 LEFT JOIN anomaly_detections ad ON l.id = ad.log_id
                 WHERE ad.id IS NULL
-                AND l.timestamp > datetime('now', '-7 days')
+                AND l.timestamp > NOW() - INTERVAL '7 days'
                 ORDER BY RANDOM()
                 LIMIT 1000
             `);
@@ -1076,13 +1076,13 @@ class AnomalyDetectionEngine {
             await this.db.run(`
                 DELETE FROM anomaly_detections 
                 WHERE resolved = 1 
-                AND resolved_at < datetime('now', '-90 days')
+                AND resolved_at < NOW() - INTERVAL '90 days'
             `);
 
             // Delete old training data (keep for 30 days)
             await this.db.run(`
                 DELETE FROM anomaly_training_data 
-                WHERE created_at < datetime('now', '-30 days')
+                WHERE created_at < NOW() - INTERVAL '30 days'
             `);
 
             this.loggers.system.info('Cleaned up old anomaly data');
@@ -1100,13 +1100,13 @@ class AnomalyDetectionEngine {
 
             const recentAnomalies = await this.db.get(`
                 SELECT COUNT(*) as count FROM anomaly_detections
-                WHERE timestamp > datetime('now', '-24 hours')
+                WHERE timestamp > NOW() - INTERVAL '24 hours'
             `);
 
             const anomaliesBySeverity = await this.db.all(`
                 SELECT severity, COUNT(*) as count
                 FROM anomaly_detections
-                WHERE timestamp > datetime('now', '-7 days')
+                WHERE timestamp > NOW() - INTERVAL '7 days'
                 GROUP BY severity
             `);
 

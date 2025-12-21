@@ -906,7 +906,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 MIN(timestamp) as first_seen,
                 MAX(timestamp) as last_seen
             FROM logs
-            WHERE timestamp >= datetime('now', 'localtime', '-' || ? || ' days')
+            WHERE timestamp >= NOW() - (? || ' days')::INTERVAL
             GROUP BY level
             ORDER BY count DESC
         `;
@@ -1015,7 +1015,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async setSetting(key, value, description = null) {
         try {
             const sql = `INSERT OR REPLACE INTO system_settings (setting_key, setting_value, description, updated_at) 
-                         VALUES (?, ?, ?, datetime('now'))`;
+                         VALUES (?, ?, ?, NOW())`;
             const result = await this.run(sql, [key, value, description]);
             return result.changes > 0 || result.lastID > 0;
         } catch (error) {
@@ -1066,7 +1066,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getActiveSession(sessionToken) {
-        const sql = `SELECT * FROM user_sessions WHERE session_token = ? AND expires_at > datetime('now')`;
+        const sql = `SELECT * FROM user_sessions WHERE session_token = ? AND expires_at > NOW()`;
         return await this.get(sql, [sessionToken]);
     }
 
@@ -1076,7 +1076,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async deactivateSession(sessionToken) {
-        const sql = `UPDATE user_sessions SET is_active = 0, last_activity = datetime('now') WHERE session_token = ?`;
+        const sql = `UPDATE user_sessions SET is_active = 0, last_activity = NOW() WHERE session_token = ?`;
         return await this.run(sql, [sessionToken]);
     }
 
@@ -1086,7 +1086,7 @@ class DatabaseAccessLayer extends EventEmitter {
         }
 
     async cleanExpiredSessions() {
-        const sql = `DELETE FROM user_sessions WHERE expires_at <= datetime('now')`;
+        const sql = `DELETE FROM user_sessions WHERE expires_at <= NOW()`;
         return await this.run(sql);
     }
 
@@ -1265,7 +1265,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 return { success: false, error: 'Webhook not found', id: Number(webhookId), enabled: false };
             }
             const newActive = row.active ? 0 : 1;
-            await this.run(`UPDATE webhooks SET active = ?, updated_at = datetime('now') WHERE id = ?`, [newActive, webhookId]);
+            await this.run(`UPDATE webhooks SET active = ?, updated_at = NOW() WHERE id = ?`, [newActive, webhookId]);
             return { success: true, id: Number(webhookId), enabled: Boolean(newActive) };
         } catch (error) {
             this.logger.error('Failed to toggle webhook:', error);
@@ -1317,7 +1317,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
                 // Update last_tested
                 await this.run(
-                    `UPDATE webhooks SET last_tested = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+                    `UPDATE webhooks SET last_tested = NOW(), updated_at = NOW() WHERE id = ?`,
                     [webhookId]
                 );
 
@@ -1497,15 +1497,15 @@ class DatabaseAccessLayer extends EventEmitter {
                     SUM(CASE WHEN level = 'info' THEN 1 ELSE 0 END) as infoCount,
                     SUM(CASE WHEN level = 'debug' THEN 1 ELSE 0 END) as debugCount
                 FROM logs 
-                WHERE timestamp >= datetime('now', 'localtime', '-24 hours')
+                WHERE timestamp >= NOW() - INTERVAL '24 hours'
             `;
             const result = await this.get(sql);
             
-            // Get today's logs using localtime timezone conversion
+            // Get today's logs
             const todaySQL = `
                 SELECT COUNT(*) as count
                 FROM logs
-                WHERE date(timestamp, 'localtime') = date('now', 'localtime')
+                WHERE DATE(timestamp) = CURRENT_DATE
             `;
             const todayResult = await this.get(todaySQL);
             

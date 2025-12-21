@@ -612,13 +612,13 @@ class RealTimeStreamingEngine {
             // Delete sessions older than 30 days
             await this.dal.run(`
                 DELETE FROM streaming_sessions 
-                WHERE connected_at < datetime('now', '-30 days')
+                WHERE connected_at < NOW() - INTERVAL '30 days'
             `);
 
             // Delete old statistics older than 7 days
             await this.dal.run(`
                 DELETE FROM streaming_statistics 
-                WHERE timestamp < datetime('now', '-7 days')
+                WHERE timestamp < NOW() - INTERVAL '7 days'
             `);
 
             this.loggers.system.info('Cleaned up old streaming sessions and statistics');
@@ -672,7 +672,7 @@ class RealTimeStreamingEngine {
 
             const recentStats = await this.dal.all(`
                 SELECT * FROM streaming_statistics 
-                WHERE timestamp > datetime('now', '-24 hours')
+                WHERE timestamp > NOW() - INTERVAL '24 hours'
                 ORDER BY timestamp DESC
                 LIMIT 100
             `);

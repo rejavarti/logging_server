@@ -567,4 +567,60 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+/**
+ * GET /api/logs/geolocation - Get geolocation data from logs
+ * Used by geolocation map widget
+ */
+router.get('/geolocation', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 500;
+        
+        // Get logs with geolocation data in metadata
+        const geoLogs = await req.dal.all(`
+            SELECT 
+                source,
+                metadata,
+                ip,
+                COUNT(*) as count
+            FROM logs 
+            WHERE (metadata::text LIKE '%latitude%' OR metadata::text LIKE '%longitude%')
+              AND timestamp >= NOW() - INTERVAL '7 days'
+            GROUP BY source, metadata, ip
+            LIMIT $1
+        `, [limit]) || [];
+        
+        // Parse geolocation data
+        const locations = [];
+        for (const log of geoLogs) {
+            try {
+                const meta = typeof log.metadata === 'string' 
+                    ? JSON.parse(log.metadata) 
+                    : log.metadata;
+                
+                if (meta && (meta.latitude || meta.lat) && (meta.longitude || meta.lon || meta.lng)) {
+                    locations.push({
+                        source: log.source,
+                        lat: meta.latitude || meta.lat,
+                        lon: meta.longitude || meta.lon || meta.lng,
+                        count: log.count,
+                        ip: log.ip || meta.ip || 'Unknown'
+                    });
+                }
+            } catch (e) {
+                // Skip invalid metadata
+            }
+        }
+        
+        res.json({ 
+            success: true, 
+            locations,
+            totalLogs: geoLogs.length,
+            message: locations.length === 0 ? 'No geolocation data found in logs' : undefined
+        });
+    } catch (error) {
+        req.app.locals?.loggers?.api?.error('Error getting geolocation data:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 module.exports = router;
