@@ -5,8 +5,8 @@
 # syntax=docker/dockerfile:1
 FROM node:18-alpine AS builder
 
-# Install build dependencies in smaller chunks to avoid BAD archive issues
-RUN apk add --no-cache python3 py3-setuptools sqlite && \
+# Install build dependencies (PostgreSQL only - no SQLite needed)
+RUN apk add --no-cache python3 py3-setuptools && \
     apk add --no-cache build-base || \
     (echo 'Retrying build-base install' && apk update && apk add --no-cache build-base)
 
@@ -53,8 +53,8 @@ RUN rm -rf .git .gitignore README.md *.md 2>/dev/null || true
 # Production stage
 FROM node:18-alpine AS production
 
-# Install runtime dependencies including PM2
-RUN apk add --no-cache sqlite tzdata tini && \
+# Install runtime dependencies including PM2 (PostgreSQL only - no SQLite needed)
+RUN apk add --no-cache tzdata tini && \
     npm install -g pm2@latest
 
 # Set timezone to Mountain Time
