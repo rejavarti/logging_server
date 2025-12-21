@@ -99,7 +99,7 @@ class LogCorrelationEngine {
         try {
             await this.db.run(`
                 INSERT INTO log_correlations (rule_id, rule_name, event_count, severity, detected_at, events_json)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES ($1, $2, $3, $4, $5, $6)
             `, [
                 correlation.rule.id,
                 correlation.rule.name,

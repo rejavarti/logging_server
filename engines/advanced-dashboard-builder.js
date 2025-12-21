@@ -63,7 +63,7 @@ class AdvancedDashboardBuilder {
             const tables = ['dashboards', 'dashboard_widgets', 'widget_templates'];
             
             for (const table of tables) {
-                const exists = await this.dal.get(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, [table]);
+                const exists = await this.dal.get(`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename = $1`, [table]);
                 if (!exists) {
                     this.loggers.system.warn(`Table ${table} does not exist, it should be created by database migration`);
                 }
@@ -186,11 +186,11 @@ class AdvancedDashboardBuilder {
 
         try {
             for (const template of defaultTemplates) {
-                const existing = await this.dal.get('SELECT id FROM widget_templates WHERE id = ?', [template.id]);
+                const existing = await this.dal.get('SELECT id FROM widget_templates WHERE id = $1', [template.id]);
                 
                 if (!existing) {
                     await this.dal.run(
-                        'INSERT INTO widget_templates (id, name, description, widget_type, default_config, category, is_system) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        'INSERT INTO widget_templates (id, name, description, widget_type, default_config, category, is_system) VALUES ($1, $2, $3, $4, $5, $6, $7)',
                         [template.id, template.name, template.description, template.type, template.template, 'system', 1]
                     );
                 }
@@ -214,7 +214,7 @@ class AdvancedDashboardBuilder {
             const result = await this.dal.run(`
                 INSERT INTO dashboards 
                 (id, name, description, configuration, user_id, is_public, created_at, updated_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             `, [
                 dashboardId,
                 dashboardData.name,
@@ -250,8 +250,8 @@ class AdvancedDashboardBuilder {
             
             await this.dal.run(`
                 UPDATE dashboards 
-                SET name = ?, description = ?, configuration = ?, updated_at = ?
-                WHERE id = ? AND user_id = ?
+                SET name = $1, description = $2, configuration = $3, updated_at = $4
+                WHERE id = $5 AND user_id = $6
             `, [
                 updates.name,
                 updates.description || '',
@@ -279,10 +279,10 @@ class AdvancedDashboardBuilder {
     async deleteDashboard(dashboardId, userId) {
         try {
             // Delete widgets first
-            await this.dal.run('DELETE FROM dashboard_widgets WHERE dashboard_id = ?', [dashboardId]);
+            await this.dal.run('DELETE FROM dashboard_widgets WHERE dashboard_id = $1', [dashboardId]);
             
             // Delete dashboard
-            await this.dal.run('DELETE FROM dashboards WHERE id = ? AND user_id = ?', [dashboardId, userId]);
+            await this.dal.run('DELETE FROM dashboards WHERE id = $1 AND user_id = $2', [dashboardId, userId]);
 
             // Update local cache
             this.dashboards.delete(dashboardId);
@@ -299,13 +299,13 @@ class AdvancedDashboardBuilder {
 
     async getDashboard(dashboardId) {
         try {
-            const dashboard = await this.dal.get('SELECT * FROM dashboards WHERE id = ?', [dashboardId]);
+            const dashboard = await this.dal.get('SELECT * FROM dashboards WHERE id = $1', [dashboardId]);
             
             if (!dashboard) {
                 return { success: false, error: 'Dashboard not found' };
             }
 
-            const widgets = await this.dal.all('SELECT * FROM dashboard_widgets WHERE dashboard_id = ?', [dashboardId]);
+            const widgets = await this.dal.all('SELECT * FROM dashboard_widgets WHERE dashboard_id = $1', [dashboardId]);
 
             return {
                 success: true,
@@ -328,7 +328,7 @@ class AdvancedDashboardBuilder {
     async getUserDashboards(userId) {
         try {
             const dashboards = await this.dal.all(
-                'SELECT * FROM dashboards WHERE user_id = ? OR is_public = true ORDER BY created_at DESC', 
+                'SELECT * FROM dashboards WHERE user_id = $1 OR is_public = true ORDER BY created_at DESC', 
                 [userId]
             );
 
@@ -352,7 +352,7 @@ class AdvancedDashboardBuilder {
             await this.dal.run(`
                 INSERT INTO dashboard_widgets 
                 (id, dashboard_id, name, type, configuration, position, created_at, updated_at) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             `, [
                 widgetId,
                 dashboardId,
@@ -379,8 +379,8 @@ class AdvancedDashboardBuilder {
 
             await this.dal.run(`
                 UPDATE dashboard_widgets 
-                SET name = ?, configuration = ?, position = ?, updated_at = ?
-                WHERE id = ?
+                SET name = $1, configuration = $2, position = $3, updated_at = $4
+                WHERE id = $5
             `, [
                 updates.name,
                 JSON.stringify(updates.configuration || {}),
@@ -399,7 +399,7 @@ class AdvancedDashboardBuilder {
 
     async deleteWidget(widgetId) {
         try {
-            await this.dal.run('DELETE FROM dashboard_widgets WHERE id = ?', [widgetId]);
+            await this.dal.run('DELETE FROM dashboard_widgets WHERE id = $1', [widgetId]);
             return { success: true };
             
         } catch (error) {

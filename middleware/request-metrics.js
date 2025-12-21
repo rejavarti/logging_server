@@ -37,7 +37,7 @@ const metricsMiddleware = (dal) => {
                         const maybePromise = activeDal.run(
                             `INSERT INTO request_metrics 
                              (endpoint, method, status_code, response_time_ms, user_id, ip_address, user_agent, timestamp)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                             VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
                             [
                                 req.path,
                                 req.method,
@@ -64,7 +64,7 @@ const metricsMiddleware = (dal) => {
                             await activeDal.run(
                                 `INSERT INTO request_metrics 
                                  (endpoint, method, status_code, response_time_ms, user_id, ip_address, user_agent, timestamp)
-                                 VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+                                 VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
                                 [
                                     req.path,
                                     req.method,

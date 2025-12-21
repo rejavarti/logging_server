@@ -221,7 +221,7 @@ class RealTimeStreamingEngine {
             await this.dal.run(`
                 INSERT INTO streaming_sessions (
                     client_id, ip_address, user_agent, connected_at
-                ) VALUES (?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4)
             `, [clientData.id, clientData.ip, clientData.userAgent, clientData.connectedAt.toISOString()]);
         } catch (error) {
             this.loggers.system.error('Failed to create streaming session:', error);
@@ -368,12 +368,12 @@ class RealTimeStreamingEngine {
         try {
             await this.dal.run(`
                 UPDATE streaming_sessions 
-                SET disconnected_at = ?, 
-                    duration_seconds = ?,
-                    messages_sent = ?,
-                    bytes_sent = ?,
+                SET disconnected_at = $1, 
+                    duration_seconds = $2,
+                    messages_sent = $3,
+                    bytes_sent = $4,
                     status = 'disconnected'
-                WHERE client_id = ?
+                WHERE client_id = $5
             `, [
                 disconnectedAt.toISOString(),
                 duration,
@@ -637,7 +637,7 @@ class RealTimeStreamingEngine {
             await this.dal.run(`
                 INSERT INTO streaming_statistics (
                     connected_clients, messages_per_second, bytes_per_second
-                ) VALUES (?, ?, ?)
+                ) VALUES ($1, $2, $3)
             `, [connectedClients, messagesPerSecond, bytesPerSecond]);
 
             // Reset counters for next interval
@@ -706,7 +706,7 @@ class RealTimeStreamingEngine {
             const result = await this.dal.run(`
                 INSERT INTO streaming_filters (
                     name, description, filter_criteria, created_by, is_public
-                ) VALUES (?, ?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4, $5)
             `, [
                 filterData.name,
                 filterData.description,

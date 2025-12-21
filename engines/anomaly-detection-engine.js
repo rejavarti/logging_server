@@ -317,7 +317,7 @@ class AnomalyDetectionEngine {
                 await this.db.run(`
                     INSERT INTO anomaly_rules (
                         name, description, rule_type, parameters, confidence_threshold
-                    ) VALUES (?, ?, ?, ?, ?)
+                    ) VALUES ($1, $2, $3, $4, $5)
                 `, [
                     rule.name,
                     rule.description,
@@ -469,7 +469,7 @@ class AnomalyDetectionEngine {
         const recentCount = await this.db.get(`
             SELECT COUNT(*) as count 
             FROM logs 
-            WHERE timestamp > ? AND (severity = ? OR level = ?)
+            WHERE timestamp > $1 AND (severity = $2 OR level = $3)
         `, [cutoffTime.toISOString(), params.log_level, params.log_level]);
 
         if (recentCount.count < params.minimum_count) {
@@ -511,7 +511,7 @@ class AnomalyDetectionEngine {
             await this.db.run(`
                 INSERT INTO anomaly_patterns (
                     pattern_type, pattern_signature, frequency_normal
-                ) VALUES (?, ?, ?)
+                ) VALUES ($1, $2, $3)
             `, ['source', source, 1]);
 
             return {
@@ -525,7 +525,7 @@ class AnomalyDetectionEngine {
         const recentActivity = await this.db.get(`
             SELECT COUNT(*) as count 
             FROM logs 
-            WHERE source = ? AND timestamp > NOW() - INTERVAL '1 hour'
+            WHERE source = $1 AND timestamp > NOW() - INTERVAL '1 hour'
         `, [source]);
 
         const expectedFrequency = sourcePattern.frequency_normal;
@@ -560,7 +560,7 @@ class AnomalyDetectionEngine {
             SELECT message FROM logs 
             WHERE timestamp > NOW() - INTERVAL '1 hour'
             ORDER BY timestamp DESC 
-            LIMIT ?
+            LIMIT $1
         `, [params.pattern_window]);
 
         // Calculate similarity scores
@@ -711,7 +711,7 @@ class AnomalyDetectionEngine {
                 INSERT INTO anomaly_detections (
                     log_id, anomaly_type, severity, confidence_score,
                     description, pattern_data, context_data
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7)
             `, [
                 logEvent.id,
                 anomalyResult.rule.rule_type,
@@ -819,7 +819,7 @@ class AnomalyDetectionEngine {
                     INSERT INTO anomaly_patterns (
                         pattern_type, pattern_signature, frequency_normal, 
                         last_seen, occurrence_count, is_baseline
-                    ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 1)
+                    ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, 1)
                     ON CONFLICT (pattern_type, pattern_signature) DO UPDATE SET
                         frequency_normal = EXCLUDED.frequency_normal,
                         last_seen = CURRENT_TIMESTAMP,
@@ -840,7 +840,7 @@ class AnomalyDetectionEngine {
                     INSERT INTO anomaly_patterns (
                         pattern_type, pattern_signature, frequency_normal,
                         last_seen, occurrence_count, is_baseline
-                    ) VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, 1)
+                    ) VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, 1)
                     ON CONFLICT (pattern_type, pattern_signature) DO UPDATE SET
                         frequency_normal = EXCLUDED.frequency_normal,
                         last_seen = CURRENT_TIMESTAMP,
@@ -1060,7 +1060,7 @@ class AnomalyDetectionEngine {
             await this.db.run(`
                 INSERT INTO anomaly_models (
                     model_name, model_type, model_data, accuracy_score, validation_score
-                ) VALUES (?, ?, ?, ?, ?)
+                ) VALUES ($1, $2, $3, $4, $5)
                 ON CONFLICT (model_name) DO UPDATE SET
                     model_type = EXCLUDED.model_type,
                     model_data = EXCLUDED.model_data,

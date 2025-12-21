@@ -162,7 +162,7 @@ class DataRetentionEngine {
                         INSERT INTO retention_policies (
                             name, description, target_table, retention_days,
                             archive_enabled, compression_enabled, delete_after_archive
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
                     `, [
                         policy.name, policy.description, policy.target_table, 
                         policy.retention_days, policy.archive_enabled, 

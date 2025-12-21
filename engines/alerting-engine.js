@@ -270,7 +270,7 @@ class AlertingEngine {
                             INSERT INTO alert_rules (
                                 name, description, type, conditions, actions, channels, severity, 
                                 enabled, cooldown, escalation_rules, created_by, trigger_count
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                         `;
                         
                         // Create default actions from channels
@@ -397,7 +397,7 @@ class AlertingEngine {
         this.db.run(`
             INSERT INTO notification_channels 
             (id, name, type, config, enabled, rate_limit) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4, $5, $6)
             ON CONFLICT (id) DO UPDATE SET
                 name = EXCLUDED.name,
                 type = EXCLUDED.type,
@@ -596,7 +596,7 @@ class AlertingEngine {
             INSERT INTO alert_history (
                 id, rule_id, rule_name, severity, status, message, 
                 log_event_data, channels_notified, triggered_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
         `, [
             alert.id,
             alert.ruleId,
@@ -612,8 +612,8 @@ class AlertingEngine {
     async updateAlertNotificationResults(alertId, results) {
         this.db.run(`
             UPDATE alert_history 
-            SET notification_results = ? 
-            WHERE id = ?
+            SET notification_results = $1 
+            WHERE id = $2
         `, [JSON.stringify(results), alertId]);
     }
 
@@ -691,8 +691,8 @@ class AlertingEngine {
 
     async updateChannelUsage(channelId, success) {
         const updateQuery = success 
-            ? 'UPDATE notification_channels SET last_used = CURRENT_TIMESTAMP, usage_count = usage_count + 1 WHERE id = ?'
-            : 'UPDATE notification_channels SET failure_count = failure_count + 1 WHERE id = ?';
+            ? 'UPDATE notification_channels SET last_used = CURRENT_TIMESTAMP, usage_count = usage_count + 1 WHERE id = $1'
+            : 'UPDATE notification_channels SET failure_count = failure_count + 1 WHERE id = $1';
         
         this.db.run(updateQuery, [channelId]);
         
@@ -841,9 +841,9 @@ Details:
         // Update in database
         this.db.run(`
             UPDATE alert_rules 
-            SET name = ?, description = ?, type = ?, condition = ?, channels = ?, 
-                severity = ?, enabled = ?, cooldown = ?, escalation_rules = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+            SET name = $1, description = $2, type = $3, condition = $4, channels = $5, 
+                severity = $6, enabled = $7, cooldown = $8, escalation_rules = $9, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $10
         `, [
             rule.name,
             rule.description || '',
@@ -885,7 +885,7 @@ Details:
                 query += ' WHERE ' + conditions.join(' AND ');
             }
 
-            query += ' ORDER BY triggered_at DESC LIMIT ?';
+            query += ' ORDER BY triggered_at DESC LIMIT $' + (params.length + 1);
             params.push(limit);
 
             this.db.all(query, params, (err, rows) => {
@@ -967,7 +967,7 @@ Details:
                 await this.dal.run(`
                     INSERT INTO alert_escalations 
                     (id, alert_id, level, channels, next_escalation_at) 
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES ($1, $2, $3, $4, $5)
                 `, [
                     escalationId,
                     alertId,
@@ -1027,8 +1027,8 @@ Details:
             // Update alert escalation level
             await this.dal.run(`
                 UPDATE alert_history 
-                SET escalated_at = CURRENT_TIMESTAMP, escalation_level = ? 
-                WHERE id = ?
+                SET escalated_at = CURRENT_TIMESTAMP, escalation_level = $1 
+                WHERE id = $2
             `, [level, alertId]);
             
         } catch (error) {
@@ -1038,7 +1038,7 @@ Details:
 
     async getAlertById(alertId) {
         try {
-            const row = await this.dal.get('SELECT * FROM alert_history WHERE id = ?', [alertId]);
+            const row = await this.dal.get('SELECT * FROM alert_history WHERE id = $1', [alertId]);
             
             if (row) {
                 return {
@@ -1064,7 +1064,7 @@ Details:
             await this.dal.run(`
                 UPDATE alert_history 
                 SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP 
-                WHERE id = ? AND status != 'resolved'
+                WHERE id = $1 AND status != 'resolved'
             `, [alertId]);
             
             this.loggers.system.info(`✅ Resolved alert ${alertId} by ${resolvedBy}`);

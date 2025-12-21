@@ -862,7 +862,7 @@ async function migrateIntegrationSecretsToDatabase() {
 async function initializeDefaultAdmin() {
     try {
         // Check if admin user exists
-        const existingAdmin = await dal.get('SELECT id FROM users WHERE username = ?', ['admin']);
+        const existingAdmin = await dal.get('SELECT id FROM users WHERE username = $1', ['admin']);
         
         if (!existingAdmin) {
             // Require AUTH_PASSWORD from environment for security
@@ -949,7 +949,7 @@ async function initializeSystemComponents() {
             // Update session last_activity (use explicit UTC time)
             const utcNow = moment.utc().format('YYYY-MM-DD HH:mm:ss');
             dal.run(
-                `UPDATE user_sessions SET last_activity = ? WHERE session_token = ?`,
+                `UPDATE user_sessions SET last_activity = $1 WHERE session_token = $2`,
                 [utcNow, token],
                 (err) => {
                     if (err) loggers.system.error('Failed to update session activity:', err);
