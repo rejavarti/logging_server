@@ -203,6 +203,15 @@ function initializeGrid() {
     
     grid.on('dragEnd', function(item) {
         console.log('🔴 dragEnd event fired for', item.getElement().getAttribute('data-widget-id'));
+        // Auto-save on dragEnd since dragReleaseEnd isn't firing
+        if (!isLocked) {
+            setTimeout(function() {
+                console.log('⏱️ Calling autoSaveLayout after dragEnd (50ms delay)');
+                autoSaveLayout();
+            }, 50);
+        } else {
+            console.log('🔒 Layout is locked, skipping auto-save');
+        }
     });
     
     grid.on('dragReleaseStart', function(item) {
@@ -211,14 +220,6 @@ function initializeGrid() {
     
     grid.on('dragReleaseEnd', function(item) {
         console.log('🎯 dragReleaseEnd event fired for', item.getElement().getAttribute('data-widget-id'), 'isLocked:', isLocked);
-        if (!isLocked) {
-            setTimeout(function() {
-                console.log('⏱️ Calling autoSaveLayout after 50ms delay');
-                autoSaveLayout();
-            }, 50);
-        } else {
-            console.log('🔒 Layout is locked, skipping auto-save');
-        }
     });
     
     console.log('✅ [5] Grid initialization completed successfully');
