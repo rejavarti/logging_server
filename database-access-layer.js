@@ -124,7 +124,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 const tags = this._serializeTags(e);
                 try {
                     await this.db.run(
-                        `INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                        `INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                         [
                             e.timestamp || new Date().toISOString(),
                             e.level || 'info',
@@ -505,12 +505,12 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getUserById(userId) {
-        const sql = `SELECT * FROM users WHERE id = ?`;
+        const sql = `SELECT * FROM users WHERE id = $1`;
         return await this.get(sql, [userId]);
     }
 
     async getUserByUsername(username) {
-        const sql = `SELECT * FROM users WHERE username = ?`;
+        const sql = `SELECT * FROM users WHERE username = $1`;
         return await this.get(sql, [username]);
     }
 
@@ -530,13 +530,13 @@ class DatabaseAccessLayer extends EventEmitter {
         
         const values = fields.map(field => updates[field]);
         // PostgreSQL uses unquoted identifiers (or double quotes if needed)
-        const setClause = fields.map(field => `${field} = ?`).join(', ');
-        const sql = `UPDATE users SET ${setClause} WHERE id = ?`;
+        const setClause = fields.map((field, idx) => `${field} = $${idx + 1}`).join(', ');
+        const sql = `UPDATE users SET ${setClause} WHERE id = $${fields.length + 1}`;
         return await this.run(sql, [...values, userId]);
     }
 
     async deleteUser(userId) {
-        const sql = `DELETE FROM users WHERE id = ?`;
+        const sql = `DELETE FROM users WHERE id = $1`;
         return await this.run(sql, [userId]);
     }
 
@@ -568,9 +568,9 @@ class DatabaseAccessLayer extends EventEmitter {
     async updateRole(roleId, updates) {
         const fields = [];
         const values = [];
-        if (updates.name) { fields.push('name = ?'); values.push(updates.name); }
-        if (updates.description !== undefined) { fields.push('description = ?'); values.push(updates.description); }
-        if (updates.permissions) { fields.push('permissions = ?'); values.push(JSON.stringify(updates.permissions)); }
+        if (updates.name) { fields.push(`name = $${values.length + 1}`); values.push(updates.name); }
+        if (updates.description !== undefined) { fields.push(`description = $${values.length + 1}`); values.push(updates.description); }
+        if (updates.permissions) { fields.push(`permissions = $${values.length + 1}`); values.push(JSON.stringify(updates.permissions)); }
         if (!fields.length) throw new Error('No valid role fields to update');
         const sql = `UPDATE roles SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${values.length + 1}`;
         values.push(roleId);
@@ -578,7 +578,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async deleteRole(roleId) {
-        const sql = `DELETE FROM roles WHERE id = ?`;
+        const sql = `DELETE FROM roles WHERE id = $1`;
         return await this.run(sql, [roleId]);
     }
 
@@ -618,7 +618,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
             // PostgreSQL async insert
             const result = await this.db.run(
-                `INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO logs (timestamp, level, source, message, metadata, ip, user_id, tags) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                 [
                     entry.timestamp || new Date().toISOString(),
                     entry.level || 'info',
@@ -679,7 +679,7 @@ class DatabaseAccessLayer extends EventEmitter {
     // Integration docs methods
     async getIntegrationDoc(type) {
         try {
-            const sql = `SELECT type, doc, updated_at FROM integration_docs WHERE type = ?`;
+            const sql = `SELECT type, doc, updated_at FROM integration_docs WHERE type = $1`;
             return await this.get(sql, [type]);
         } catch (error) {
             this.logger.warn('Failed to get integration doc:', error.message);
@@ -705,7 +705,7 @@ class DatabaseAccessLayer extends EventEmitter {
     // File ingestion offset persistence
     async getFileOffset(filePath) {
         try {
-            const sql = `SELECT file_path, last_offset FROM file_ingestion_offsets WHERE file_path = ?`;
+            const sql = `SELECT file_path, last_offset FROM file_ingestion_offsets WHERE file_path = $1`;
             return await this.get(sql, [filePath]);
         } catch (error) {
             this.logger.warn('Failed to get file offset:', error.message);
@@ -740,7 +740,7 @@ class DatabaseAccessLayer extends EventEmitter {
         try {
             // Only return unacknowledged notifications - acknowledged ones are "cleared"
             // Order by created_at DESC, then id DESC for deterministic ordering when timestamps are equal
-            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors WHERE acknowledged = FALSE ORDER BY created_at DESC, id DESC LIMIT ?`;
+            const sql = `SELECT id, source, file_path, line_number, line_snippet, reason, created_at, acknowledged FROM parse_errors WHERE acknowledged = FALSE ORDER BY created_at DESC, id DESC LIMIT $1`;
             return await this.all(sql, [limit]);
         } catch (error) {
             this.logger.warn('Failed to get recent parse errors:', error.message);
@@ -760,7 +760,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async acknowledgeParseError(id) {
         try {
-            const sql = `UPDATE parse_errors SET acknowledged = TRUE WHERE id = ? AND acknowledged = FALSE`;
+            const sql = `UPDATE parse_errors SET acknowledged = TRUE WHERE id = $1 AND acknowledged = FALSE`;
             return await this.run(sql, [id]);
         } catch (error) {
             this.logger.warn('Failed to acknowledge parse error:', error.message);
@@ -774,31 +774,31 @@ class DatabaseAccessLayer extends EventEmitter {
         const params = [];
         
         if (filters.level) {
-            sql += ` AND level = ?`;
+            sql += ` AND level = $${params.length + 1}`;
             params.push(filters.level);
         }
         
         if (filters.source) {
-            sql += ` AND source = ?`;
+            sql += ` AND source = $${params.length + 1}`;
             params.push(filters.source);
         }
         
         if (filters.device_id) {
-            sql += ` AND device_id = ?`;
+            sql += ` AND device_id = $${params.length + 1}`;
             params.push(filters.device_id);
         }
         
         if (filters.start_date) {
-            sql += ` AND timestamp >= ?`;
+            sql += ` AND timestamp >= $${params.length + 1}`;
             params.push(filters.start_date);
         }
         
         if (filters.end_date) {
-            sql += ` AND timestamp <= ?`;
+            sql += ` AND timestamp <= $${params.length + 1}`;
             params.push(filters.end_date);
         }
         
-        sql += ` ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
+        sql += ` ORDER BY timestamp DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
         params.push(limit, offset);
         
         return await this.all(sql, params);
@@ -809,28 +809,28 @@ class DatabaseAccessLayer extends EventEmitter {
         const params = [];
         
         if (filters.level) {
-            sql += ` AND level = ?`;
+            sql += ` AND level = $${params.length + 1}`;
             params.push(filters.level);
         }
         
         if (filters.source) {
-            sql += ` AND source = ?`;
+            sql += ` AND source = $${params.length + 1}`;
             params.push(filters.source);
         }
         
         if (filters.device_id) {
-            sql += ` AND device_id = ?`;
+            sql += ` AND device_id = $${params.length + 1}`;
             params.push(filters.device_id);
         }
         
         // Support date range filtering for analytics
         if (filters.start_date) {
-            sql += ` AND date(timestamp) >= date(?)`;
+            sql += ` AND date(timestamp) >= date($${params.length + 1})`;
             params.push(filters.start_date);
         }
         
         if (filters.end_date) {
-            sql += ` AND date(timestamp) <= date(?)`;
+            sql += ` AND date(timestamp) <= date($${params.length + 1})`;
             params.push(filters.end_date);
         }
         
@@ -906,7 +906,7 @@ class DatabaseAccessLayer extends EventEmitter {
                 MIN(timestamp) as first_seen,
                 MAX(timestamp) as last_seen
             FROM logs
-            WHERE timestamp >= NOW() - (? || ' days')::INTERVAL
+            WHERE timestamp >= NOW() - ($1 || ' days')::INTERVAL
             GROUP BY level
             ORDER BY count DESC
         `;
@@ -931,7 +931,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getDashboardWidgets(dashboardId) {
-        const sql = `SELECT * FROM dashboard_widgets WHERE dashboard_id = ? ORDER BY position_y, position_x`;
+        const sql = `SELECT * FROM dashboard_widgets WHERE dashboard_id = $1 ORDER BY position_y, position_x`;
         return await this.all(sql, [dashboardId]);
     }
 
@@ -956,13 +956,13 @@ class DatabaseAccessLayer extends EventEmitter {
         }
         
         const validValues = validFields.map(field => processedData[field]);
-        const setClause = validFields.map(field => `\`${field}\` = ?`).join(', ');
-        const sql = `UPDATE dashboard_widgets SET ${setClause} WHERE id = ?`;
+        const setClause = validFields.map((field, idx) => `\`${field}\` = $${idx + 1}`).join(', ');
+        const sql = `UPDATE dashboard_widgets SET ${setClause} WHERE id = $${validFields.length + 1}`;
         return await this.run(sql, [...validValues, widgetId]);
     }
 
     async deleteDashboardWidget(widgetId) {
-        const sql = `DELETE FROM dashboard_widgets WHERE id = ?`;
+        const sql = `DELETE FROM dashboard_widgets WHERE id = $1`;
         return await this.run(sql, [widgetId]);
     }
 
@@ -982,7 +982,7 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getDevice(deviceId) {
-        const sql = `SELECT * FROM devices WHERE id = ?`;
+        const sql = `SELECT * FROM devices WHERE id = $1`;
         return await this.get(sql, [deviceId]);
     }
 
@@ -1003,7 +1003,7 @@ class DatabaseAccessLayer extends EventEmitter {
     // System settings methods
     async getSetting(key, defaultValue = null) {
         try {
-            const sql = `SELECT setting_value FROM system_settings WHERE setting_key = ?`;
+            const sql = `SELECT setting_value FROM system_settings WHERE setting_key = $1`;
             const result = await this.get(sql, [key]);
             return result ? result.setting_value : defaultValue;
         } catch (error) {
@@ -1015,7 +1015,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async setSetting(key, value, description = null) {
         try {
             const sql = `INSERT INTO system_settings (setting_key, setting_value, description, updated_at) 
-                         VALUES (?, ?, ?, NOW())
+                         VALUES ($1, $2, $3, NOW())
                          ON CONFLICT (setting_key) 
                          DO UPDATE SET setting_value = EXCLUDED.setting_value, 
                                       description = EXCLUDED.description, 
@@ -1040,7 +1040,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async deleteSetting(key) {
         try {
-            const sql = `DELETE FROM system_settings WHERE setting_key = ?`;
+            const sql = `DELETE FROM system_settings WHERE setting_key = $1`;
             const result = await this.run(sql, [key]);
             return result.changes > 0;
         } catch (error) {
@@ -1054,7 +1054,7 @@ class DatabaseAccessLayer extends EventEmitter {
     async createUserSession(sessionData) {
         try {
             const sql = `INSERT INTO user_sessions (session_token, user_id, ip_address, user_agent, expires_at)
-                         VALUES (?, ?, ?, ?, ?)`;
+                         VALUES ($1, $2, $3, $4, $5)`;
             const params = [
                 sessionData.session_token,
                 sessionData.user_id,
@@ -1070,22 +1070,22 @@ class DatabaseAccessLayer extends EventEmitter {
     }
 
     async getActiveSession(sessionToken) {
-        const sql = `SELECT * FROM user_sessions WHERE session_token = ? AND expires_at > NOW()`;
+        const sql = `SELECT * FROM user_sessions WHERE session_token = $1 AND expires_at > NOW()`;
         return await this.get(sql, [sessionToken]);
     }
 
     async deleteSession(sessionToken) {
-        const sql = `DELETE FROM user_sessions WHERE session_token = ?`;
+        const sql = `DELETE FROM user_sessions WHERE session_token = $1`;
         return await this.run(sql, [sessionToken]);
     }
 
     async deactivateSession(sessionToken) {
-        const sql = `UPDATE user_sessions SET is_active = 0, last_activity = NOW() WHERE session_token = ?`;
+        const sql = `UPDATE user_sessions SET is_active = 0, last_activity = NOW() WHERE session_token = $1`;
         return await this.run(sql, [sessionToken]);
     }
 
         async deleteSessionById(sessionId) {
-            const sql = `DELETE FROM user_sessions WHERE id = ?`;
+            const sql = `DELETE FROM user_sessions WHERE id = $1`;
             return await this.run(sql, [sessionId]);
         }
 
@@ -1113,7 +1113,7 @@ class DatabaseAccessLayer extends EventEmitter {
         
         const sql = `INSERT INTO alert_rules (name, description, type, conditions, severity, cooldown, 
                      enabled, channels, escalation_rules, created_at, updated_at) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`;
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`;
         const params = [
             ruleData.name,
             ruleData.description || null,
@@ -1131,26 +1131,26 @@ class DatabaseAccessLayer extends EventEmitter {
     // System metrics methods  
     async recordMetric(metricName, value, metricType = 'gauge', tags = {}) {
         const sql = `INSERT INTO system_metrics (metric_name, metric_value, metric_type, tags, timestamp) 
-                     VALUES (?, ?, ?, ?, NOW())`;
+                     VALUES ($1, $2, $3, $4, NOW())`;
         const params = [metricName, value, metricType, JSON.stringify(tags)];
         return await this.run(sql, params);
     }
 
     async getMetrics(metricName, startTime = null, endTime = null, limit = 1000) {
-        let sql = `SELECT * FROM system_metrics WHERE metric_name = ?`;
+        let sql = `SELECT * FROM system_metrics WHERE metric_name = $1`;
         const params = [metricName];
         
         if (startTime) {
-            sql += ` AND timestamp >= ?`;
+            sql += ` AND timestamp >= $2`;
             params.push(startTime);
         }
         
         if (endTime) {
-            sql += ` AND timestamp <= ?`;
+            sql += ` AND timestamp <= $${params.length + 1}`;
             params.push(endTime);
         }
         
-        sql += ` ORDER BY timestamp DESC LIMIT ?`;
+        sql += ` ORDER BY timestamp DESC LIMIT $${params.length + 1}`;
         params.push(limit);
         
         return await this.all(sql, params);
@@ -1179,7 +1179,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async getWebhookById(webhookId) {
         try {
-            const sql = `SELECT * FROM webhooks WHERE id = ?`;
+            const sql = `SELECT * FROM webhooks WHERE id = $1`;
             return await this.db.get(sql, [webhookId]);
         } catch (error) {
             this.logger.warn('Failed to get webhook by ID:', error.message);
@@ -1189,7 +1189,7 @@ class DatabaseAccessLayer extends EventEmitter {
 
     async createWebhook(webhookData) {
         const sql = `INSERT INTO webhooks (name, url, method, headers, active, created_at) 
-                     VALUES (?, ?, ?, ?, ?, NOW())`;
+                     VALUES ($1, $2, $3, $4, $5, NOW())`;
         const params = [
             webhookData.name,
             webhookData.url,
