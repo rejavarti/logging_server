@@ -4,7 +4,7 @@ const path = require('path');
 const router = express.Router();
 
 // Helper: update data/config/ingestion-state.json based on ingestion settings
-function updateIngestionStateFromSettings(ingestionSettings) {
+function updateIngestionStateFromSettings(ingestionSettings, logger) {
     if (!ingestionSettings || typeof ingestionSettings !== 'object') return;
 
     try {
@@ -16,7 +16,7 @@ function updateIngestionStateFromSettings(ingestionSettings) {
             const raw = fs.readFileSync(statePath, 'utf8');
             state = JSON.parse(raw);
         } catch (readErr) {
-            req.app.locals?.loggers?.api?.warn('ingestion-state.json not found or invalid, initializing a new one:', readErr.message);
+            if (logger) logger.warn('ingestion-state.json not found or invalid, initializing a new one:', readErr.message);
         }
 
         // Map UI toggles to concrete ports/protocols managed by Port Guardian
@@ -42,9 +42,9 @@ function updateIngestionStateFromSettings(ingestionSettings) {
         const tmpPath = statePath + '.tmp';
         fs.writeFileSync(tmpPath, JSON.stringify(state, null, 2));
         fs.renameSync(tmpPath, statePath);
-        req.app.locals?.loggers?.api?.info('🔒 Updated ingestion-state.json to reflect ingestion settings');
+        if (logger) logger.info('🔒 Updated ingestion-state.json to reflect ingestion settings');
     } catch (err) {
-        req.app.locals?.loggers?.api?.warn('Failed to update ingestion-state.json from settings:', err.message);
+        if (logger) logger.warn('Failed to update ingestion-state.json from settings:', err.message);
     }
 }
 
@@ -183,7 +183,7 @@ router.put('/', async (req, res) => {
         // Update Port Guardian ingestion-state when ingestion toggles are provided
         try {
             if (settingsData.ingestion) {
-                updateIngestionStateFromSettings(settingsData.ingestion);
+                updateIngestionStateFromSettings(settingsData.ingestion, req.app.locals?.loggers?.api);
             }
         } catch (pgErr) {
             req.app.locals?.loggers?.api?.warn('Port Guardian state update warning:', pgErr.message);
