@@ -49,23 +49,67 @@ function formatTime(timestamp) {
 // Initialize Dashboard
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 DOMContentLoaded fired, starting initialization...');
+    console.log('🔍 Checking dependencies...');
+    console.log('  - Muuri available?', typeof Muuri !== 'undefined');
+    console.log('  - echarts available?', typeof echarts !== 'undefined');
+    console.log('  - Leaflet available?', typeof L !== 'undefined');
+    
+    if (typeof Muuri === 'undefined') {
+        console.error('❌ FATAL: Muuri library not loaded! Cannot initialize grid.');
+        return;
+    }
+    
     try {
         initializeGrid();
         console.log('✅ initializeGrid() completed');
     } catch (error) {
         console.error('❌ initializeGrid() failed:', error);
+        console.error('Stack:', error.stack);
     }
-    initializeCharts();
+    
+    try {
+        if (typeof initializeCharts === 'function') {
+            initializeCharts();
+        } else {
+            console.warn('⚠️ initializeCharts function not found (expected in inline script)');
+        }
+    } catch (error) {
+        console.error('❌ initializeCharts failed:', error);
+    }
+    
     // Load layout AFTER grid and charts are initialized
     setTimeout(() => {
-        loadSavedLayout();
+        try {
+            if (typeof loadSavedLayout === 'function') {
+                loadSavedLayout();
+            } else {
+                console.warn('⚠️ loadSavedLayout function not found');
+            }
+        } catch (error) {
+            console.error('❌ loadSavedLayout failed:', error);
+        }
+        
         setTimeout(() => {
-            setupResizeObservers();
+            try {
+                if (typeof setupResizeObservers === 'function') {
+                    setupResizeObservers();
+                } else {
+                    console.warn('⚠️ setupResizeObservers function not found');
+                }
+            } catch (error) {
+                console.error('❌ setupResizeObservers failed:', error);
+            }
         }, 1000);
     }, 500);
+    
     // Start refreshing system stats every 30 seconds
-    refreshSystemStats();
-    setInterval(refreshSystemStats, 30000);
+    try {
+        refreshSystemStats();
+        setInterval(refreshSystemStats, 30000);
+    } catch (error) {
+        console.error('❌ refreshSystemStats failed:', error);
+    }
+    
     console.log('🎨 Muuri Dashboard initialized');
 });
 
@@ -135,9 +179,19 @@ function initializeGrid() {
     
     // Test drag handle styles
     const headers = document.querySelectorAll('.widget-header');
+    console.log(`📋 Found ${headers.length} widget headers`);
     headers.forEach((header, i) => {
         const styles = window.getComputedStyle(header);
         console.log(`Header ${i}: cursor=${styles.cursor}, pointer-events=${styles.pointerEvents}, z-index=${styles.zIndex}`);
+        
+        // Add test click handler to verify headers are interactive
+        header.addEventListener('mousedown', function(e) {
+            console.log(`🖱️ MOUSEDOWN on header ${i}:`, header.parentElement.parentElement.getAttribute('data-widget-id'));
+        });
+        
+        header.addEventListener('click', function(e) {
+            console.log(`👆 CLICK on header ${i}:`, header.parentElement.parentElement.getAttribute('data-widget-id'));
+        });
     });
     
     // Debug: Monitor all drag events
