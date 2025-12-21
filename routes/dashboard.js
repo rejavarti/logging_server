@@ -611,12 +611,16 @@ router.get('/', async (req, res) => {
             
             // Save layout on drag end - but wait for drag release animation to complete
             grid.on('dragReleaseEnd', function(item) {
+                console.log('🎯 dragReleaseEnd event fired for', item.getElement().getAttribute('data-widget-id'), 'isLocked:', isLocked);
                 if (!isLocked) {
                     // Muuri has finished positioning the item, now safe to save
                     // Small delay to ensure transform is fully applied
                     setTimeout(function() {
+                        console.log('⏱️ Calling autoSaveLayout after 50ms delay');
                         autoSaveLayout();
                     }, 50);
+                } else {
+                    console.log('🔒 Layout is locked, skipping auto-save');
                 }
             });
             
