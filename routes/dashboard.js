@@ -52,6 +52,9 @@ router.get('/', async (req, res) => {
     <script src="/vendor/echarts/echarts.min.js"></script>
     <script src="/vendor/leaflet/leaflet.js"></script>
     
+    <!-- Dashboard Main Script - External with cache busting -->
+    <script src="/js/dashboard-main.js?v=${Date.now()}"></script>
+    
     <!-- Widget System scripts moved below primary initialization script to ensure dependencies are defined first -->
         
     <style>
@@ -493,6 +496,8 @@ router.get('/', async (req, res) => {
         </div>
 
         <script>
+        // VERSION CHECK: ${Date.now()} - If you see this in console, cache is working!
+        console.log('📦 Dashboard inline script loading... Version:', ${Date.now()});
         let grid;
         let charts = {};
         let isLocked = false;
@@ -539,144 +544,8 @@ router.get('/', async (req, res) => {
             }
         }
         
-        // Initialize Dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 DOMContentLoaded fired, starting initialization...');
-            try {
-                initializeGrid();
-                console.log('✅ initializeGrid() completed');
-            } catch (error) {
-                console.error('❌ initializeGrid() failed:', error);
-            }
-            initializeCharts();
-            // Load layout AFTER grid and charts are initialized
-            // Increased timeout to ensure Muuri completes layout calculation
-            setTimeout(() => {
-                loadSavedLayout();
-                // Setup resize observers AFTER layout is loaded to prevent initial auto-save
-                setTimeout(() => {
-                    setupResizeObservers();
-                }, 1000);
-            }, 500);
-            // Start refreshing system stats every 30 seconds
-            refreshSystemStats();
-            setInterval(refreshSystemStats, 30000);
-            console.log('🎨 Muuri Dashboard initialized');
-        });
-        
-        // Refresh system stats widget
-        async function refreshSystemStats() {
-            try {
-                const response = await fetch('/api/system/metrics', { credentials: 'same-origin' });
-                if (!response.ok) return;
-                const data = await response.json();
-                
-                // Update the stat values in the DOM
-                const totalLogsEl = document.getElementById('totalLogs');
-                const logsTodayEl = document.getElementById('logsToday');
-                const sourcesEl = document.getElementById('sources');
-                
-                if (totalLogsEl) totalLogsEl.textContent = (data.totalLogs || 0).toLocaleString();
-                if (logsTodayEl && data.logsToday !== undefined) logsTodayEl.textContent = (data.logsToday || 0).toLocaleString();
-                if (sourcesEl) sourcesEl.textContent = (data.activeSources || 0).toLocaleString();
-            } catch (error) {
-                console.error('Failed to refresh system stats:', error);
-            }
-        }
-        
-        // Initialize Muuri Grid
-        function initializeGrid() {
-            try {
-                console.log('🔧 [1] Starting initializeGrid function...');
-                console.log('🔧 [2] Checking for grid container...');
-                const container = document.querySelector('.dashboard-grid');
-                console.log('🔧 [3] Grid container:', container);
-                console.log('📦 Grid container exists:', !!container);
-                console.log('📦 Widget items found:', document.querySelectorAll('.widget-item').length);
-                console.log('📦 Widget headers found:', document.querySelectorAll('.widget-header').length);
-                
-                console.log('🔧 [4] Creating Muuri instance...');
-                grid = new Muuri('.dashboard-grid', {
-                dragEnabled: true,
-                dragHandle: '.widget-header',
-                dragSortHeuristics: {
-                    sortInterval: 50,
-                    minDragDistance: 10,
-                    minBounceBackAngle: 1
-                },
-                layoutDuration: 0, // Instant layout (no animation that might reposition)
-                layoutEasing: 'ease-out',
-                dragRelease: {
-                    duration: 300,
-                    easing: 'ease-out'
-                },
-                // Enable true free-form positioning with overlapping (Windows-like)
-                dragSort: false, // Disable automatic sorting
-                layout: function (grid, layoutId, items, width, height, callback) {
-                    // Custom layout: do nothing - widgets stay exactly where they are positioned
-                    // This prevents Muuri from auto-arranging or repositioning widgets
-                    var layout = [];
-                    items.forEach(function(item) {
-                        var position = item.getPosition();
-                        layout.push({
-                            left: position.left,
-                            top: position.top,
-                            width: item._width,
-                            height: item._height
-                        });
-                    });
-                    if (callback) callback(layout);
-                }
-            });
-            
-            console.log('✅ Muuri grid created, items:', grid.getItems().length);
-            console.log('🎮 Drag enabled:', grid._settings.dragEnabled);
-            console.log('🎮 Drag handle:', grid._settings.dragHandle);
-            
-            // Test: Check if drag handles are clickable
-            const headers = document.querySelectorAll('.widget-header');
-            headers.forEach((header, i) => {
-                const styles = window.getComputedStyle(header);
-                console.log(`Header ${i}: cursor=${styles.cursor}, pointer-events=${styles.pointerEvents}, z-index=${styles.zIndex}`);
-            });
-            
-            // Debug: Monitor all drag events
-            grid.on('dragStart', function(item) {
-                console.log('🟢 dragStart event fired for', item.getElement().getAttribute('data-widget-id'));
-            });
-            
-            grid.on('dragEnd', function(item) {
-                console.log('🔴 dragEnd event fired for', item.getElement().getAttribute('data-widget-id'));
-            });
-            
-            grid.on('dragReleaseStart', function(item) {
-                console.log('🟡 dragReleaseStart event fired for', item.getElement().getAttribute('data-widget-id'));
-            });
-            
-            // Save layout on drag end - but wait for drag release animation to complete
-            grid.on('dragReleaseEnd', function(item) {
-                console.log('🎯 dragReleaseEnd event fired for', item.getElement().getAttribute('data-widget-id'), 'isLocked:', isLocked);
-                if (!isLocked) {
-                    // Muuri has finished positioning the item, now safe to save
-                    // Small delay to ensure transform is fully applied
-                    setTimeout(function() {
-                        console.log('⏱️ Calling autoSaveLayout after 50ms delay');
-                        autoSaveLayout();
-                    }, 50);
-                } else {
-                    console.log('🔒 Layout is locked, skipping auto-save');
-                }
-            });
-            
-            // Expose grid globally immediately for external scripts
-            window.grid = grid;
-            console.log('✅ [5] Grid initialization completed successfully');
-            } catch (error) {
-                console.error('❌ Error in initializeGrid:', error);
-                console.error('Stack trace:', error.stack);
-                throw error;
-            }
-        }
+        // NOTE: Main initialization moved to /js/dashboard-main.js for better cache control
+        // The external file includes: initializeGrid(), refreshSystemStats(), formatTimestamp(), etc.
 
         // Resize Observer to react when user resizes widgets (CSS resize)
         function setupResizeObservers() {
